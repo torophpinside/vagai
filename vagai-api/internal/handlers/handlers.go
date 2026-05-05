@@ -1,0 +1,421 @@
+package handlers
+
+import (
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/anomalyco/vagai-api/internal/models"
+	"github.com/anomalyco/vagai-api/internal/services"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+var DB *gorm.DB
+
+func SetDB(db *gorm.DB) {
+	DB = db
+}
+
+func getDB(c *gin.Context) *gorm.DB {
+	if scoped, exists := c.Get("scoped_db"); exists {
+		return scoped.(*gorm.DB)
+	}
+	return DB
+}
+
+func ListJobs(c *gin.Context) {
+	db := getDB(c)
+	var jobs []models.Job
+	query := db.Where("1=1")
+
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status NOT IN ?", []string{"ignored", "unmatched"})
+	}
+
+	if site := c.Query("site"); site != "" {
+		query = query.Where("site_id = ?", site)
+	}
+
+	query.Preload("Site").Find(&jobs)
+	c.JSON(http.StatusOK, jobs)
+}
+
+func GetJob(c *gin.Context) {
+	db := getDB(c)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var job models.Job
+	if err := db.Preload("Site").First(&job, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
+		return
+	}
+
+	var matches []models.Match
+	db.Where("job_id = ?", id).Preload("Resume", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "name")
+	}).Find(&matches)
+
+	c.JSON(http.StatusOK, gin.H{"job": job, "matches": matches})
+}
+
+func UpdateJobStatus(c *gin.Context) {
+	db := getDB(c)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var job models.Job
+	if err := db.First(&job, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
+		return
+	}
+
+	var body struct {
+		Status string `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	job.Status = models.JobStatus(body.Status)
+	db.Save(&job)
+	c.JSON(http.StatusOK, job)
+}
+
+func ListMatches(c *gin.Context) {
+	db := getDB(c)
+	var matches []models.Match
+	threshold, _ := strconv.Atoi(c.DefaultQuery("threshold", "1"))
+	sortOrder := c.DefaultQuery("sort", "desc")
+	appliedFilter := c.DefaultQuery("applied", "false")
+
+	orgID := c.GetUint("org_id")
+	
+	query := db.Where("matches.organization_id = ?", orgID).Preload("Job", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "title", "company", "url", "site_id", "description")
+	}).Preload("Resume", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "name")
+	}).Joins("JOIN jobs ON jobs.id = matches.job_id").Where("jobs.status NOT IN ?", []string{"ignored", "unmatched"}).Where("similarity_score >= ?", threshold)
+
+	if appliedFilter == "true" {
+		query = query.Where("matches.applied = ?", true)
+	} else {
+		query = query.Where("matches.applied = ?", false)
+	}
+
+	if site := c.Query("site"); site != "" {
+		query = query.Where("jobs.site_id = ?", site)
+	}
+
+	if sortOrder == "asc" {
+		query = query.Order("similarity_score ASC")
+	} else {
+		query = query.Order("similarity_score DESC")
+	}
+
+	query.Find(&matches)
+	if matches == nil {
+		matches = []models.Match{}
+	}
+	c.JSON(http.StatusOK, matches)
+}
+
+func UpdateMatch(c *gin.Context) {
+	db := getDB(c)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var match models.Match
+	if err := db.First(&match, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
+		return
+	}
+
+	var body struct {
+		Applied bool `json:"applied"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	match.Applied = body.Applied
+	if body.Applied {
+		now := time.Now()
+		match.AppliedAt = &now
+	} else {
+		match.AppliedAt = nil
+	}
+	db.Save(&match)
+	c.JSON(http.StatusOK, match)
+}
+
+func DeleteMatch(c *gin.Context) {
+	db := getDB(c)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var match models.Match
+	if err := db.First(&match, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
+		return
+	}
+
+	if err := db.Delete(&match).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar match"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Match deletado"})
+}
+
+func GetStats(c *gin.Context) {
+	db := getDB(c)
+	var totalJobs, totalMatches, totalSites, totalApplied int64
+	db.Model(&models.Job{}).Count(&totalJobs)
+	db.Model(&models.Match{}).Count(&totalMatches)
+	db.Model(&models.Match{}).Where("applied = ?", true).Count(&totalApplied)
+	db.Model(&models.Site{}).Where("active = ?", true).Count(&totalSites)
+
+	var jobs []models.Job
+	db.Find(&jobs)
+
+	languageCount := make(map[string]int)
+	keywordCount := make(map[string]int)
+
+	commonLangs := []string{"python", "javascript", "typescript", "java", "go", "rust", "c++", "c#", "ruby", "php", "swift", "kotlin", "scala", "sql", "r"}
+	commonKeywords := []string{"react", "vue", "angular", "node", "django", "flask", "spring", "docker", "kubernetes", "aws", "azure", "gcp", "linux", "mysql", "postgresql", "mongodb", "redis", "git", "devops", "agile", "scrum", "api", "rest", "graphql", "microservices", "machine learning", "ai", "data science"}
+
+	for _, job := range jobs {
+		textLower := strings.ToLower(job.Title + " " + job.Description)
+
+		for _, lang := range commonLangs {
+			pattern := `\b` + regexp.QuoteMeta(lang) + `\b`
+			if regexp.MustCompile(pattern).MatchString(textLower) {
+				languageCount[lang]++
+			}
+		}
+		for _, kw := range commonKeywords {
+			pattern := `\b` + regexp.QuoteMeta(kw) + `\b`
+			if regexp.MustCompile(pattern).MatchString(textLower) {
+				keywordCount[kw]++
+			}
+		}
+	}
+
+	sortedLanguages := []map[string]interface{}{}
+	for lang, count := range languageCount {
+		sortedLanguages = append(sortedLanguages, map[string]interface{}{"name": lang, "count": count})
+	}
+	sort.Slice(sortedLanguages, func(i, j int) bool {
+		return sortedLanguages[i]["count"].(int) > sortedLanguages[j]["count"].(int)
+	})
+	if len(sortedLanguages) > 10 {
+		sortedLanguages = sortedLanguages[:10]
+	}
+
+	sortedKeywords := []map[string]interface{}{}
+	for kw, count := range keywordCount {
+		sortedKeywords = append(sortedKeywords, map[string]interface{}{"name": kw, "count": count})
+	}
+	sort.Slice(sortedKeywords, func(i, j int) bool {
+		return sortedKeywords[i]["count"].(int) > sortedKeywords[j]["count"].(int)
+	})
+	if len(sortedKeywords) > 10 {
+		sortedKeywords = sortedKeywords[:10]
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_jobs":    totalJobs,
+		"total_matches": totalMatches,
+		"total_applied": totalApplied,
+		"active_sites":  totalSites,
+		"languages":     sortedLanguages,
+		"keywords":      sortedKeywords,
+	})
+}
+
+func ListSites(c *gin.Context) {
+	db := getDB(c)
+	var sites []models.Site
+	db.Find(&sites)
+	c.JSON(http.StatusOK, sites)
+}
+
+func DeleteSite(c *gin.Context) {
+	db := getDB(c)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err := db.Delete(&models.Site{}, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Site removido"})
+}
+
+func AddSite(c *gin.Context) {
+	db := getDB(c)
+	var site models.Site
+	if err := c.ShouldBindJSON(&site); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Usa organization_id do JWT se não fornecido
+	if site.OrganizationID == 0 {
+		if orgID, exists := c.Get("org_id"); exists {
+			site.OrganizationID = orgID.(uint)
+		}
+	}
+
+	site.Active = true
+
+	// Descobrir seletores automaticamente via IA
+	log.Printf("Descobrindo seletores para: %s", site.URL)
+	selectors, err := services.DiscoverSelectorsWithAI(site.URL)
+	if err != nil {
+		log.Printf("Erro ao descobrir seletores: %v", err)
+		// Define valores padrão em caso de erro
+		site.SelectorLinks = "a.job-link, a[href*='job']"
+		site.SelectorCompany = ".company, .company-name"
+		site.SelectorDescription = ".description, .job-description"
+	} else {
+		site.SelectorLinks = selectors["selector_links"]
+		site.SelectorCompany = selectors["selector_company"]
+		site.SelectorDescription = selectors["selector_description"]
+		site.DelaySeconds = 2
+		site.RespectRobots = true
+	}
+
+	log.Printf("Seletores descobertos: links=%s, company=%s, desc=%s",
+		site.SelectorLinks, site.SelectorCompany, site.SelectorDescription)
+
+	db.Create(&site)
+	c.JSON(http.StatusCreated, site)
+}
+
+func ListResumes(c *gin.Context) {
+	db := getDB(c)
+	var resumes []models.Resume
+	db.Find(&resumes)
+	c.JSON(http.StatusOK, resumes)
+}
+
+func UploadResume(c *gin.Context) {
+	db := getDB(c)
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Arquivo não enviado"})
+		return
+	}
+
+	uploadDir := "./uploads/resumes"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao criar diretório de uploads"})
+		return
+	}
+
+	filePath := filepath.Join(uploadDir, time.Now().Format("20060102150405")+"_"+file.Filename)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao salvar arquivo"})
+		return
+	}
+
+	log.Printf("Extraindo texto de: %s", filePath)
+	content, err := services.ExtractTextFromFile(filePath)
+	if err != nil {
+		log.Printf("Erro na extração: %v", err)
+	}
+
+	if content != "" {
+		log.Printf("Processando conteúdo com AI...")
+		// Timeout de 180s para AI
+		done := make(chan bool, 1)
+		go func() {
+			processedContent, aiErr := services.ProcessResumeContent(content)
+			if aiErr == nil {
+				content = processedContent
+			} else {
+				log.Printf("Erro na AI: %v", aiErr)
+			}
+			done <- true
+		}()
+		select {
+		case <-done:
+			// OK
+		case <-time.After(180 * time.Second):
+			log.Printf("Timeout no processamento AI")
+		}
+	}
+
+	var resume models.Resume
+	// Usa organization_id do JWT
+	if orgID, exists := c.Get("org_id"); exists {
+		resume.OrganizationID = orgID.(uint)
+	}
+	resume.Name = file.Filename
+	resume.FilePath = filePath
+	resume.Content = content
+	resume.UploadedAt = time.Now()
+
+	if err := db.Create(&resume).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar no banco"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Currículo carregado e processado", "resume": resume})
+}
+
+func AnalyzeResume(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Arquivo não enviado"})
+		return
+	}
+
+	ext := strings.ToLower(file.Filename)
+	if !strings.Contains(ext, ".pdf") && !strings.Contains(ext, ".doc") && !strings.Contains(ext, ".docx") && !strings.Contains(ext, ".txt") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tipo de arquivo não suportado"})
+		return
+	}
+
+	tmpDir := "./uploads/resumes"
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao criar diretório"})
+		return
+	}
+
+	filePath := filepath.Join(tmpDir, "analysis_"+time.Now().Format("20060102150405")+"_"+file.Filename)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao salvar arquivo"})
+		return
+	}
+	defer os.Remove(filePath)
+
+	content, err := services.ExtractTextFromFile(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao extrair texto do arquivo"})
+		return
+	}
+
+	if content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Não foi possível extrair texto do arquivo"})
+		return
+	}
+
+	if len(content) > 8000 {
+		content = content[:8000]
+	}
+
+	c.Set("RequestTimeout", 180*time.Second)
+
+	analysisResult, aiErr := services.AnalyzeResumeWithAI(content)
+	if aiErr != nil {
+		log.Printf("Erro na análise de IA: %v", aiErr)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao analisar currículo"})
+		return
+	}
+
+	c.JSON(http.StatusOK, analysisResult)
+}

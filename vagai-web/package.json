@@ -1,0 +1,26 @@
+{
+  "name": "vagai-web",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.17.0",
+    "axios": "^1.6.2",
+    "chart.js": "^4.5.1",
+    "lucide-vue-next": "^1.0.0",
+    "vue": "^3.4.0",
+    "vue-chartjs": "^5.3.3",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "vite": "^5.0.10"
+  }
+}

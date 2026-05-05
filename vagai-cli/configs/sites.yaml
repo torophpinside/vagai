@@ -1,0 +1,25 @@
+sites:
+  - name: "RemoteOK"
+    url: "https://remoteok.com"
+    selector_links: "td.company a"
+    active: true
+    respect_robots: true
+    delay_seconds: 2
+
+  - name: "WeWorkRemotely"
+    url: "https://weworkremotely.com/remote-jobs/search"
+    selector_links: "section.jobs li a[href^='/remote-jobs/']"
+    selector_company: ".company"
+    selector_description: ".listing-container"
+    active: true
+    delay_seconds: 1
+
+  - name: "LinkedIn"
+    url: "https://www.linkedin.com/jobs/search/"
+    selector_links: "a.base-card__full-link"
+    selector_company: ".topcard__org-name-link"
+    selector_description: ".show-more-less-html__markup"
+    active: true
+    delay_seconds: 5
+    respect_robots: true
+

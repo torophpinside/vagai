@@ -1,0 +1,6 @@
+.env
+.vscode
+.opencode
+vagai-api/uploads/resumes/*.pdf
+vagai-web/dist
+vagai-web/node_modules

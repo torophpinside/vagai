@@ -1,0 +1,101 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: vagai-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: vagai
+      MYSQL_USER: vagai
+      MYSQL_PASSWORD: vagai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - vagai-net
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vagai-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - vagai-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./vagai-api
+      dockerfile: Dockerfile
+    container_name: vagai-api
+    ports:
+      - "8080:8080"
+    network_mode: host
+    environment:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: vagai
+      DB_PASSWORD: vagai
+      DB_NAME: vagai
+      LMSTUDIO_URL: http://127.0.0.1:1234
+      JWT_SECRET: vagai-super-secret-change-in-production
+      REDIS_URL: redis://127.0.0.1:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./vagai-api/uploads:/app/uploads
+
+  web:
+    build:
+      context: ./vagai-web
+      dockerfile: Dockerfile
+    container_name: vagai-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - vagai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  scheduler:
+    build:
+      context: ./vagai-cli
+      dockerfile: Dockerfile
+    container_name: vagai-scheduler
+    network_mode: host
+    environment:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: vagai
+      DB_PASSWORD: vagai
+      DB_NAME: vagai
+      LMSTUDIO_URL: http://127.0.0.1:1234
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./vagai-cli/configs:/app/configs
+      - ./vagai-cli/curriculos:/app/curriculos
+    command: [ "schedule", "run" ]
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  vagai-net:
+    driver: bridge
