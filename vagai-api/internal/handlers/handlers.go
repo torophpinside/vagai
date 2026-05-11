@@ -401,6 +401,9 @@ func UploadResume(c *gin.Context) {
 }
 
 func AnalyzeResume(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Arquivo não enviado"})
@@ -450,5 +453,92 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, analysisResult)
+	strengths, _ := json.Marshal(toStringSlice(analysisResult["strengths"]))
+	weaknesses, _ := json.Marshal(toStringSlice(analysisResult["weaknesses"]))
+	suggestions, _ := json.Marshal(toStringSlice(analysisResult["suggestions"]))
+	fullAnalysis, _ := analysisResult["fullAnalysis"].(string)
+
+	analysis := models.ResumeAnalysis{
+		OrganizationID: orgID,
+		FileName:       file.Filename,
+		FullAnalysis:   fullAnalysis,
+		Strengths:      string(strengths),
+		Weaknesses:     string(weaknesses),
+		Suggestions:    string(suggestions),
+	}
+
+	if err := db.Create(&analysis).Error; err != nil {
+		log.Printf("Erro ao salvar análise: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar análise"})
+		return
+	}
+
+	log.Printf("Análise salva: ID=%d, File=%s", analysis.ID, file.Filename)
+	c.JSON(http.StatusCreated, analysis)
+}
+
+func DeleteResumeAnalysis(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	var analysis models.ResumeAnalysis
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&analysis).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Análise não encontrada"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar análise"})
+		}
+		return
+	}
+
+	if err := db.Delete(&analysis).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover análise"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Análise removida"})
+}
+
+func ListResumeAnalyses(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	var analyses []models.ResumeAnalysis
+	db.Where("organization_id = ?", orgID).Order("created_at desc").Find(&analyses)
+	c.JSON(http.StatusOK, analyses)
+}
+
+func GetResumeAnalysis(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var analysis models.ResumeAnalysis
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&analysis).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Análise não encontrada"})
+		return
+	}
+	c.JSON(http.StatusOK, analysis)
+}
+
+func toStringSlice(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+	if s, ok := v.([]string); ok {
+		return s
+	}
+	if arr, ok := v.([]interface{}); ok {
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+	return nil
 }

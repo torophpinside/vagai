@@ -72,6 +72,9 @@ func main() {
 		api.GET("/resumes", handlers.ListResumes)
 		api.POST("/resumes/upload", handlers.UploadResume)
 		api.POST("/resumes/analyze", handlers.AnalyzeResume)
+		api.GET("/resume-analyses", handlers.ListResumeAnalyses)
+		api.GET("/resume-analyses/:id", handlers.GetResumeAnalysis)
+		api.DELETE("/resume-analyses/:id", handlers.DeleteResumeAnalysis)
 	}
 
 	srv := &http.Server{
@@ -101,6 +104,7 @@ func autoMigrate(db *gorm.DB) {
 		&models.Job{},
 		&models.Resume{},
 		&models.Match{},
+		&models.ResumeAnalysis{},
 		&models.AgentLog{},
 	)
 

@@ -126,6 +126,20 @@ CREATE TABLE agent_logs (
     details JSON,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Análises de currículo (resultado da IA)
+CREATE TABLE resume_analyses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    organization_id INT NOT NULL,
+    resume_id INT,
+    file_name VARCHAR(255),
+    full_analysis TEXT,
+    strengths JSON,
+    weaknesses JSON,
+    suggestions JSON,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id)
+);
 ```
 
 ---
@@ -145,6 +159,7 @@ CREATE TABLE agent_logs (
 **Crawlers especiais:**
 - **RemoteOK:** Usa API JSON em `https://remoteok.com/api`
 - **Working Nomads:** Usa API JSON em `https://www.workingnomads.com/api/exposed_jobs/`
+- **Workana:** Extrai dados do atributo Vue `:results-initials` (JSON embutido no HTML), com paginação automática (até 50 páginas, 9 resultados/página)
 
 **Ferramentas integradas:**
 - HTTP client com timeout e retry
@@ -167,17 +182,25 @@ vagai sites add --name "remoteok" --url "https://remoteok.com" --selector ".job-
 
 **Comportamento:**
 - Carrega todos os currículos da tabela `resumes`
+- Constrói corpus TF-IDF com todas as vagas + currículos
 - Para vagas com status `'new'` de sites ativos:
-  - Calcula similaridade TF-IDF + cosine similarity (ou embeddings via sentence-transformers)
-  - Extrai palavras-chave em comum
+  - Calcula similaridade via **TF-IDF + cosine similarity** (corpus completo com IDF real)
+  - Extrai palavras-chave em comum (lista de ~30 tecnologias)
+  - Avalia compatibilidade de localização (remote, presencial, híbrido, cidades)
+  - Aplica fórmula: `score = 0.6*textual + 0.3*skills + 0.1*location`
   - Registra score e keywords no `matches`
-  - Se score > limiar (ex: 60), marca job como `'matched'`
+  - Se score > threshold (padrão: 65), marca job como `'matched'`
+- **Fallback:** Se IA do LM Studio estiver indisponível, usa TF-IDF + cosine similarity
 - **Filtro automático:** Ignora vagas de sites com `active = false`
+- **Re-análise:** `--force` remove filtro de status e reprocessa todas as vagas
 
 **Estratégia de matching:**
 ```go
 score = (0.6 * similaridade_textual) + (0.3 * overlap_skills) + (0.1 * match_localizacao)
 ```
+- **Similaridade textual:** Cosseno entre vetores TF-IDF (corpo do corpus completo)
+- **Overlap de skills:** Intersecção de ~30 tecnologias pré-definidas entre vaga e currículo
+- **Localização:** Match de termos como remote/remoto, presencial, SP, RJ, BH, etc.
 
 **Comandos CLI:**
 ```bash
@@ -199,12 +222,19 @@ vagai match --threshold 70
 | ------ | --------------------- | ------------------------------------------------ |
 | GET    | `/api/jobs`           | Lista vagas (com filtros: site, status, data)    |
 | GET    | `/api/jobs/:id`       | Detalhe de uma vaga + matches                    |
-| GET    | `/api/matches`        | Lista matches (params: threshold, sort)          |
-| GET    | `/api/stats`          | Estatísticas: total vagas, matches, sites ativos, linguagens e tecnologias mais requisitadas |
+| PATCH  | `/api/jobs/:id`       | Atualiza status de uma vaga                      |
+| GET    | `/api/matches`        | Lista matches (params: threshold, sort, applied) |
+| PATCH  | `/api/matches/:id`    | Atualiza match (ex: marcar como candidatado)     |
+| DELETE | `/api/matches/:id`    | Remove um match                                  |
 | GET    | `/api/sites`          | Lista sites monitorados                          |
-| POST   | `/api/sites`          | Adiciona novo site                               |
+| POST   | `/api/sites`          | Adiciona novo site (com descoberta de seletores via IA) |
+| DELETE | `/api/sites/:id`      | Remove site e vagas associadas                   |
 | GET    | `/api/resumes`        | Lista currículos cadastrados                     |
 | POST   | `/api/resumes/upload` | Faz upload de novo currículo (PDF/DOCX/TXT)      |
+| POST   | `/api/resumes/analyze`| Analisa currículo com IA e salva resultado       |
+| GET    | `/api/resume-analyses`| Lista análises de currículo realizadas           |
+| GET    | `/api/resume-analyses/:id` | Detalhe de uma análise                       |
+| DELETE | `/api/resume-analyses/:id` | Remove uma análise                           |
 
 **Autenticação:** (opcional) API Key via header `X-API-Key`
 

@@ -175,6 +175,19 @@ type Match struct {
 	AnalyzedAt      time.Time  `gorm:"autoCreateTime" json:"analyzed_at"`
 }
 
+type ResumeAnalysis struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"index;not null" json:"organization_id"`
+	ResumeID       uint      `gorm:"index" json:"resume_id"`
+	Resume         Resume    `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
+	FileName       string    `gorm:"size:255" json:"file_name"`
+	FullAnalysis   string    `gorm:"type:text" json:"full_analysis"`
+	Strengths      string    `gorm:"type:json" json:"strengths"`
+	Weaknesses     string    `gorm:"type:json" json:"weaknesses"`
+	Suggestions    string    `gorm:"type:json" json:"suggestions"`
+	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
 type AgentLog struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID uint      `gorm:"index;not null" json:"organization_id"`
