@@ -2,7 +2,7 @@
   <div class="space-y-12">
     <div>
       <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Dashboard</h1>
-      <p class="text-slate-400">Visão geral do seu império de caça às vagas.</p>
+      <p class="text-slate-400">Visão geral de suas vagas.</p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center h-64">

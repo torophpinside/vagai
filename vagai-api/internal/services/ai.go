@@ -100,28 +100,37 @@ func DiscoverSelectorsWithAI(url string) (map[string]string, error) {
 		Timeout: 60 * time.Second,
 	}
 
-	prompt := fmt.Sprintf(`Analise a página de vagas de emprego neste URL e retorne os seletores CSS necessários para extrair os dados.
+	// Busca o HTML real da página
+	htmlContent, err := fetchHTML(url)
+	if err != nil {
+		log.Printf("Erro ao buscar HTML de %s: %v, usando fallback", url, err)
+		return getDefaultSelectors(), nil
+	}
+
+	// Limita o tamanho do HTML para evitar tokens excessivos
+	if len(htmlContent) > 50000 {
+		htmlContent = htmlContent[:50000]
+	}
+
+	prompt := fmt.Sprintf(`Analise o HTML abaixo de uma página de vagas de emprego e retorne os seletores CSS necessários para extrair os dados.
 
 URL: %s
 
+HTML DA PÁGINA:
+%s
+
 TAREFA:
-1. Acesse mentalmente a estrutura HTML de sites de vagas similares
-2. Identifique os seletores CSS para:
-   - LINKS: elementos <a> que levam às páginas das vagas (seletor para links de vagas)
-   - COMPANY: elemento que contém o nome da empresa
-   - DESCRIPTION: elemento que contém a descrição da vaga
+Identifique os seletores CSS para:
+- LINKS: elementos <a> que levam às páginas das vagas (seletor para links de vagas)
+- COMPANY: elemento que contém o nome da empresa
+- DESCRIPTION: elemento que contém a descrição da vaga
 
 Responda ESTRITAMENTE em JSON válido no formato:
 {
   "selector_links": "seletor css para links",
-  "selector_company": "seletor css para empresa", 
+  "selector_company": "seletor css para empresa",
   "selector_description": "seletor css para descrição"
-}
-
-Exemplos de seletores comuns:
-- RemoteOK: "td.company a" para links
-- WeWorkRemotely: "section.jobs li a[href^='/remote-jobs/']" para links
-- LinkedIn: "a.base-card__full-link" para links`, url)
+}`, url, htmlContent)
 
 	messages := []Message{
 		{Role: "system", Content: "Você é um especialista em web scraping e extração de dados HTML. Retorne apenas JSON válido com os seletores CSS."},
@@ -189,6 +198,48 @@ Exemplos de seletores comuns:
 	}
 
 	return selectors, nil
+}
+
+// fetchHTML busca o conteúdo HTML de uma URL
+func fetchHTML(url string) (string, error) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+// getDefaultSelectors retorna seletores padrão quando a IA falha
+func getDefaultSelectors() map[string]string {
+	return map[string]string{
+		"selector_links":       "a[href*='job'], a.job-link, article a",
+		"selector_company":     ".company, .company-name, [class*='company']",
+		"selector_description": ".description, .job-description, article, main",
+	}
 }
 
 func AnalyzeResumeWithAI(resumeContent string) (map[string]interface{}, error) {

@@ -15,6 +15,7 @@ import (
 )
 
 var useLMStudio = true
+var idf map[string]float64
 
 const maxParallelAI = 2
 
@@ -69,7 +70,12 @@ func Run(threshold int, force bool) error {
 		return nil
 	}
 
-	log.Printf("Processando %d vagas com %d currículos (max %d паралеlas)", len(jobs), len(resumes), maxParallelAI)
+	log.Printf("Construindo corpus TF-IDF com %d vagas e %d currículos...", len(jobs), len(resumes))
+	corpus := buildCorpus(jobs, resumes)
+	idf = computeIDF(corpus)
+	log.Printf("IDF calculado para %d termos únicos", len(idf))
+
+	log.Printf("Processando %d vagas com %d currículos (max %d paralelas)", len(jobs), len(resumes), maxParallelAI)
 
 	jobsChan := make(chan jobTask, len(jobs)*len(resumes))
 	resultsChan := make(chan matchResult, len(jobs)*len(resumes))
@@ -236,16 +242,122 @@ func calculateMatchFallback(jobTitle, jobDesc, resumeContent string) (float64, [
 		return 0, nil, "", fmt.Errorf("currículo sem conteúdo textual válido")
 	}
 
-	common := intersection(jobWords, resumeWords)
-	similarity := float64(len(common)) / math.Sqrt(float64(len(jobWords)*len(resumeWords))) * 100
+	textual := cosineSimilarityTFIDF(jobDesc, resumeContent)
 
-	score := 0.6*similarity + 0.3*float64(len(common))*2 + 0.1*100
+	skills := extractKeywordsLMStudio(jobDesc, resumeContent)
+	skillScore := float64(len(skills)) * (100.0 / 15.0)
+	if skillScore > 100 {
+		skillScore = 100
+	}
+
+	loc := locationMatch(jobDesc, resumeContent)
+
+	score := 0.6*textual + 0.3*skillScore + 0.1*loc
 	if score > 100 {
 		score = 100
 	}
+	if score < 0 {
+		score = 0
+	}
 
-	reason := fmt.Errorf("Match baseado em %d palavras em comum", len(common))
-	return score, common, reason.Error(), nil
+	reason := fmt.Sprintf("TF-IDF: %.1f, Skills: %s, Local: %.1f", textual, strings.Join(skills, ", "), loc)
+	return score, skills, reason, nil
+}
+
+func buildCorpus(jobs []models.Job, resumes []models.Resume) []string {
+	corpus := make([]string, 0, len(jobs)+len(resumes))
+	for _, j := range jobs {
+		corpus = append(corpus, j.Title+" "+j.Description)
+	}
+	for _, r := range resumes {
+		corpus = append(corpus, r.Content)
+	}
+	return corpus
+}
+
+func computeIDF(corpus []string) map[string]float64 {
+	docCount := make(map[string]int)
+	for _, doc := range corpus {
+		words := unique(extractWords(doc))
+		for _, w := range words {
+			docCount[w]++
+		}
+	}
+	N := float64(len(corpus))
+	result := make(map[string]float64, len(docCount))
+	for w, count := range docCount {
+		result[w] = math.Log(N / float64(count))
+	}
+	return result
+}
+
+func termFrequency(words []string) map[string]float64 {
+	tf := make(map[string]float64)
+	for _, w := range words {
+		tf[w]++
+	}
+	total := float64(len(words))
+	if total == 0 {
+		return tf
+	}
+	for w, c := range tf {
+		tf[w] = c / total
+	}
+	return tf
+}
+
+func cosineSimilarityTFIDF(text1, text2 string) float64 {
+	if idf == nil {
+		return 0
+	}
+
+	words1 := extractWords(text1)
+	words2 := extractWords(text2)
+
+	tf1 := termFrequency(words1)
+	tf2 := termFrequency(words2)
+
+	vocab := make(map[string]bool)
+	for w := range tf1 {
+		vocab[w] = true
+	}
+	for w := range tf2 {
+		vocab[w] = true
+	}
+
+	var dot, norm1, norm2 float64
+	for w := range vocab {
+		idfW := idf[w]
+		v1 := tf1[w] * idfW
+		v2 := tf2[w] * idfW
+		dot += v1 * v2
+		norm1 += v1 * v1
+		norm2 += v2 * v2
+	}
+
+	if norm1 == 0 || norm2 == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(norm1) * math.Sqrt(norm2)) * 100
+}
+
+func locationMatch(text1, text2 string) float64 {
+	locations := []string{
+		"remote", "remoto", "presencial", "hibrido", "híbrido",
+		"são paulo", "sp", "rio de janeiro", "rj",
+		"belo horizonte", "bh", "curitiba", "porto alegre",
+		"brasil", "brazil", "lisboa", "lisbon",
+	}
+
+	t1 := strings.ToLower(text1)
+	t2 := strings.ToLower(text2)
+
+	for _, loc := range locations {
+		if strings.Contains(t1, loc) && strings.Contains(t2, loc) {
+			return 100
+		}
+	}
+	return 0
 }
 
 func extractKeywordsLMStudio(jobDesc, resumeContent string) []string {

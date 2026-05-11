@@ -32,8 +32,9 @@ func getDB(c *gin.Context) *gorm.DB {
 
 func ListJobs(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	var jobs []models.Job
-	query := db.Where("1=1")
+	query := db.Where("organization_id = ?", orgID)
 
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
@@ -51,9 +52,10 @@ func ListJobs(c *gin.Context) {
 
 func GetJob(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var job models.Job
-	if err := db.Preload("Site").First(&job, id).Error; err != nil {
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).Preload("Site").First(&job).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
 		return
 	}
@@ -68,9 +70,10 @@ func GetJob(c *gin.Context) {
 
 func UpdateJobStatus(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var job models.Job
-	if err := db.First(&job, id).Error; err != nil {
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&job).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
 		return
 	}
@@ -128,9 +131,10 @@ func ListMatches(c *gin.Context) {
 
 func UpdateMatch(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var match models.Match
-	if err := db.First(&match, id).Error; err != nil {
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&match).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
 		return
 	}
@@ -156,9 +160,10 @@ func UpdateMatch(c *gin.Context) {
 
 func DeleteMatch(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var match models.Match
-	if err := db.First(&match, id).Error; err != nil {
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&match).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
 		return
 	}
@@ -173,14 +178,16 @@ func DeleteMatch(c *gin.Context) {
 
 func GetStats(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
 	var totalJobs, totalMatches, totalSites, totalApplied int64
-	db.Model(&models.Job{}).Count(&totalJobs)
-	db.Model(&models.Match{}).Count(&totalMatches)
-	db.Model(&models.Match{}).Where("applied = ?", true).Count(&totalApplied)
-	db.Model(&models.Site{}).Where("active = ?", true).Count(&totalSites)
+	db.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&totalJobs)
+	db.Model(&models.Match{}).Where("organization_id = ?", orgID).Count(&totalMatches)
+	db.Model(&models.Match{}).Where("organization_id = ? AND applied = ?", orgID, true).Count(&totalApplied)
+	db.Model(&models.Site{}).Where("organization_id = ? AND active = ?", orgID, true).Count(&totalSites)
 
 	var jobs []models.Job
-	db.Find(&jobs)
+	db.Where("organization_id = ?", orgID).Find(&jobs)
 
 	languageCount := make(map[string]int)
 	keywordCount := make(map[string]int)
@@ -239,18 +246,43 @@ func GetStats(c *gin.Context) {
 
 func ListSites(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	var sites []models.Site
-	db.Find(&sites)
+	db.Where("organization_id = ?", orgID).Find(&sites)
 	c.JSON(http.StatusOK, sites)
 }
 
 func DeleteSite(c *gin.Context) {
 	db := getDB(c)
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err := db.Delete(&models.Site{}, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
+	orgID := c.GetUint("org_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
+
+	var site models.Site
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&site).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar site"})
+		}
+		return
+	}
+
+	// Deleta jobs associados primeiro
+	if err := db.Where("site_id = ?", site.ID).Delete(&models.Job{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover jobs do site"})
+		return
+	}
+
+	// Deleta o site
+	if err := db.Delete(&site).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover site"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Site removido"})
 }
 
@@ -297,8 +329,9 @@ func AddSite(c *gin.Context) {
 
 func ListResumes(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
 	var resumes []models.Resume
-	db.Find(&resumes)
+	db.Where("organization_id = ?", orgID).Find(&resumes)
 	c.JSON(http.StatusOK, resumes)
 }
 

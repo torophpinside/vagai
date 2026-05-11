@@ -43,8 +43,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	r.GET("/api/stats", handlers.GetStats)
-
 	auth := r.Group("/api/auth")
 	{
 		auth.POST("/register", handlers.Register)
@@ -55,6 +53,7 @@ func main() {
 	api.Use(middleware.JWTAuth())
 	api.Use(middleware.ScopedDB(db))
 	{
+		api.GET("/stats", handlers.GetStats)
 		api.GET("/me", handlers.GetMe)
 		api.PATCH("/me", handlers.UpdateProfile)
 		api.POST("/me/change-password", handlers.ChangePassword)

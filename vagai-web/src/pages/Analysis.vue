@@ -132,7 +132,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import { api } from '../services/api'
 import { 
   Upload,
   FileText,
@@ -172,8 +172,7 @@ const analyzeResume = async () => {
   formData.append('type', 'analysis')
 
   try {
-    const response = await axios.post('/api/resumes/analyze', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    const response = await api.post('/resumes/analyze', formData, {
       timeout: 180000
     })
     analysis.value = response.data

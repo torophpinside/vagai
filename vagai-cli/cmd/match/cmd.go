@@ -20,6 +20,6 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().IntVarP(&threshold, "threshold", "t", 70, "Threshold mínimo de similaridade (0-100)")
+	Cmd.Flags().IntVarP(&threshold, "threshold", "t", 65, "Threshold mínimo de similaridade (0-100)")
 	Cmd.Flags().BoolVarP(&force, "force", "f", false, "Força re-matching de todas as vagas")
 }

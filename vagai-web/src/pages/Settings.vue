@@ -82,7 +82,7 @@
                 <h3 class="font-bold text-white">{{ site.name }}</h3>
                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-2">
                   <a :href="site.url" target="_blank" class="hover:text-indigo-400 transition-colors flex items-center gap-1">
-                    {{ site.url }} <ExternalLink class="w-3 h-3" />
+                    {{ site.url?.substring(0, 40) }}... <ExternalLink class="w-3 h-3" />
                   </a>
                 </p>
               </div>

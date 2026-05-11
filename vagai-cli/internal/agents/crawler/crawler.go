@@ -3,9 +3,12 @@ package crawler
 import (
 	"encoding/json"
 	"fmt"
+	"html"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +66,10 @@ func crawlSite(site models.Site) error {
 		return crawlWorkingNomadsAPI(site)
 	}
 
+	if strings.Contains(strings.ToLower(site.Name), "workana") || strings.Contains(site.URL, "workana.com") {
+		return crawlWorkana(site)
+	}
+
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
@@ -71,9 +78,10 @@ func crawlSite(site models.Site) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", userAgents[0])
+	uaIndex := len(site.URL) % len(userAgents)
+	req.Header.Set("User-Agent", userAgents[uaIndex])
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Language", "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -100,85 +108,183 @@ func crawlSite(site models.Site) error {
 
 	log.Printf("Usando seletor de links: %s", selector)
 
+	elemCount := doc.Find(selector).Length()
+	log.Printf("Seletor encontrou %d elementos na página", elemCount)
+
+	isLinkedIn := strings.Contains(strings.ToLower(site.Name), "linkedin") ||
+		strings.Contains(strings.ToLower(site.URL), "linkedin.com")
+
 	now := time.Now()
-	doc.Find(selector).Each(func(i int, s *goquery.Selection) {
-		href, exists := s.Attr("href")
-		if !exists || href == "" {
-			return
-		}
+	
+	if isLinkedIn {
+		// Abordagem baseada em cards: extrai título, empresa e link de cada card
+		doc.Find(selector).Each(func(i int, card *goquery.Selection) {
+			// Extrai link da vaga
+			linkHref, _ := card.Find("a[href*='/jobs/view/']").Attr("href")
+			if linkHref == "" {
+				return
+			}
+			link := normalizeURL(linkHref, site.URL)
 
-		// Tenta extrair título de vários atributos
-		title := strings.TrimSpace(s.Text())
-		if title == "" {
-			if t, ok := s.Attr("title"); ok && t != "" {
-				title = strings.TrimSpace(t)
-			} else if t, ok := s.Attr("aria-label"); ok && t != "" {
-				title = strings.TrimSpace(t)
+			// Extrai título
+			title := strings.TrimSpace(card.Find("h3.base-search-card__title").First().Text())
+			if title == "" {
+				title = strings.TrimSpace(card.Find(".sr-only").First().Text())
+			}
+			if title == "" {
+				return
+			}
+
+			// Extrai empresa
+			company := ""
+			if site.SelectorCompany != "" {
+				company = strings.TrimSpace(card.Find(site.SelectorCompany).First().Text())
+			}
+
+			log.Printf("Link encontrado: %s", title)
+			if company != "" {
+				log.Printf("Empresa: %s", company)
+			}
+
+			// Filtra links que não são vagas
+			titleLower := strings.ToLower(title)
+			if strings.Contains(titleLower, "back to") ||
+				strings.Contains(titleLower, "view all") ||
+				strings.Contains(titleLower, "login") ||
+				strings.Contains(titleLower, "sign up") ||
+				strings.Contains(titleLower, "post a job") {
+				return
+			}
+
+			// Verifica se a vaga já existe
+			var existingJob models.Job
+			if err := db.DB.Where("url = ?", link).First(&existingJob).Error; err == nil {
+				if existingJob.Description == "" {
+					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
+					fetchJobDetails(&existingJob, site, client)
+					db.DB.Save(&existingJob)
+				}
+				return
+			}
+
+			job := models.Job{
+				OrganizationID: site.OrganizationID,
+				SiteID:         site.ID,
+				URL:            link,
+				Title:          title,
+				Company:        company,
+				CollectedAt:    now,
+				Status:         models.JobStatusNew,
+			}
+
+			if site.DelaySeconds > 0 {
+				time.Sleep(time.Duration(site.DelaySeconds) * time.Second)
+			}
+			fetchJobDetails(&job, site, client)
+
+			if job.Company == "" && company != "" {
+				job.Company = company
+			}
+
+			if shouldIgnoreJob(&job) {
+				log.Printf("Vaga ignorada por filtro: %s", title)
+				return
+			}
+
+			if err := db.DB.Create(&job).Error; err != nil {
+				log.Printf("Erro ao salvar vaga: %v", err)
 			} else {
-				// Tenta pegar o texto de elementos filhos
-				title = strings.TrimSpace(s.Find("h2, h3, .title, .job-title").First().Text())
+				jobsFound++
+				log.Printf("Vaga salva: %s", title)
 			}
-		}
-
-		if title == "" {
-			return
-		}
-
-		// Normaliza a URL
-		link := normalizeURL(href, site.URL)
-
-		log.Printf("Link encontrado: %s - %s", title, link)
-
-		// Filtra links que não são vagas
-		titleLower := strings.ToLower(title)
-		if strings.Contains(titleLower, "back to") ||
-			strings.Contains(titleLower, "view all") ||
-			strings.Contains(titleLower, "login") ||
-			strings.Contains(titleLower, "sign up") ||
-			strings.Contains(titleLower, "post a job") {
-			return
-		}
-
-		// Verifica se a vaga já existe
-		var existingJob models.Job
-		if err := db.DB.Where("url = ?", link).First(&existingJob).Error; err == nil {
-			// Se já existe mas não tem descrição, tenta buscar
-			if existingJob.Description == "" {
-				log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
-				fetchJobDetails(&existingJob, site, client)
-				db.DB.Save(&existingJob)
+		})
+	} else {
+		// Abordagem original baseada em links
+		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
+			href, exists := s.Attr("href")
+			if !exists || href == "" {
+				return
 			}
-			return
-		}
 
-		job := models.Job{
-			OrganizationID: site.OrganizationID,
-			SiteID:         site.ID,
-			URL:            link,
-			Title:          title,
-			CollectedAt:    now,
-			Status:         models.JobStatusNew,
-		}
+			title := strings.TrimSpace(s.Text())
+			if title == "" {
+				if t, ok := s.Attr("title"); ok && t != "" {
+					title = strings.TrimSpace(t)
+				} else if t, ok := s.Attr("aria-label"); ok && t != "" {
+					title = strings.TrimSpace(t)
+				} else {
+					title = strings.TrimSpace(s.Find("h2, h3, .title, .job-title").First().Text())
+				}
+			}
 
-		// Busca detalhes antes de salvar
-		if site.DelaySeconds > 0 {
-			time.Sleep(time.Duration(site.DelaySeconds) * time.Second)
-		}
-		fetchJobDetails(&job, site, client)
+			if title == "" {
+				return
+			}
 
-		// Verifica filtros após buscar descrição
-		if shouldIgnoreJob(&job) {
-			log.Printf("Vaga ignorada por filtro (descrição): %s", title)
-			return
-		}
+			company := ""
+			if site.SelectorCompany != "" {
+				parent := s.Parent()
+				company = strings.TrimSpace(parent.Find(site.SelectorCompany).First().Text())
+			}
 
-		if err := db.DB.Create(&job).Error; err != nil {
-			log.Printf("Erro ao salvar vaga: %v", err)
-		} else {
-			jobsFound++
-			log.Printf("Vaga salva: %s", title)
-		}
-	})
+			link := normalizeURL(href, site.URL)
+
+			log.Printf("Link encontrado: %s - %s", title, link)
+			if company != "" {
+				log.Printf("Empresa encontrada na listagem: %s", company)
+			}
+
+			titleLower := strings.ToLower(title)
+			if strings.Contains(titleLower, "back to") ||
+				strings.Contains(titleLower, "view all") ||
+				strings.Contains(titleLower, "login") ||
+				strings.Contains(titleLower, "sign up") ||
+				strings.Contains(titleLower, "post a job") {
+				return
+			}
+
+			var existingJob models.Job
+			if err := db.DB.Where("url = ?", link).First(&existingJob).Error; err == nil {
+				if existingJob.Description == "" {
+					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
+					fetchJobDetails(&existingJob, site, client)
+					db.DB.Save(&existingJob)
+				}
+				return
+			}
+
+			job := models.Job{
+				OrganizationID: site.OrganizationID,
+				SiteID:         site.ID,
+				URL:            link,
+				Title:          title,
+				Company:        company,
+				CollectedAt:    now,
+				Status:         models.JobStatusNew,
+			}
+
+			if site.DelaySeconds > 0 {
+				time.Sleep(time.Duration(site.DelaySeconds) * time.Second)
+			}
+			fetchJobDetails(&job, site, client)
+
+			if job.Company == "" && company != "" {
+				job.Company = company
+			}
+
+			if shouldIgnoreJob(&job) {
+				log.Printf("Vaga ignorada por filtro (descrição): %s", title)
+				return
+			}
+
+			if err := db.DB.Create(&job).Error; err != nil {
+				log.Printf("Erro ao salvar vaga: %v", err)
+			} else {
+				jobsFound++
+				log.Printf("Vaga salva: %s", title)
+			}
+		})
+	}
 
 	log.Printf("Vagas encontradas: %d", jobsFound)
 	db.DB.Model(&site).Update("last_crawl", time.Now())
@@ -224,8 +330,9 @@ func fetchJobDetails(job *models.Job, site models.Site, client *http.Client) err
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", userAgents[0])
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	uaIndex := len(job.URL) % len(userAgents)
+	req.Header.Set("User-Agent", userAgents[uaIndex])
+	req.Header.Set("Accept-Language", "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -294,6 +401,154 @@ func fetchJobDetails(job *models.Job, site models.Site, client *http.Client) err
 	return nil
 }
 
+func crawlWorkana(site models.Site) error {
+	log.Printf("Usando crawler específico para Workana")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	now := time.Now()
+	var jobsFound int
+
+	resultsPattern := regexp.MustCompile(`results-initials=(['"])`)
+
+	baseURL := site.URL
+	if !strings.Contains(baseURL, "workana.com") {
+		baseURL = "https://www.workana.com/jobs"
+	}
+
+	for page := 1; page <= 50; page++ {
+		var pageURL string
+		if strings.Contains(baseURL, "?") {
+			pageURL = baseURL + "&page=" + strconv.Itoa(page)
+		} else {
+			pageURL = baseURL + "?page=" + strconv.Itoa(page)
+		}
+
+		log.Printf("Buscando página %d: %s", page, pageURL)
+
+		req, err := http.NewRequest("GET", pageURL, nil)
+		if err != nil {
+			return err
+		}
+		uaIndex := len(pageURL) % len(userAgents)
+		req.Header.Set("User-Agent", userAgents[uaIndex])
+		req.Header.Set("Accept", "text/html,application/xhtml+xml")
+		req.Header.Set("Accept-Language", "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Erro ao acessar página %d: %v", page, err)
+			break
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		htmlContent := string(body)
+
+		if resp.StatusCode != 200 {
+			log.Printf("Página %d retornou status %d", page, resp.StatusCode)
+			break
+		}
+
+		loc := resultsPattern.FindStringSubmatchIndex(htmlContent)
+		if loc == nil {
+			log.Printf("Nenhum dado encontrado na página %d", page)
+			break
+		}
+		// value starts right after the opening quote
+		quoteByte := htmlContent[loc[2]]
+		valStart := loc[2] + 1
+		valEnd := strings.IndexByte(htmlContent[valStart:], byte(quoteByte))
+		if valEnd == -1 {
+			log.Printf("Aspas de fechamento não encontradas na página %d", page)
+			break
+		}
+		rawJSON := htmlContent[valStart : valStart+valEnd]
+
+		decoded := html.UnescapeString(rawJSON)
+		var pageData map[string]interface{}
+		if err := json.Unmarshal([]byte(decoded), &pageData); err != nil {
+			log.Printf("Erro ao decodificar JSON na página %d: %v", page, err)
+			break
+		}
+
+		resultsRaw, ok := pageData["results"].([]interface{})
+		if !ok || len(resultsRaw) == 0 {
+			log.Printf("Nenhum resultado na página %d", page)
+			break
+		}
+
+		log.Printf("Encontrados %d resultados na página %d", len(resultsRaw), page)
+
+		for _, item := range resultsRaw {
+			result, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			slug, _ := result["slug"].(string)
+			if slug == "" {
+				continue
+			}
+
+			titleRaw, _ := result["title"].(string)
+			title := stripHTML(titleRaw)
+			title = strings.TrimSpace(title)
+			if title == "" {
+				title = slug
+			}
+
+			authorName, _ := result["authorName"].(string)
+			descRaw, _ := result["description"].(string)
+			description := stripHTML(descRaw)
+
+			jobURL := "https://www.workana.com/job/" + slug
+
+			var existingJob models.Job
+			if err := db.DB.Where("url = ?", jobURL).First(&existingJob).Error; err == nil {
+				continue
+			}
+
+			job := models.Job{
+				OrganizationID: site.OrganizationID,
+				SiteID:         site.ID,
+				URL:            jobURL,
+				Title:          title,
+				Company:        authorName,
+				Description:    description,
+				CollectedAt:    now,
+				Status:         models.JobStatusNew,
+			}
+
+			if shouldIgnoreJob(&job) {
+				log.Printf("Vaga ignorada por filtro: %s", title)
+				continue
+			}
+
+			if err := db.DB.Create(&job).Error; err != nil {
+				log.Printf("Erro ao salvar vaga: %v", err)
+			} else {
+				jobsFound++
+				log.Printf("Vaga salva: %s", title)
+			}
+		}
+
+		if len(resultsRaw) == 0 {
+			log.Printf("Nenhum resultado na página %d, encerrando paginação", page)
+			break
+		}
+
+		if site.DelaySeconds > 0 {
+			time.Sleep(time.Duration(site.DelaySeconds) * time.Second)
+		}
+	}
+
+	log.Printf("Total de vagas encontradas na Workana: %d", jobsFound)
+	db.DB.Model(&site).Update("last_crawl", time.Now())
+	db.Log(site.OrganizationID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
+
+	return nil
+}
+
 func crawlRemoteOKAPI(site models.Site) error {
 	log.Printf("Usando API para RemoteOK: https://remoteok.com/api")
 
@@ -354,13 +609,14 @@ func crawlRemoteOKAPI(site models.Site) error {
 		}
 
 		job = models.Job{
-			SiteID:      site.ID,
-			URL:         jobURL,
-			Title:       title,
-			Company:     company,
-			Description: description,
-			CollectedAt: now,
-			Status:      models.JobStatusNew,
+			OrganizationID: site.OrganizationID,
+			SiteID:        site.ID,
+			URL:           jobURL,
+			Title:         title,
+			Company:       company,
+			Description:   description,
+			CollectedAt:   now,
+			Status:        models.JobStatusNew,
 		}
 
 		if err := db.DB.Create(&job).Error; err != nil {
@@ -436,12 +692,13 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 		}
 
 		job = models.Job{
-			SiteID:      site.ID,
-			URL:         jobURL,
-			Title:       title,
-			Description: stripHTML(description),
-			CollectedAt: now,
-			Status:     models.JobStatusNew,
+			OrganizationID: site.OrganizationID,
+			SiteID:        site.ID,
+			URL:           jobURL,
+			Title:         title,
+			Description:   stripHTML(description),
+			CollectedAt:   now,
+			Status:        models.JobStatusNew,
 		}
 
 		if err := db.DB.Create(&job).Error; err != nil {
