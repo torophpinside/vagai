@@ -34,6 +34,9 @@ export const useJobs = (filters = {}) => {
       if (Array.isArray(params.status)) {
         params.status = params.status.join(',')
       }
+      if (Array.isArray(params.site)) {
+        params.site = params.site.join(',')
+      }
       return api.get('/jobs', { params }).then(res => res.data)
     }
   })
@@ -43,13 +46,10 @@ export const useMatches = (filters = {}) => {
   return useQuery({
     queryKey: ['matches', filters],
     queryFn: () => {
-      const params = {}
-      if (filters.sort) params.sort = filters.sort
-      if (Array.isArray(filters.site) && filters.site.length > 0) {
-        params.site = filters.site.join(',')
+      const params = { ...toValue(filters) }
+      if (Array.isArray(params.site) && params.site.length > 0) {
+        params.site = params.site.join(',')
       }
-      if (filters.threshold) params.threshold = filters.threshold
-      if (filters.applied) params.applied = filters.applied
       return api.get('/matches', { params }).then(res => res.data)
     }
   })

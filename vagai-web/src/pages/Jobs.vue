@@ -11,32 +11,29 @@
             <button @click="toggle" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
               <Filter class="w-4 h-4 text-slate-500 shrink-0" />
               <span class="text-sm text-slate-300">
-                <template v-if="!filters.site">Todos os Sites</template>
-                <template v-else>{{ siteLabel }}</template>
+                <template v-if="filters.site.length === 0">Todos os Sites</template>
+                <template v-else>{{ filters.site.length }} site{{ filters.site.length > 1 ? 's' : '' }}</template>
               </span>
               <ChevronDown class="w-3.5 h-3.5 text-slate-500" :class="open ? 'rotate-180' : ''" />
             </button>
           </template>
           <template #default="{ close }">
-            <button @click="filters.site = ''; close()"
-              class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
-              :class="!filters.site ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
-            >
-              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="!filters.site ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
-                <svg v-if="!filters.site" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-              </div>
-              Todos os Sites
-            </button>
             <button v-for="site in sites" :key="site.id"
-              @click="filters.site = site.id; close()"
+              @click="toggleSite(site.id)"
               class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
-              :class="filters.site === site.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+              :class="filters.site.includes(site.id) ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
             >
-              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.site === site.id ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
-                <svg v-if="filters.site === site.id" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.site.includes(site.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                <svg v-if="filters.site.includes(site.id)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
               </div>
               {{ site.name }}
             </button>
+            <div v-if="filters.site.length > 0" class="border-t border-white/5 p-2">
+              <button @click="filters.site = []; close()" class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                <X class="w-4 h-4" />
+                Limpar filtros
+              </button>
+            </div>
           </template>
         </DropdownMenu>
         <DropdownMenu v-model:open="statusOpen" position="bottom-right">
@@ -80,6 +77,13 @@
       <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
     </div>
 
+    <div v-else-if="jobs.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
+      <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+        <X class="w-10 h-10 text-slate-600" />
+      </div>
+      <p class="text-slate-500 max-w-md">Nenhum resultado</p>
+    </div>
+
     <div v-else class="glass-card overflow-hidden">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-white/5">
@@ -88,6 +92,7 @@
               <th class="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Título</th>
               <th class="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Empresa</th>
               <th class="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+              <th class="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Score</th>
               <th class="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Coletado em</th>
               <th class="px-8 py-5 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">Ações</th>
             </tr>
@@ -113,11 +118,20 @@
                   {{ statusLabelMap[job.status] || job.status }}
                 </span>
               </td>
+              <td class="px-8 py-6">
+                <div v-if="job.max_score > 0" :class="scoreClass(job.max_score)" class="px-3 py-1 rounded-full text-xs font-bold text-center min-w-[3rem]">
+                  {{ Math.round(job.max_score) }}%
+                </div>
+                <span v-else class="text-slate-600 text-sm">—</span>
+              </td>
               <td class="px-8 py-6 text-slate-400 text-sm">
                 {{ formatDate(job.collected_at) }}
               </td>
               <td class="px-8 py-6 text-right">
                 <div class="flex items-center justify-end gap-3">
+                  <button v-if="job.status !== 'matched' && job.status !== 'ignored'" @click="markAsMatched(job.id)" class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500 hover:text-white transition-all" title="Marcar como Match">
+                    <CheckCircle2 class="w-4 h-4" />
+                  </button>
                   <a :href="job.url" target="_blank" class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500 hover:text-white transition-all">
                     <ExternalLink class="w-4 h-4" />
                   </a>
@@ -154,14 +168,14 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useJobs, useSites, updateJobStatus } from '../services/api'
-import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
+import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X, CheckCircle2 } from 'lucide-vue-next'
 import DropdownMenu from '../components/DropdownMenu.vue'
 
 const queryClient = useQueryClient()
 const { data: sites } = useSites()
 
 const filters = reactive({
-  site: '',
+  site: [],
   status: [],
   page: 1,
   limit: 20
@@ -169,7 +183,7 @@ const filters = reactive({
 
 watch([() => filters.site, () => filters.status], () => {
   filters.page = 1
-})
+}, { deep: true })
 
 const { data: jobsResponse, isLoading } = useJobs(filters)
 
@@ -202,10 +216,14 @@ const statusLabelMap = {
 
 const siteOpen = ref(false)
 
-const siteLabel = computed(() => {
-  const selected = sites.value?.find(s => s.id === filters.site)
-  return selected?.name || ''
-})
+const toggleSite = (id) => {
+  const idx = filters.site.indexOf(id)
+  if (idx >= 0) {
+    filters.site.splice(idx, 1)
+  } else {
+    filters.site.push(id)
+  }
+}
 
 const statusOpen = ref(false)
 
@@ -220,6 +238,11 @@ const toggleStatus = (value) => {
 
 const hideJob = async (jobId) => {
   await updateJobStatus(jobId, 'ignored')
+  queryClient.invalidateQueries({ queryKey: ['jobs'] })
+}
+
+const markAsMatched = async (jobId) => {
+  await updateJobStatus(jobId, 'matched')
   queryClient.invalidateQueries({ queryKey: ['jobs'] })
 }
 
@@ -242,6 +265,13 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(date))
+}
+
+const scoreClass = (score) => {
+  if (score >= 0.8) return 'bg-emerald-500/10 text-emerald-400'
+  if (score >= 0.6) return 'bg-indigo-500/10 text-indigo-400'
+  if (score >= 0.4) return 'bg-amber-500/10 text-amber-400'
+  return 'bg-slate-500/10 text-slate-400'
 }
 </script>
 

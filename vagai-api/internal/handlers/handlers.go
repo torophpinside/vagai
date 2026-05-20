@@ -92,7 +92,16 @@ func ListJobs(c *gin.Context) {
 	}
 
 	if site := c.Query("site"); site != "" {
-		query = query.Where("site_id = ?", site)
+		siteIDs := strings.Split(site, ",")
+		ids := make([]uint, 0, len(siteIDs))
+		for _, s := range siteIDs {
+			if id, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32); err == nil {
+				ids = append(ids, uint(id))
+			}
+		}
+		if len(ids) > 0 {
+			query = query.Where("site_id IN ?", ids)
+		}
 	}
 
 	var total int64
@@ -115,8 +124,38 @@ func ListJobs(c *gin.Context) {
 		jobs = []models.Job{}
 	}
 
+	scoreMap := make(map[uint]float64)
+	if len(jobs) > 0 {
+		ids := make([]uint, len(jobs))
+		for i, j := range jobs {
+			ids[i] = j.ID
+		}
+		var scores []struct {
+			JobID uint    `gorm:"column:job_id"`
+			Score float64 `gorm:"column:score"`
+		}
+		db.Model(&models.Match{}).
+			Select("job_id, MAX(similarity_score) as score").
+			Where("job_id IN ?", ids).
+			Group("job_id").
+			Find(&scores)
+		for _, s := range scores {
+			scoreMap[s.JobID] = s.Score
+		}
+	}
+
+	type jobItem struct {
+		models.Job
+		MaxScore float64 `json:"max_score"`
+	}
+
+	data := make([]jobItem, len(jobs))
+	for i, j := range jobs {
+		data[i] = jobItem{Job: j, MaxScore: scoreMap[j.ID]}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":       jobs,
+		"data":       data,
 		"total":      total,
 		"page":       page,
 		"limit":      limit,
@@ -167,18 +206,16 @@ func UpdateJobStatus(c *gin.Context) {
 
 func ListMatches(c *gin.Context) {
 	db := getDB(c)
-	var matches []models.Match
+	orgID := c.GetUint("org_id")
 	threshold, _ := strconv.Atoi(c.DefaultQuery("threshold", "1"))
 	sortOrder := c.DefaultQuery("sort", "desc")
 	appliedFilter := c.DefaultQuery("applied", "false")
 
-	orgID := c.GetUint("org_id")
-	
-	query := db.Where("matches.organization_id = ?", orgID).Preload("Job", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id", "title", "company", "url", "site_id", "description")
-	}).Preload("Resume", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id", "name")
-	}).Joins("JOIN jobs ON jobs.id = matches.job_id").Where("jobs.status NOT IN ?", []string{"ignored", "unmatched"}).Where("similarity_score >= ?", threshold)
+	query := db.Model(&models.Match{}).
+		Where("matches.organization_id = ?", orgID).
+		Joins("JOIN jobs ON jobs.id = matches.job_id").
+		Where("jobs.status NOT IN ?", []string{"ignored", "unmatched"}).
+		Where("similarity_score >= ?", threshold)
 
 	if appliedFilter == "true" {
 		query = query.Where("matches.applied = ?", true)
@@ -205,11 +242,36 @@ func ListMatches(c *gin.Context) {
 		query = query.Order("similarity_score DESC")
 	}
 
-	query.Find(&matches)
+	var total int64
+	query.Count(&total)
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	var matches []models.Match
+	query.Preload("Job", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "title", "company", "url", "site_id", "description")
+	}).Preload("Resume", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "name")
+	}).Offset(offset).Limit(limit).Find(&matches)
 	if matches == nil {
 		matches = []models.Match{}
 	}
-	c.JSON(http.StatusOK, matches)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":       matches,
+		"total":      total,
+		"page":       page,
+		"limit":      limit,
+		"totalPages": (int(total) + limit - 1) / limit,
+	})
 }
 
 func UpdateMatch(c *gin.Context) {

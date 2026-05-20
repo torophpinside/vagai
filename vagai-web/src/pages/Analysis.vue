@@ -2,7 +2,7 @@
   <div class="space-y-8">
     <div>
       <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Análise de Currículo</h1>
-      <p class="text-slate-400">Faça upload do seu currículo e receba feedback de um Analista de RH Sênior.</p>
+      <p class="text-slate-400">Faça upload do seu currículo e receba feedback de melhorias e sugestões.</p>
     </div>
 
     <div class="glass-card p-8">

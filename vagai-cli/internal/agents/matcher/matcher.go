@@ -124,28 +124,26 @@ func Run(threshold int, force bool) error {
 		if result.alreadyExists {
 			continue
 		}
-		if result.score > float64(threshold) {
-			// Buscar organization_id do job
-			var job models.Job
-			db.DB.First(&job, result.jobID)
-			
-			match := models.Match{
-				OrganizationID:  job.OrganizationID,
-				JobID:           result.jobID,
-				ResumeID:        result.resumeID,
-				SimilarityScore: result.score,
-				KeywordsMatched: fmt.Sprintf(`["%s"]`, strings.Join(result.keywords, `", "`)),
-				AIReason:        result.reason,
-			}
-			if err := db.DB.Create(&match).Error; err != nil {
-				log.Printf("Erro ao salvar match: %v", err)
-			} else {
-				matchCount++
-				var job models.Job
-				db.DB.First(&job, result.jobID)
+		// Buscar organization_id do job
+		var job models.Job
+		db.DB.First(&job, result.jobID)
+		
+		match := models.Match{
+			OrganizationID:  job.OrganizationID,
+			JobID:           result.jobID,
+			ResumeID:        result.resumeID,
+			SimilarityScore: result.score,
+			KeywordsMatched: fmt.Sprintf(`["%s"]`, strings.Join(result.keywords, `", "`)),
+			AIReason:        result.reason,
+		}
+		if err := db.DB.Create(&match).Error; err != nil {
+			log.Printf("Erro ao salvar match: %v", err)
+		} else {
+			matchCount++
+			if result.score > float64(threshold) {
 				db.DB.Model(&job).Update("status", models.JobStatusMatched)
-				log.Printf("Match salvo: job=%d resume=%d score=%.2f", result.jobID, result.resumeID, result.score)
 			}
+			log.Printf("Match salvo: job=%d resume=%d score=%.2f", result.jobID, result.resumeID, result.score)
 		}
 	}
 
