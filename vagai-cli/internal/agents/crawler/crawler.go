@@ -56,6 +56,16 @@ func Run(targetSite string) error {
 func crawlSite(site models.Site) error {
 	log.Printf("Buscando vagas em: %s", site.URL)
 
+	if site.OrganizationID > 0 {
+		allowed, current, maxLimit, err := db.CheckJobsLimit(site.OrganizationID)
+		if err != nil {
+			log.Printf("Erro ao verificar limite do plano para org %d: %v", site.OrganizationID, err)
+		} else if !allowed {
+			log.Printf("Limite de vagas atingido para org %d: %d/%d. Pulando site %s", site.OrganizationID, current, maxLimit, site.Name)
+			return nil
+		}
+	}
+
 	var jobsFound int
 
 	if site.Name == "remoteok" || strings.Contains(site.URL, "remoteok.com") {

@@ -77,6 +77,15 @@ func Run(threshold int, force bool) error {
 
 	log.Printf("Processando %d vagas com %d currículos (max %d paralelas)", len(jobs), len(resumes), maxParallelAI)
 
+	if !force {
+		jobIDs := make([]uint, len(jobs))
+		for i, j := range jobs {
+			jobIDs[i] = j.ID
+		}
+		db.DB.Model(&models.Job{}).Where("id IN ?", jobIDs).Update("status", models.JobStatusAnalyzed)
+		log.Printf("%d vagas marcadas como analyzed (serão atualizadas para matched se houver match)", len(jobIDs))
+	}
+
 	jobsChan := make(chan jobTask, len(jobs)*len(resumes))
 	resultsChan := make(chan matchResult, len(jobs)*len(resumes))
 

@@ -33,6 +33,7 @@ func main() {
 	DB = db
 
 	autoMigrate(db)
+	dropResumeAnalysisFK(db)
 	handlers.SetDB(db)
 
 	r := gin.Default()
@@ -54,9 +55,11 @@ func main() {
 	api.Use(middleware.ScopedDB(db))
 	{
 		api.GET("/stats", handlers.GetStats)
+		api.GET("/plans", handlers.ListPlans)
 		api.GET("/me", handlers.GetMe)
 		api.PATCH("/me", handlers.UpdateProfile)
 		api.POST("/me/change-password", handlers.ChangePassword)
+		api.POST("/me/plan", handlers.ChangePlan)
 		api.GET("/jobs", handlers.ListJobs)
 		api.GET("/jobs/:id", handlers.GetJob)
 		api.PATCH("/jobs/:id", handlers.UpdateJobStatus)
@@ -111,33 +114,33 @@ func autoMigrate(db *gorm.DB) {
 	seedPlans(db)
 }
 
-func seedPlans(db *gorm.DB) {
-	var count int64
-	db.Model(&models.Plan{}).Count(&count)
-	if count > 0 {
-		return
-	}
+func dropResumeAnalysisFK(db *gorm.DB) {
+	db.Exec("ALTER TABLE resume_analyses DROP FOREIGN KEY fk_resume_analyses_resume")
+	db.Exec("ALTER TABLE resume_analyses DROP INDEX fk_resume_analyses_resume")
+}
 
+func seedPlans(db *gorm.DB) {
 	plans := []models.Plan{
 		{
 			Name: "Free", Slug: "free", PriceMonthly: 0, PriceYearly: 0,
-			MaxJobs: 100, MaxResumes: 3, MaxSites: 5, MaxCrawlsPerDay: 10,
-			Features: `["100 vagas", "3 currículos", "5 sites", "Matching básico"]`,
+			MaxJobs: 1000, MaxResumes: 1, MaxSites: 5,
+			Features: `["1000 vagas", "1 currículo", "5 fontes", "Matching básico"]`,
 		},
 		{
 			Name: "Pro", Slug: "pro", PriceMonthly: 4900, PriceYearly: 49000,
-			MaxJobs: 1000, MaxResumes: 10, MaxSites: 20, MaxCrawlsPerDay: 50,
-			Features: `["1000 vagas", "10 currículos", "20 sites", "Matching AI avançado", "Alertas por email", "Análise de currículo"]`,
-		},
-		{
-			Name: "Enterprise", Slug: "enterprise", PriceMonthly: 14900, PriceYearly: 149000,
-			MaxJobs: -1, MaxResumes: -1, MaxSites: -1, MaxCrawlsPerDay: -1,
-			Features: `["Vagas ilimitadas", "Currículos ilimitados", "Sites ilimitados", "Matching AI avançado", "Alertas por email", "Análise de currículo", "API access", "Webhooks", "Suporte prioritário"]`,
+			MaxJobs: -1, MaxResumes: 3, MaxSites: 25,
+			Features: `["Vagas ilimitadas", "3 currículos", "25 fontes", "Matching por IA"]`,
 		},
 	}
 
 	for _, plan := range plans {
-		db.Where("slug = ?", plan.Slug).FirstOrCreate(&plan)
+		var existing models.Plan
+		if err := db.Where("slug = ?", plan.Slug).First(&existing).Error; err != nil {
+			db.Create(&plan)
+		} else {
+			plan.ID = existing.ID
+			db.Model(&existing).Updates(plan)
+		}
 	}
 }
 

@@ -60,10 +60,6 @@
             />
           </div>
 
-          <div class="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-300 text-sm">
-            <strong>14 dias grátis</strong> no plano Pro. Sem cartão de crédito.
-          </div>
-
           <div v-if="error" class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
             {{ error }}
           </div>

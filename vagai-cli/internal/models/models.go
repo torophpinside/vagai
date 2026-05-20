@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type JobStatus string
@@ -9,9 +11,37 @@ type JobStatus string
 const (
 	JobStatusNew       JobStatus = "new"
 	JobStatusMatched   JobStatus = "matched"
+	JobStatusAnalyzed  JobStatus = "analyzed"
 	JobStatusUnmatched JobStatus = "unmatched"
 	JobStatusIgnored   JobStatus = "ignored"
 )
+
+type Organization struct {
+	ID               uint           `gorm:"primaryKey" json:"id"`
+	Name             string         `gorm:"size:200;not null" json:"name"`
+	Slug             string         `gorm:"size:100;uniqueIndex;not null" json:"slug"`
+	Plan             string         `gorm:"size:50;default:free" json:"plan"`
+	StripeCustomerID string         `gorm:"size:255" json:"-"`
+	TrialEndsAt      *time.Time     `json:"trial_ends_at"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+type Plan struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	Name            string    `gorm:"size:100;not null" json:"name"`
+	Slug            string    `gorm:"size:50;uniqueIndex;not null" json:"slug"`
+	PriceMonthly    int       `gorm:"default:0" json:"price_monthly"`
+	PriceYearly     int       `gorm:"default:0" json:"price_yearly"`
+	MaxJobs         int       `gorm:"default:100" json:"max_jobs"`
+	MaxResumes      int       `gorm:"default:3" json:"max_resumes"`
+	MaxSites        int       `gorm:"default:5" json:"max_sites"`
+	MaxCrawlsPerDay int       `gorm:"default:10" json:"-"`
+	Features        string    `gorm:"type:json" json:"features"`
+	StripePriceID   string    `gorm:"size:255" json:"-"`
+	CreatedAt       time.Time `json:"created_at"`
+}
 
 type Site struct {
 	ID                  uint       `gorm:"primaryKey" json:"id"`

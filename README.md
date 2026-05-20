@@ -65,30 +65,20 @@ docker-compose up -d
 
 Isso sobe MySQL, Redis, API, Web e o agendador de tarefas.
 
-### Configurar sites monitorados
+### Adicionar sites
 
-Edite `vagai-cli/configs/sites.yaml`:
-
-```yaml
-sites:
-  - name: remoteok
-    url: https://remoteok.com
-    enabled: true
-  - name: weworkremotely
-    url: https://weworkremotely.com
-    enabled: true
-```
+Pela interface Web ou via API, adicione a URL do site desejado — o VagAI descobre automaticamente os seletores CSS com IA.
 
 ### Adicionar currículos
 
-Envie via API ou coloque os arquivos em `vagai-api/uploads/` (PDF ou DOCX).
+Envie via API/Web em PDF, DOCX ou TXT.
 
 ### Rodar busca manual
 
 ```bash
 cd vagai-cli
 go run main.go crawl --site remoteok
-go run main.go match --resume curriculum.pdf
+go run main.go match
 ```
 
 ## Funcionalidades
@@ -99,11 +89,21 @@ go run main.go match --resume curriculum.pdf
 - **Dashboard** — gráficos de vagas por tecnologia, empresa, tempo
 - **Agendamento** — coleta automática via cron
 - **Multi-tenancy** — isolamento de dados por usuário/empresa
-- **Planos** — Free, Pro, Enterprise com limites diferenciados
+- **Planos** — Free e Pro com limites diferenciados
 
 ## Status
 
-9 Sprints concluídos. O sistema está funcional para busca, matching e visualização via dashboard.
+Sistema funcional para busca, matching, autenticação multi-tenancy e visualização via dashboard.
+
+## Próximos passos
+
+- **UI/UX** — refinamento visual da plataforma (animações, responsividade, temas)
+- **Pagamentos** — integração com gateway (Stripe) para upgrade de planos
+- **Organização** — gestão de membros (convite, papéis), auditoria de ações, logs de atividade
+- **Notificações** — alertas por email quando novos matches de alto score forem encontrados
+- **API Keys** — gerenciamento de chaves de API para integração externa
+- **Webhooks** — disparar eventos para serviços externos (novas vagas, matches, etc.)
+- **Testes E2E** — Playwright para fluxos críticos (login, registro, navegação)
 
 ## Docs
 

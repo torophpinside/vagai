@@ -261,6 +261,71 @@ func TestHandler_FormFile(t *testing.T) {
 	}
 }
 
+func TestToStringSlice(t *testing.T) {
+	t.Run("nil input", func(t *testing.T) {
+		result := toStringSlice(nil)
+		if result != nil {
+			t.Errorf("Expected nil, got %v", result)
+		}
+	})
+
+	t.Run("[]string input", func(t *testing.T) {
+		result := toStringSlice([]string{"a", "b", "c"})
+		if len(result) != 3 || result[0] != "a" || result[1] != "b" || result[2] != "c" {
+			t.Errorf("Unexpected result: %v", result)
+		}
+	})
+
+	t.Run("[]interface{} with strings", func(t *testing.T) {
+		result := toStringSlice([]interface{}{"x", "y", "z"})
+		if len(result) != 3 || result[0] != "x" || result[1] != "y" || result[2] != "z" {
+			t.Errorf("Unexpected result: %v", result)
+		}
+	})
+
+	t.Run("[]interface{} with mixed types", func(t *testing.T) {
+		result := toStringSlice([]interface{}{"a", 123, "b"})
+		if len(result) != 2 || result[0] != "a" || result[1] != "b" {
+			t.Errorf("Unexpected result: %v", result)
+		}
+	})
+
+	t.Run("[]interface{} with no strings", func(t *testing.T) {
+		result := toStringSlice([]interface{}{1, 2, 3})
+		if len(result) != 0 {
+			t.Errorf("Expected empty slice, got %v", result)
+		}
+	})
+
+	t.Run("empty []string", func(t *testing.T) {
+		result := toStringSlice([]string{})
+		if len(result) != 0 {
+			t.Errorf("Expected empty slice, got %v", result)
+		}
+	})
+
+	t.Run("empty []interface{}", func(t *testing.T) {
+		result := toStringSlice([]interface{}{})
+		if len(result) != 0 {
+			t.Errorf("Expected empty slice, got %v", result)
+		}
+	})
+}
+
+func TestListPlans_WithoutDB(t *testing.T) {
+	t.Skip("Skipping test that requires database connection")
+
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/plans", nil)
+	ListPlans(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
 func TestHandler_MultipartRequest(t *testing.T) {
 	w := httptest.NewRecorder()
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -26,8 +27,9 @@ type Message struct {
 }
 
 type ChatRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Temperature float64   `json:"temperature,omitempty"`
 }
 
 type ChatResponse struct {
@@ -251,30 +253,37 @@ func AnalyzeResumeWithAI(resumeContent string) (map[string]interface{}, error) {
 		Timeout: 180 * time.Second,
 	}
 
-	prompt := fmt.Sprintf(`Você é um ANALISTA DE RH SÊNIOR com mais de 15 anos de experiência em recrutamento e seleção de profissionais de tecnologia.
-Analise o currículo abaixo de forma completa e profissional.
-
-Para cada seção, siga estas diretrizes:
-1. PONTOS FORTES: Identifique habilidades técnicas, experiências relevantes, certificações, tecnologias específicas que o candidato domina e que são valorizadas no mercado.
-2. PONTOS DE ATENÇÃO: Identifique gaps de experiência, falta de tecnologias importantes, inconsistências no currículo, áreas que precisam de desenvolvimento.
-3. SUGESTÕES DE MELHORIA: Recomendações práticas e específicas para melhorar o currículo - mudanças na formatação, tecnologias a adicionar, formas de evidenciar achievements,etc.
-
-Ao final, forneça uma ANÁLISE COMPLETA com visão geral do perfil, recomendações de melhoria e próximos passos.
+	prompt := fmt.Sprintf(`Analise o currículo abaixo como um Analista de RH Sênior.
 
 CURRÍCULO:
 %s
 
-Responda estritamente em formato JSON válido com esta estrutura exata:
-{"strengths": ["ponto1", "ponto2"], "weaknesses": ["ponto1", "ponto2"], "suggestions": ["sugestão1", "sugestão2"], "fullAnalysis": "texto da análise completa aqui"}`, resumeContent)
+Escreva sua análise usando EXATAMENTE estes cabeçalhos de seção:
+
+PONTOS FORTES:
+- item 1
+- item 2
+
+PONTOS DE ATENÇÃO:
+- item 1
+- item 2
+
+SUGESTÕES DE MELHORIA:
+- item 1
+- item 2
+
+ANÁLISE COMPLETA:
+texto livre aqui`, resumeContent)
 
 	messages := []Message{
-		{Role: "system", Content: "Você é um Analista de RH Sênior especializado em tecnologia. Analise currículos de forma profissional e forneça feedback construtivo. Responda sempre em JSON válido com as chaves exactas: strengths, weaknesses, suggestions, fullAnalysis."},
+		{Role: "system", Content: "Você é um Analista de RH Sênior especializado em tecnologia. Use os cabeçalhos PONTOS FORTES, PONTOS DE ATENÇÃO, SUGESTÕES DE MELHORIA e ANÁLISE COMPLETA. Use bullets (-) para listar itens."},
 		{Role: "user", Content: prompt},
 	}
 
 	body, err := json.Marshal(ChatRequest{
-		Model:    "local-model",
-		Messages: messages,
+		Model:       "local-model",
+		Messages:    messages,
+		Temperature: 0.1,
 	})
 	if err != nil {
 		return nil, err
@@ -306,40 +315,60 @@ Responda estritamente em formato JSON válido com esta estrutura exata:
 		return nil, fmt.Errorf("sem resposta da AI")
 	}
 
-	responseText := result.Choices[0].Message.Content
+	rawText := strings.TrimSpace(result.Choices[0].Message.Content)
 
-	// Clean up response - remove markdown code blocks if present
-	responseText = strings.TrimPrefix(responseText, "```json")
-	responseText = strings.TrimPrefix(responseText, "```")
-	responseText = strings.TrimSuffix(responseText, "```")
-	responseText = strings.TrimSpace(responseText)
+	analysis := map[string]interface{}{
+		"strengths":   extractBullets(rawText, "PONTOS FORTES", "PONTOS DE ATENÇÃO"),
+		"weaknesses":  extractBullets(rawText, "PONTOS DE ATENÇÃO", "SUGESTÕES DE MELHORIA"),
+		"suggestions": extractBullets(rawText, "SUGESTÕES DE MELHORIA", "ANÁLISE COMPLETA"),
+	}
 
-	// Try to parse as JSON
-	var analysis map[string]interface{}
-	if err := json.Unmarshal([]byte(responseText), &analysis); err != nil {
-		// Try to find JSON in response if wrapped in quotes
-		first := strings.Index(responseText, "{")
-		last := strings.LastIndex(responseText, "}")
-		if first != -1 && last != -1 && last > first {
-			responseText = responseText[first : last+1]
-			if err := json.Unmarshal([]byte(responseText), &analysis); err != nil {
-				log.Printf("Erro ao parsear JSON: %v", err)
-				analysis = map[string]interface{}{
-					"fullAnalysis": responseText,
-					"strengths":    []string{},
-					"weaknesses":   []string{},
-					"suggestions":   []string{},
-				}
-			}
-		} else {
-			analysis = map[string]interface{}{
-				"fullAnalysis": responseText,
-				"strengths":    []string{},
-				"weaknesses":   []string{},
-				"suggestions":   []string{},
-			}
-		}
+	analiseIdx := strings.Index(rawText, "ANÁLISE COMPLETA")
+	if analiseIdx != -1 {
+		after := rawText[analiseIdx+len("ANÁLISE COMPLETA"):]
+		analysis["fullAnalysis"] = strings.TrimSpace(after)
+	} else {
+		analysis["fullAnalysis"] = rawText
 	}
 
 	return analysis, nil
+}
+
+func extractBullets(text, sectionStart, sectionEnd string) []string {
+	start := strings.Index(text, sectionStart)
+	if start == -1 {
+		return []string{}
+	}
+	content := text[start+len(sectionStart):]
+	if sectionEnd != "" {
+		end := strings.Index(content, sectionEnd)
+		if end != -1 {
+			content = content[:end]
+		}
+	}
+	lines := strings.Split(content, "\n")
+	var items []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "- ") {
+			items = append(items, strings.TrimPrefix(line, "- "))
+		} else if strings.HasPrefix(line, "* ") {
+			items = append(items, strings.TrimPrefix(line, "* "))
+		} else if matched, _ := regexp.MatchString(`^\d+[\.\)]\s`, line); matched {
+			re := regexp.MustCompile(`^\d+[\.\)]\s`)
+			items = append(items, re.ReplaceAllString(line, ""))
+		}
+	}
+	if len(items) == 0 {
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "**") && !strings.HasPrefix(line, "#") {
+				items = append(items, line)
+			}
+		}
+	}
+	return items
 }

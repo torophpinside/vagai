@@ -6,19 +6,75 @@
         <p class="text-slate-400">Gerencie as oportunidades encontradas pelo scanner.</p>
       </div>
       <div class="flex gap-4 items-center">
-        <div class="relative">
-          <select 
-            v-model="filters.site" 
-            class="bg-slate-800/50 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none min-w-[200px]"
-          >
-            <option value="">Todos os Sites</option>
-            <option v-for="site in sites" :key="site.id" :value="site.id">
-              {{ site.name }}
-            </option>
-          </select>
-          <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <Filter class="w-4 h-4" />
-          </div>
+        <div class="relative" ref="siteRef">
+          <button @click="siteOpen = !siteOpen" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
+            <Filter class="w-4 h-4 text-slate-500 shrink-0" />
+            <span class="text-sm text-slate-300">
+              <template v-if="!filters.site">Todos os Sites</template>
+              <template v-else>{{ siteLabel }}</template>
+            </span>
+            <ChevronDown class="w-3.5 h-3.5 text-slate-500 transition-transform" :class="siteOpen ? 'rotate-180' : ''" />
+          </button>
+          <transition name="fade">
+            <div v-if="siteOpen" class="absolute left-0 mt-2 w-56 bg-slate-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+              <div class="p-2 space-y-0.5">
+                <button
+                  @click="filters.site = ''; siteOpen = false"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+                  :class="!filters.site ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+                >
+                  <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="!filters.site ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                    <svg v-if="!filters.site" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  Todos os Sites
+                </button>
+                <button
+                  v-for="site in sites" :key="site.id"
+                  @click="filters.site = site.id; siteOpen = false"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+                  :class="filters.site === site.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+                >
+                  <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.site === site.id ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                    <svg v-if="filters.site === site.id" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  {{ site.name }}
+                </button>
+              </div>
+            </div>
+          </transition>
+        </div>
+        <div class="relative" ref="statusRef">
+          <button @click="statusOpen = !statusOpen" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
+            <Filter class="w-4 h-4 text-slate-500 shrink-0" />
+            <span class="text-sm text-slate-300">
+              <template v-if="filters.status.length === 0">Status</template>
+              <template v-else>{{ filters.status.length }} status{{ filters.status.length > 1 ? '' : '' }}</template>
+            </span>
+            <ChevronDown class="w-3.5 h-3.5 text-slate-500 transition-transform" :class="statusOpen ? 'rotate-180' : ''" />
+          </button>
+          <transition name="fade">
+            <div v-if="statusOpen" class="absolute right-0 mt-2 w-56 bg-slate-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+              <div class="p-2 space-y-0.5">
+                <button
+                  v-for="opt in statusOptions" :key="opt.value"
+                  @click="toggleStatus(opt.value)"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+                  :class="filters.status.includes(opt.value) ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+                >
+                  <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.status.includes(opt.value) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                    <svg v-if="filters.status.includes(opt.value)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  {{ opt.label }}
+                </button>
+              </div>
+              <div v-if="filters.status.length > 0" class="border-t border-white/5 p-2">
+                <button @click="filters.status = []; statusOpen = false" class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                  <X class="w-4 h-4" />
+                  Limpar filtros
+                </button>
+              </div>
+            </div>
+          </transition>
         </div>
         <button class="btn-primary flex items-center gap-2">
           <RefreshCcw class="w-4 h-4" />
@@ -61,7 +117,7 @@
               </td>
               <td class="px-8 py-6">
                 <span :class="statusClass(job.status)" class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
-                  {{ job.status }}
+                  {{ statusLabelMap[job.status] || job.status }}
                 </span>
               </td>
               <td class="px-8 py-6 text-slate-400 text-sm">
@@ -81,23 +137,106 @@
           </tbody>
         </table>
       </div>
+      <div v-if="totalPages > 0" class="flex items-center justify-between px-8 py-4 border-t border-white/5">
+        <span class="text-sm text-slate-400">
+          {{ showingInfo }}
+        </span>
+        <div class="flex items-center gap-2">
+          <button @click="filters.page--" :disabled="filters.page <= 1" class="px-3 py-1.5 text-sm rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+            <ChevronLeft class="w-4 h-4 inline-block -ml-0.5" />
+            Anterior
+          </button>
+          <span class="text-sm text-slate-400 px-2 font-mono">{{ filters.page }} / {{ totalPages }}</span>
+          <button @click="filters.page++" :disabled="filters.page >= totalPages" class="px-3 py-1.5 text-sm rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+            Próximo
+            <ChevronRight class="w-4 h-4 inline-block -mr-0.5" />
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useJobs, useSites, updateJobStatus } from '../services/api'
-import { ExternalLink, Trash2, RefreshCcw, Filter } from 'lucide-vue-next'
-
-const filters = reactive({
-  site: ''
-})
+import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
-const { data: jobs, isLoading } = useJobs(filters)
 const { data: sites } = useSites()
+
+const filters = reactive({
+  site: '',
+  status: [],
+  page: 1,
+  limit: 20
+})
+
+watch([() => filters.site, () => filters.status], () => {
+  filters.page = 1
+})
+
+const { data: jobsResponse, isLoading } = useJobs(filters)
+
+const jobs = computed(() => jobsResponse.value?.data || [])
+const total = computed(() => jobsResponse.value?.total || 0)
+const totalPages = computed(() => jobsResponse.value?.totalPages || 0)
+
+const showingInfo = computed(() => {
+  if (total.value === 0) return 'Nenhuma vaga encontrada'
+  const from = (filters.page - 1) * filters.limit + 1
+  const to = Math.min(filters.page * filters.limit, total.value)
+  return `Mostrando ${from} a ${to} de ${total.value} vagas`
+})
+
+const statusOptions = [
+  { value: 'new', label: 'Novas' },
+  { value: 'matched', label: 'Match' },
+  { value: 'analyzed', label: 'Analisadas' },
+  { value: 'unmatched', label: 'Sem Match' },
+  { value: 'ignored', label: 'Ignoradas' }
+]
+
+const statusLabelMap = {
+  new: 'Nova',
+  matched: 'Match',
+  analyzed: 'Analisada',
+  unmatched: 'Sem Match',
+  ignored: 'Ignorada'
+}
+
+const siteOpen = ref(false)
+const siteRef = ref(null)
+
+const siteLabel = computed(() => {
+  const selected = sites.value?.find(s => s.id === filters.site)
+  return selected?.name || ''
+})
+
+const statusOpen = ref(false)
+const statusRef = ref(null)
+
+const onClickOutside = (e) => {
+  if (siteRef.value && !siteRef.value.contains(e.target)) {
+    siteOpen.value = false
+  }
+  if (statusRef.value && !statusRef.value.contains(e.target)) {
+    statusOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
+
+const toggleStatus = (value) => {
+  const idx = filters.status.indexOf(value)
+  if (idx >= 0) {
+    filters.status.splice(idx, 1)
+  } else {
+    filters.status.push(value)
+  }
+}
 
 const hideJob = async (jobId) => {
   await updateJobStatus(jobId, 'ignored')
@@ -108,6 +247,8 @@ const statusClass = (status) => {
   const classes = {
     new: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
     matched: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    analyzed: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    unmatched: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
     ignored: 'bg-slate-700/50 text-slate-400 border-white/5'
   }
   return classes[status] || classes.new
@@ -123,3 +264,13 @@ const formatDate = (date) => {
   }).format(new Date(date))
 }
 </script>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>

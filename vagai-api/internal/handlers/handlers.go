@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -30,14 +32,61 @@ func getDB(c *gin.Context) *gorm.DB {
 	return DB
 }
 
+type planResource string
+
+const (
+	resourceSites   planResource = "sites"
+	resourceResumes planResource = "resumes"
+	resourceJobs    planResource = "jobs"
+)
+
+func checkPlanLimit(db *gorm.DB, orgID uint, resource planResource) (allowed bool, current int, maxLimit int, err error) {
+	var org models.Organization
+	if err := db.First(&org, orgID).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	var plan models.Plan
+	if err := db.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	switch resource {
+	case resourceSites:
+		maxLimit = plan.MaxSites
+	case resourceResumes:
+		maxLimit = plan.MaxResumes
+	case resourceJobs:
+		maxLimit = plan.MaxJobs
+	}
+
+	if maxLimit == -1 {
+		return true, 0, 0, nil
+	}
+
+	var count int64
+	switch resource {
+	case resourceSites:
+		db.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&count)
+	case resourceResumes:
+		db.Model(&models.Resume{}).Where("organization_id = ?", orgID).Count(&count)
+	case resourceJobs:
+		db.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&count)
+	}
+	current = int(count)
+
+	return current < maxLimit, current, maxLimit, nil
+}
+
 func ListJobs(c *gin.Context) {
 	db := getDB(c)
 	orgID := c.GetUint("org_id")
-	var jobs []models.Job
+
 	query := db.Where("organization_id = ?", orgID)
 
 	if status := c.Query("status"); status != "" {
-		query = query.Where("status = ?", status)
+		statuses := strings.Split(status, ",")
+		query = query.Where("status IN ?", statuses)
 	} else {
 		query = query.Where("status NOT IN ?", []string{"ignored", "unmatched"})
 	}
@@ -46,8 +95,33 @@ func ListJobs(c *gin.Context) {
 		query = query.Where("site_id = ?", site)
 	}
 
-	query.Preload("Site").Find(&jobs)
-	c.JSON(http.StatusOK, jobs)
+	var total int64
+	query.Model(&models.Job{}).Count(&total)
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	var jobs []models.Job
+	query.Preload("Site").Offset(offset).Limit(limit).Find(&jobs)
+
+	if jobs == nil {
+		jobs = []models.Job{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":       jobs,
+		"total":      total,
+		"page":       page,
+		"limit":      limit,
+		"totalPages": (int(total) + limit - 1) / limit,
+	})
 }
 
 func GetJob(c *gin.Context) {
@@ -113,7 +187,16 @@ func ListMatches(c *gin.Context) {
 	}
 
 	if site := c.Query("site"); site != "" {
-		query = query.Where("jobs.site_id = ?", site)
+		siteIDs := strings.Split(site, ",")
+		ids := make([]uint, 0, len(siteIDs))
+		for _, s := range siteIDs {
+			if id, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32); err == nil {
+				ids = append(ids, uint(id))
+			}
+		}
+		if len(ids) > 0 {
+			query = query.Where("jobs.site_id IN ?", ids)
+		}
 	}
 
 	if sortOrder == "asc" {
@@ -294,11 +377,27 @@ func AddSite(c *gin.Context) {
 		return
 	}
 
+	orgID, _ := c.Get("org_id")
+
 	// Usa organization_id do JWT se não fornecido
 	if site.OrganizationID == 0 {
-		if orgID, exists := c.Get("org_id"); exists {
+		if orgID != nil {
 			site.OrganizationID = orgID.(uint)
 		}
+	}
+
+	allowed, current, maxLimit, err := checkPlanLimit(db, site.OrganizationID, resourceSites)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":  fmt.Sprintf("Limite de sites atingido: %d/%d", current, maxLimit),
+			"current": current,
+			"limit":  maxLimit,
+		})
+		return
 	}
 
 	site.Active = true
@@ -343,6 +442,22 @@ func UploadResume(c *gin.Context) {
 		return
 	}
 
+	orgID := c.GetUint("org_id")
+
+	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceResumes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   fmt.Sprintf("Limite de currículos atingido: %d/%d", current, maxLimit),
+			"current": current,
+			"limit":   maxLimit,
+		})
+		return
+	}
+
 	uploadDir := "./uploads/resumes"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao criar diretório de uploads"})
@@ -363,7 +478,6 @@ func UploadResume(c *gin.Context) {
 
 	if content != "" {
 		log.Printf("Processando conteúdo com AI...")
-		// Timeout de 180s para AI
 		done := make(chan bool, 1)
 		go func() {
 			processedContent, aiErr := services.ProcessResumeContent(content)
@@ -376,17 +490,13 @@ func UploadResume(c *gin.Context) {
 		}()
 		select {
 		case <-done:
-			// OK
 		case <-time.After(180 * time.Second):
 			log.Printf("Timeout no processamento AI")
 		}
 	}
 
 	var resume models.Resume
-	// Usa organization_id do JWT
-	if orgID, exists := c.Get("org_id"); exists {
-		resume.OrganizationID = orgID.(uint)
-	}
+	resume.OrganizationID = orgID
 	resume.Name = file.Filename
 	resume.FilePath = filePath
 	resume.Content = content
@@ -474,7 +584,22 @@ func AnalyzeResume(c *gin.Context) {
 	}
 
 	log.Printf("Análise salva: ID=%d, File=%s", analysis.ID, file.Filename)
-	c.JSON(http.StatusCreated, analysis)
+
+	var parsedStrengths, parsedWeaknesses, parsedSuggestions []string
+	json.Unmarshal([]byte(analysis.Strengths), &parsedStrengths)
+	json.Unmarshal([]byte(analysis.Weaknesses), &parsedWeaknesses)
+	json.Unmarshal([]byte(analysis.Suggestions), &parsedSuggestions)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"id":              analysis.ID,
+		"organization_id": analysis.OrganizationID,
+		"file_name":       analysis.FileName,
+		"fullAnalysis":    analysis.FullAnalysis,
+		"strengths":       parsedStrengths,
+		"weaknesses":      parsedWeaknesses,
+		"suggestions":     parsedSuggestions,
+		"created_at":      analysis.CreatedAt,
+	})
 }
 
 func DeleteResumeAnalysis(c *gin.Context) {
@@ -504,12 +629,33 @@ func DeleteResumeAnalysis(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Análise removida"})
 }
 
+func formatAnalysisResponse(a models.ResumeAnalysis) gin.H {
+	var strengths, weaknesses, suggestions []string
+	json.Unmarshal([]byte(a.Strengths), &strengths)
+	json.Unmarshal([]byte(a.Weaknesses), &weaknesses)
+	json.Unmarshal([]byte(a.Suggestions), &suggestions)
+	return gin.H{
+		"id":              a.ID,
+		"organization_id": a.OrganizationID,
+		"file_name":       a.FileName,
+		"fullAnalysis":    a.FullAnalysis,
+		"strengths":       strengths,
+		"weaknesses":      weaknesses,
+		"suggestions":     suggestions,
+		"created_at":      a.CreatedAt,
+	}
+}
+
 func ListResumeAnalyses(c *gin.Context) {
 	db := getDB(c)
 	orgID := c.GetUint("org_id")
 	var analyses []models.ResumeAnalysis
 	db.Where("organization_id = ?", orgID).Order("created_at desc").Find(&analyses)
-	c.JSON(http.StatusOK, analyses)
+	result := make([]gin.H, len(analyses))
+	for i, a := range analyses {
+		result[i] = formatAnalysisResponse(a)
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func GetResumeAnalysis(c *gin.Context) {
@@ -521,7 +667,16 @@ func GetResumeAnalysis(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Análise não encontrada"})
 		return
 	}
-	c.JSON(http.StatusOK, analysis)
+	c.JSON(http.StatusOK, formatAnalysisResponse(analysis))
+}
+
+func ListPlans(c *gin.Context) {
+	var plans []models.Plan
+	DB.Find(&plans)
+	if plans == nil {
+		plans = []models.Plan{}
+	}
+	c.JSON(http.StatusOK, plans)
 }
 
 func toStringSlice(v interface{}) []string {

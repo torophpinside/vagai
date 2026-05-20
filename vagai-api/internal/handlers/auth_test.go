@@ -265,6 +265,39 @@ func TestRegister_InvalidEmail(t *testing.T) {
 	}
 }
 
+func TestChangePlan_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("org_id", uint(1))
+
+	c.Request = httptest.NewRequest("PUT", "/plan", strings.NewReader("invalid"))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	ChangePlan(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestChangePlan_MissingPlanSlug(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("org_id", uint(1))
+
+	body := `{}`
+	c.Request = httptest.NewRequest("PUT", "/plan", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	ChangePlan(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
 func TestSetDB(t *testing.T) {
 	var testDB *gorm.DB
 	SetDB(testDB)

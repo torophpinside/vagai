@@ -47,6 +47,8 @@ func Init() error {
 func autoMigrate() error {
 	log.Println("Executando auto migrate...")
 	return DB.AutoMigrate(
+		&models.Organization{},
+		&models.Plan{},
 		&models.Site{},
 		&models.Job{},
 		&models.Resume{},
@@ -72,4 +74,50 @@ func Log(orgID uint, agentName, action, details string) {
 		Details:        details,
 	}
 	DB.Create(&logEntry)
+}
+
+func CheckJobsLimit(orgID uint) (bool, int, int, error) {
+	var org models.Organization
+	if err := DB.First(&org, orgID).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	var plan models.Plan
+	if err := DB.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	if plan.MaxJobs == -1 {
+		return true, 0, 0, nil
+	}
+
+	var count int64
+	DB.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&count)
+
+	return int(count) < plan.MaxJobs, int(count), plan.MaxJobs, nil
+}
+
+func CheckSitesLimit(orgID uint) (bool, int, int, error) {
+	if orgID == 0 {
+		return true, 0, 0, nil
+	}
+
+	var org models.Organization
+	if err := DB.First(&org, orgID).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	var plan models.Plan
+	if err := DB.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+		return false, 0, 0, err
+	}
+
+	if plan.MaxSites == -1 {
+		return true, 0, 0, nil
+	}
+
+	var count int64
+	DB.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&count)
+
+	return int(count) < plan.MaxSites, int(count), plan.MaxSites, nil
 }

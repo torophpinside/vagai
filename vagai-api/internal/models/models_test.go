@@ -13,6 +13,7 @@ func TestJobStatusConstants(t *testing.T) {
 	}{
 		{"New", JobStatusNew, "new"},
 		{"Matched", JobStatusMatched, "matched"},
+		{"Analyzed", JobStatusAnalyzed, "analyzed"},
 		{"Unmatched", JobStatusUnmatched, "unmatched"},
 		{"Ignored", JobStatusIgnored, "ignored"},
 	}

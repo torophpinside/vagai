@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/anomalyco/vagai-api/internal/middleware"
 	"github.com/anomalyco/vagai-api/internal/models"
@@ -43,10 +42,9 @@ func Register(c *gin.Context) {
 	defer tx.Rollback()
 
 	org := models.Organization{
-		Name:        body.Organization,
-		Slug:        generateSlug(body.Organization),
-		Plan:        "free",
-		TrialEndsAt: func() *time.Time { t := time.Now().Add(14 * 24 * time.Hour); return &t }(),
+		Name: body.Organization,
+		Slug: generateSlug(body.Organization),
+		Plan: "free",
 	}
 	if err := tx.Create(&org).Error; err != nil {
 		if strings.Contains(err.Error(), "Duplicate") {
@@ -81,12 +79,21 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	var freePlan models.Plan
+	if err := tx.Where("slug = ?", "free").First(&freePlan).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao configurar plano"})
+		return
+	}
+
 	subscription := models.Subscription{
 		OrganizationID: org.ID,
-		Status:         models.SubStatusTrial,
-		CurrentPeriodEnd: func() *time.Time { t := time.Now().Add(14 * 24 * time.Hour); return &t }(),
+		PlanID:         freePlan.ID,
+		Status:         models.SubStatusActive,
 	}
-	tx.Create(&subscription)
+	if err := tx.Create(&subscription).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar assinatura"})
+		return
+	}
 
 	tx.Commit()
 
@@ -102,6 +109,7 @@ func Register(c *gin.Context) {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  membership.Role,
 		},
 		"organization": gin.H{
 			"id":   org.ID,
@@ -110,7 +118,6 @@ func Register(c *gin.Context) {
 			"plan": org.Plan,
 		},
 		"token": token,
-		"trial_ends_at": subscription.CurrentPeriodEnd,
 	})
 }
 
@@ -154,6 +161,7 @@ func Login(c *gin.Context) {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  membership.Role,
 		},
 		"organization": gin.H{
 			"id":   membership.Organization.ID,
@@ -187,6 +195,14 @@ func GetMe(c *gin.Context) {
 	var sub models.Subscription
 	DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub)
 
+	var plan models.Plan
+	DB.Where("slug = ?", org.Plan).First(&plan)
+
+	var jobCount, resumeCount, siteCount int64
+	DB.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&jobCount)
+	DB.Model(&models.Resume{}).Where("organization_id = ?", orgID).Count(&resumeCount)
+	DB.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&siteCount)
+
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
 			"id":    user.ID,
@@ -202,6 +218,21 @@ func GetMe(c *gin.Context) {
 			"slug":          org.Slug,
 			"plan":          org.Plan,
 			"trial_ends_at": org.TrialEndsAt,
+		},
+		"plan": gin.H{
+			"name":             plan.Name,
+			"slug":             plan.Slug,
+			"price_monthly":    plan.PriceMonthly,
+			"price_yearly":     plan.PriceYearly,
+			"max_jobs":         plan.MaxJobs,
+			"max_resumes":      plan.MaxResumes,
+			"max_sites":        plan.MaxSites,
+			"features":         plan.Features,
+		},
+		"usage": gin.H{
+			"jobs":    jobCount,
+			"resumes": resumeCount,
+			"sites":   siteCount,
 		},
 		"subscription": gin.H{
 			"status":              sub.Status,
@@ -267,6 +298,55 @@ func ChangePassword(c *gin.Context) {
 	DB.Model(&user).Update("password_hash", string(hashedPassword))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Senha alterada com sucesso"})
+}
+
+func ChangePlan(c *gin.Context) {
+	orgID, _ := c.Get("org_id")
+
+	var body struct {
+		PlanSlug string `json:"plan_slug" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var plan models.Plan
+	if err := DB.Where("slug = ?", body.PlanSlug).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Plano não encontrado"})
+		return
+	}
+
+	var org models.Organization
+	if err := DB.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+		return
+	}
+
+	org.Plan = plan.Slug
+	if err := DB.Save(&org).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar plano"})
+		return
+	}
+
+	var sub models.Subscription
+	if err := DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub).Error; err == nil {
+		sub.PlanID = plan.ID
+		DB.Save(&sub)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Plano alterado para " + plan.Name,
+		"plan": gin.H{
+			"name":           plan.Name,
+			"slug":           plan.Slug,
+			"price_monthly":  plan.PriceMonthly,
+			"max_jobs":       plan.MaxJobs,
+			"max_resumes":    plan.MaxResumes,
+			"max_sites":      plan.MaxSites,
+			"features":       plan.Features,
+		},
+	})
 }
 
 func generateSlug(name string) string {

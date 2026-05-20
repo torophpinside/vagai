@@ -11,6 +11,7 @@ type JobStatus string
 const (
 	JobStatusNew       JobStatus = "new"
 	JobStatusMatched   JobStatus = "matched"
+	JobStatusAnalyzed  JobStatus = "analyzed"
 	JobStatusUnmatched JobStatus = "unmatched"
 	JobStatusIgnored   JobStatus = "ignored"
 )
@@ -77,7 +78,7 @@ type Plan struct {
 	MaxJobs         int       `gorm:"default:100" json:"max_jobs"`
 	MaxResumes      int       `gorm:"default:3" json:"max_resumes"`
 	MaxSites        int       `gorm:"default:5" json:"max_sites"`
-	MaxCrawlsPerDay int       `gorm:"default:10" json:"max_crawls_per_day"`
+	MaxCrawlsPerDay int       `gorm:"default:10" json:"-"`
 	Features        string    `gorm:"type:json" json:"features"`
 	StripePriceID   string    `gorm:"size:255" json:"-"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -178,8 +179,7 @@ type Match struct {
 type ResumeAnalysis struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID uint      `gorm:"index;not null" json:"organization_id"`
-	ResumeID       uint      `gorm:"index" json:"resume_id"`
-	Resume         Resume    `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
+	ResumeID       *uint     `gorm:"index" json:"resume_id"`
 	FileName       string    `gorm:"size:255" json:"file_name"`
 	FullAnalysis   string    `gorm:"type:text" json:"full_analysis"`
 	Strengths      string    `gorm:"type:json" json:"strengths"`
