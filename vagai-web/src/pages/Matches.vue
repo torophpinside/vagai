@@ -50,18 +50,12 @@
               class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
               :class="filters.sort === 'desc' ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
             >
-              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.sort === 'desc' ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
-                <svg v-if="filters.sort === 'desc'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-              </div>
               Maior similaridade
             </button>
             <button @click="filters.sort = 'asc'; close()"
               class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
               :class="filters.sort === 'asc' ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
             >
-              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.sort === 'asc' ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
-                <svg v-if="filters.sort === 'asc'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-              </div>
               Menor similaridade
             </button>
           </template>
