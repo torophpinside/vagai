@@ -37,14 +37,35 @@
           </template>
         </DropdownMenu>
 
-        <!-- Sort -->
-        <div class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl">
-          <ArrowUpDown class="w-4 h-4 text-slate-500" />
-          <select v-model="filters.sort" class="bg-transparent text-sm text-slate-300 outline-none">
-            <option value="desc" class="bg-slate-900">Maior similaridade</option>
-            <option value="asc" class="bg-slate-900">Menor similaridade</option>
-          </select>
-        </div>
+        <DropdownMenu v-model:open="sortOpen">
+          <template #trigger="{ open, toggle }">
+            <button @click="toggle" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
+              <ArrowUpDown class="w-4 h-4 text-slate-500 shrink-0" />
+              <span class="text-sm text-slate-300">{{ sortLabel }}</span>
+              <ChevronDown class="w-3.5 h-3.5 text-slate-500" :class="open ? 'rotate-180' : ''" />
+            </button>
+          </template>
+          <template #default="{ close }">
+            <button @click="filters.sort = 'desc'; close()"
+              class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+              :class="filters.sort === 'desc' ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+            >
+              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.sort === 'desc' ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                <svg v-if="filters.sort === 'desc'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+              </div>
+              Maior similaridade
+            </button>
+            <button @click="filters.sort = 'asc'; close()"
+              class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+              :class="filters.sort === 'asc' ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+            >
+              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.sort === 'asc' ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                <svg v-if="filters.sort === 'asc'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+              </div>
+              Menor similaridade
+            </button>
+          </template>
+        </DropdownMenu>
       </div>
     </div>
 
@@ -119,7 +140,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useMatches, useSites, updateJobStatus, updateMatch } from '../services/api'
 import { 
@@ -146,6 +167,11 @@ const filters = reactive({
 })
 
 const siteOpen = ref(false)
+const sortOpen = ref(false)
+
+const sortLabel = computed(() => {
+  return filters.sort === 'desc' ? 'Maior similaridade' : 'Menor similaridade'
+})
 
 const toggleSite = (id) => {
   const idx = filters.site.indexOf(id)
