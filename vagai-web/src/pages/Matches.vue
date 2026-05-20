@@ -6,40 +6,36 @@
         <p class="text-slate-400">Correspondências inteligentes baseadas no seu currículo.</p>
       </div>
       <div class="flex items-center gap-4">
-        <!-- Site Filter - Multi-select Dropdown -->
-        <div class="relative" ref="siteFilterRef">
-          <button @click="siteOpen = !siteOpen" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
-            <Filter class="w-4 h-4 text-slate-500 shrink-0" />
-            <span class="text-sm text-slate-300">
-              <template v-if="filters.site.length === 0">Todos os Sites</template>
-              <template v-else>{{ filters.site.length }} site{{ filters.site.length > 1 ? 's' : '' }}</template>
-            </span>
-            <ChevronDown class="w-3.5 h-3.5 text-slate-500 transition-transform" :class="siteOpen ? 'rotate-180' : ''" />
-          </button>
-          <transition name="fade">
-            <div v-if="siteOpen" class="absolute right-0 mt-2 w-56 bg-slate-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-              <div class="p-2 space-y-0.5">
-                <button
-                  v-for="site in sites" :key="site.id"
-                  @click="toggleSite(site.id)"
-                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
-                  :class="filters.site.includes(site.id) ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
-                >
-                  <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.site.includes(site.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
-                    <svg v-if="filters.site.includes(site.id)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-                  </div>
-                  {{ site.name }}
-                </button>
+        <DropdownMenu v-model:open="siteOpen" position="bottom-right">
+          <template #trigger="{ open, toggle }">
+            <button @click="toggle" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
+              <Filter class="w-4 h-4 text-slate-500 shrink-0" />
+              <span class="text-sm text-slate-300">
+                <template v-if="filters.site.length === 0">Todos os Sites</template>
+                <template v-else>{{ filters.site.length }} site{{ filters.site.length > 1 ? 's' : '' }}</template>
+              </span>
+              <ChevronDown class="w-3.5 h-3.5 text-slate-500" :class="open ? 'rotate-180' : ''" />
+            </button>
+          </template>
+          <template #default="{ close }">
+            <button v-for="site in sites" :key="site.id"
+              @click="toggleSite(site.id)"
+              class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+              :class="filters.site.includes(site.id) ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+            >
+              <div class="w-4 h-4 rounded border flex items-center justify-center transition-all" :class="filters.site.includes(site.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                <svg v-if="filters.site.includes(site.id)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
               </div>
-              <div v-if="filters.site.length > 0" class="border-t border-white/5 p-2">
-                <button @click="filters.site = []; siteOpen = false" class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
-                  <X class="w-4 h-4" />
-                  Limpar filtros
-                </button>
-              </div>
+              {{ site.name }}
+            </button>
+            <div v-if="filters.site.length > 0" class="border-t border-white/5 p-2">
+              <button @click="filters.site = []; close()" class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                <X class="w-4 h-4" />
+                Limpar filtros
+              </button>
             </div>
-          </transition>
-        </div>
+          </template>
+        </DropdownMenu>
 
         <!-- Sort -->
         <div class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl">
@@ -123,7 +119,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useMatches, useSites, updateJobStatus, updateMatch } from '../services/api'
 import { 
@@ -140,6 +136,7 @@ import {
   X,
   ChevronDown
 } from 'lucide-vue-next'
+import DropdownMenu from '../components/DropdownMenu.vue'
 
 const filters = reactive({
   sort: 'desc',
@@ -149,16 +146,6 @@ const filters = reactive({
 })
 
 const siteOpen = ref(false)
-const siteFilterRef = ref(null)
-
-const onClickOutside = (e) => {
-  if (siteFilterRef.value && !siteFilterRef.value.contains(e.target)) {
-    siteOpen.value = false
-  }
-}
-
-onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 const toggleSite = (id) => {
   const idx = filters.site.indexOf(id)
@@ -214,11 +201,4 @@ const parseKeywords = (kws) => {
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
 </style>

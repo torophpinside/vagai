@@ -41,35 +41,38 @@
         </nav>
       </div>
 
-      <div class="mt-auto p-8 relative">
-        <div class="glass-card p-4 flex items-center gap-4">
-          <div class="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-            <User class="w-6 h-6 text-indigo-400" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-bold text-white truncate">{{ userName }}</div>
-            <div class="text-xs text-slate-500 truncate">{{ orgName }}</div>
-          </div>
-          <button @click="showUserMenu = !showUserMenu" class="text-slate-400 hover:text-white">
-            <ChevronUp v-if="showUserMenu" class="w-4 h-4" />
-            <ChevronDown v-else class="w-4 h-4" />
-          </button>
-        </div>
-
-        <div v-if="showUserMenu" class="absolute bottom-full left-8 right-8 mb-2 glass-card p-2 z-50">
-          <router-link to="/settings" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
-            <SettingsIcon class="w-4 h-4 inline mr-2" />
-            Configurações
-          </router-link>
-          <router-link to="/settings/billing" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
-            <CreditCard class="w-4 h-4 inline mr-2" />
-            Billing
-          </router-link>
-          <button @click="handleLogout" class="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-white/5 rounded-lg">
-            <LogOut class="w-4 h-4 inline mr-2" />
-            Sair
-          </button>
-        </div>
+      <div class="mt-auto p-8">
+        <DropdownMenu v-model:open="showUserMenu" position="top-left" width="" panel-class="right-0">
+          <template #trigger="{ open, toggle }">
+            <div class="glass-card p-4 flex items-center gap-4" @click="toggle">
+              <div class="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                <User class="w-6 h-6 text-indigo-400" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-bold text-white truncate">{{ userName }}</div>
+                <div class="text-xs text-slate-500 truncate">{{ orgName }}</div>
+              </div>
+              <button class="text-slate-400 hover:text-white">
+                <ChevronUp v-if="open" class="w-4 h-4" />
+                <ChevronDown v-else class="w-4 h-4" />
+              </button>
+            </div>
+          </template>
+          <template #default="{ close }">
+            <router-link @click="close" to="/settings" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
+              <SettingsIcon class="w-4 h-4 inline mr-2" />
+              Configurações
+            </router-link>
+            <router-link @click="close" to="/settings/billing" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
+              <CreditCard class="w-4 h-4 inline mr-2" />
+              Billing
+            </router-link>
+            <button @click="handleLogout" class="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-white/5 rounded-lg">
+              <LogOut class="w-4 h-4 inline mr-2" />
+              Sair
+            </button>
+          </template>
+        </DropdownMenu>
       </div>
     </aside>
 
@@ -116,6 +119,7 @@ import {
   LogOut
 } from 'lucide-vue-next'
 import { useAuth } from './composables/auth'
+import DropdownMenu from './components/DropdownMenu.vue'
 
 const router = useRouter()
 const { user, isAuthenticated, initAuth, logout } = useAuth()
