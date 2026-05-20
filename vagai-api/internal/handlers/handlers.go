@@ -214,13 +214,14 @@ func ListMatches(c *gin.Context) {
 	query := db.Model(&models.Match{}).
 		Where("matches.organization_id = ?", orgID).
 		Joins("JOIN jobs ON jobs.id = matches.job_id").
-		Where("jobs.status NOT IN ?", []string{"ignored", "unmatched"}).
 		Where("similarity_score >= ?", threshold)
 
 	if appliedFilter == "true" {
-		query = query.Where("matches.applied = ?", true)
+		query = query.Where("matches.applied = ?", true).
+			Where("jobs.status NOT IN ?", []string{"ignored", "unmatched"})
 	} else {
-		query = query.Where("matches.applied = ?", false)
+		query = query.Where("matches.applied = ?", false).
+			Where("jobs.status = ?", "matched")
 	}
 
 	if site := c.Query("site"); site != "" {
@@ -429,6 +430,41 @@ func DeleteSite(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Site removido"})
+}
+
+func UpdateSite(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	var site models.Site
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&site).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar site"})
+		}
+		return
+	}
+
+	var body struct {
+		Active *bool `json:"active"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if body.Active != nil {
+		site.Active = *body.Active
+	}
+
+	db.Save(&site)
+	c.JSON(http.StatusOK, site)
 }
 
 func AddSite(c *gin.Context) {

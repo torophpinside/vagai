@@ -77,6 +77,7 @@ export const usePlans = () => {
 }
 
 export const addSite = (site) => api.post('/sites', site)
+export const updateSite = (id, data) => api.patch(`/sites/${id}`, data)
 export const deleteSite = (id) => api.delete(`/sites/${id}`)
 export const uploadResume = (formData) => api.post('/resumes/upload', formData, {
   timeout: 180000

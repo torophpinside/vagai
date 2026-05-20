@@ -70,6 +70,7 @@ func main() {
 
 		api.GET("/sites", handlers.ListSites)
 		api.POST("/sites", handlers.AddSite)
+		api.PATCH("/sites/:id", handlers.UpdateSite)
 		api.DELETE("/sites/:id", handlers.DeleteSite)
 
 		api.GET("/resumes", handlers.ListResumes)

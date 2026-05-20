@@ -88,9 +88,9 @@
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <span :class="site.active ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-slate-700 bg-slate-700/50 text-slate-400'" class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border">
-                {{ site.active ? 'Ativo' : 'Inativo' }}
-              </span>
+              <button @click="toggleSiteActive(site)" :class="site.active ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'" class="p-2 rounded-lg transition-all" :title="site.active ? 'Desativar' : 'Ativar'">
+                <Power class="w-4 h-4" />
+              </button>
               <button @click="handleDeleteSite(site.id)" class="p-2 bg-slate-700/50 text-slate-400 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition-all">
                 <Trash2 class="w-4 h-4" />
               </button>
@@ -175,7 +175,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { addSite, deleteSite, uploadResume, useSites, useResumes } from '../services/api'
+import { addSite, updateSite, deleteSite, uploadResume, useSites, useResumes } from '../services/api'
 import { 
   Globe, 
   Plus, 
@@ -187,7 +187,8 @@ import {
   Trash2,
   ExternalLink,
   Users,
-  CreditCard
+  CreditCard,
+  Power
 } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
@@ -217,6 +218,13 @@ const deleteSiteMutation = useMutation({
   }
 })
 
+const toggleSiteMutation = useMutation({
+  mutationFn: ({ id, data }) => updateSite(id, data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['sites'] })
+  }
+})
+
 const resumeMutation = useMutation({
   mutationFn: uploadResume,
   onSuccess: () => {
@@ -230,6 +238,9 @@ const handleDeleteSite = (id) => {
   if (confirm('Remover esta fonte?')) {
     deleteSiteMutation.mutate(id)
   }
+}
+const toggleSiteActive = (site) => {
+  toggleSiteMutation.mutate({ id: site.id, data: { active: !site.active } })
 }
 const handleFileChange = (e) => { resumeFile.value = e.target.files[0] }
 const handleUploadResume = () => {

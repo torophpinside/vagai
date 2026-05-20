@@ -127,7 +127,7 @@ func Run(threshold int, force bool) error {
 		// Buscar organization_id do job
 		var job models.Job
 		db.DB.First(&job, result.jobID)
-		
+
 		match := models.Match{
 			OrganizationID:  job.OrganizationID,
 			JobID:           result.jobID,
