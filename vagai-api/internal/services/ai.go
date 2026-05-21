@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 var baseURL = "http://127.0.0.1:1234"
@@ -435,14 +437,23 @@ Se nao encontrar um campo, deixe string vazia.`, aiInput, url)
 }
 
 func stripHTMLTags(html string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	text := re.ReplaceAllString(html, " ")
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return html
+	}
+
+	doc.Find("script, style, noscript, iframe, svg, meta, link, head").Remove()
+
+	var text string
+	doc.Find("body").Each(func(_ int, s *goquery.Selection) {
+		text = s.Text()
+	})
+	if text == "" {
+		text = doc.Text()
+	}
+
 	text = strings.ReplaceAll(text, "&nbsp;", " ")
 	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
 	reSpace := regexp.MustCompile(`\s+`)
 	text = reSpace.ReplaceAllString(text, " ")
 	return strings.TrimSpace(text)
