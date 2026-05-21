@@ -6,6 +6,10 @@
         <p class="text-slate-400">Gerencie as oportunidades encontradas pelo scanner.</p>
       </div>
       <div class="flex gap-4 items-center">
+        <div class="relative flex-1 max-w-xs">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input v-model="searchQuery" type="text" placeholder="Buscar por título..." class="input-field pl-10 h-12 w-full" />
+        </div>
         <DropdownMenu v-model:open="siteOpen">
           <template #trigger="{ open, toggle }">
             <button @click="toggle" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
@@ -168,7 +172,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useJobs, useSites, updateJobStatus } from '../services/api'
-import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X, CheckCircle2 } from 'lucide-vue-next'
+import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X, CheckCircle2, Search } from 'lucide-vue-next'
 import DropdownMenu from '../components/DropdownMenu.vue'
 
 const queryClient = useQueryClient()
@@ -177,11 +181,22 @@ const { data: sites } = useSites()
 const filters = reactive({
   site: [],
   status: [],
+  search: '',
   page: 1,
   limit: 20
 })
 
-watch([() => filters.site, () => filters.status], () => {
+const searchQuery = ref('')
+
+let searchTimer
+watch(searchQuery, (val) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    filters.search = val
+  }, 300)
+})
+
+watch([() => filters.site, () => filters.status, () => filters.search], () => {
   filters.page = 1
 }, { deep: true })
 

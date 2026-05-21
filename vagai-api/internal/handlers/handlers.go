@@ -104,6 +104,10 @@ func ListJobs(c *gin.Context) {
 		}
 	}
 
+	if search := c.Query("search"); search != "" {
+		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(search)+"%")
+	}
+
 	var total int64
 	query.Model(&models.Job{}).Count(&total)
 
