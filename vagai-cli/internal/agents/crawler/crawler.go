@@ -179,7 +179,7 @@ func crawlSite(site models.Site) error {
 
 			job := models.Job{
 				OrganizationID: site.OrganizationID,
-				SiteID:         site.ID,
+				SiteID:         &site.ID,
 				URL:            link,
 				Title:          title,
 				Company:        company,
@@ -265,7 +265,7 @@ func crawlSite(site models.Site) error {
 
 			job := models.Job{
 				OrganizationID: site.OrganizationID,
-				SiteID:         site.ID,
+				SiteID:         &site.ID,
 				URL:            link,
 				Title:          title,
 				Company:        company,
@@ -520,7 +520,7 @@ func crawlWorkana(site models.Site) error {
 
 			job := models.Job{
 				OrganizationID: site.OrganizationID,
-				SiteID:         site.ID,
+				SiteID:         &site.ID,
 				URL:            jobURL,
 				Title:          title,
 				Company:        authorName,
@@ -620,7 +620,7 @@ func crawlRemoteOKAPI(site models.Site) error {
 
 		job = models.Job{
 			OrganizationID: site.OrganizationID,
-			SiteID:        site.ID,
+			SiteID:        &site.ID,
 			URL:           jobURL,
 			Title:         title,
 			Company:       company,
@@ -703,7 +703,7 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 
 		job = models.Job{
 			OrganizationID: site.OrganizationID,
-			SiteID:        site.ID,
+			SiteID:        &site.ID,
 			URL:           jobURL,
 			Title:         title,
 			Description:   stripHTML(description),

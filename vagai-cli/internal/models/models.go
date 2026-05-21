@@ -60,8 +60,8 @@ type Site struct {
 type Job struct {
 	ID             uint       `gorm:"primaryKey" json:"id"`
 	OrganizationID uint       `gorm:"index;default:0" json:"organization_id"`
-	SiteID         uint       `gorm:"index" json:"site_id"`
-	Site           Site       `gorm:"foreignKey:SiteID" json:"site,omitempty"`
+	SiteID         *uint      `gorm:"index" json:"site_id"`
+	Site           *Site      `gorm:"foreignKey:SiteID" json:"site,omitempty"`
 	Title          string     `gorm:"size:255" json:"title"`
 	Company        string     `gorm:"size:255" json:"company"`
 	Description    string     `gorm:"type:text" json:"description"`
