@@ -340,13 +340,25 @@ func ExtractJobFromURL(url string) (map[string]string, error) {
 		return nil, fmt.Errorf("erro ao buscar página: %w", err)
 	}
 
-	if len(htmlContent) > 40000 {
-		htmlContent = htmlContent[:40000]
+	pageText := stripHTMLTags(htmlContent)
+
+	lines := strings.Split(pageText, "\n")
+	var cleaned []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			cleaned = append(cleaned, line)
+		}
+	}
+	pageText = strings.Join(cleaned, "\n")
+
+	if len(pageText) > 15000 {
+		pageText = pageText[:15000]
 	}
 
 	prompt := fmt.Sprintf(`Extraia as informações da vaga de emprego abaixo.
 
-HTML DA PÁGINA:
+TEXTO EXTRAÍDO DA PÁGINA:
 %s
 
 URL: %s
@@ -355,11 +367,13 @@ Responda ESTRITAMENTE em JSON válido no formato:
 {
   "title": "titulo da vaga",
   "company": "nome da empresa",
-  "description": "descricao da vaga"
-}`, htmlContent, url)
+  "description": "descricao completa da vaga extraida do texto"
+}
+
+IMPORTANTE: extraia a descricao real do texto acima, nao invente informacoes genericas. Se nao encontrar um campo, deixe string vazia.`, pageText, url)
 
 	messages := []Message{
-		{Role: "system", Content: "Você é um especialista em extração de dados de páginas de emprego. Retorne apenas JSON válido."},
+		{Role: "system", Content: "Você é um especialista em extração de dados de páginas de emprego. Extraia APENAS informacoes que estao explicitamente no texto fornecido. Retorne apenas JSON válido."},
 		{Role: "user", Content: prompt},
 	}
 
@@ -367,6 +381,7 @@ Responda ESTRITAMENTE em JSON válido no formato:
 	body, err := json.Marshal(ChatRequest{
 		Model:    "local-model",
 		Messages: messages,
+		Temperature: 0.1,
 	})
 	if err != nil {
 		return nil, err
@@ -406,7 +421,46 @@ Responda ESTRITAMENTE em JSON válido no formato:
 		return nil, fmt.Errorf("erro ao parsear JSON da AI: %w", err)
 	}
 
+	if data["title"] == "" {
+		title, ok := extractTitleFallback(htmlContent)
+		if ok {
+			data["title"] = title
+		}
+	}
+
 	return data, nil
+}
+
+func stripHTMLTags(html string) string {
+	re := regexp.MustCompile(`<[^>]*>`)
+	text := re.ReplaceAllString(html, " ")
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	text = strings.ReplaceAll(text, "&quot;", "\"")
+	text = strings.ReplaceAll(text, "&#39;", "'")
+	reSpace := regexp.MustCompile(`\s+`)
+	text = reSpace.ReplaceAllString(text, " ")
+	return strings.TrimSpace(text)
+}
+
+func extractTitleFallback(html string) (string, bool) {
+	re := regexp.MustCompile(`<title[^>]*>([^<]+)</title>`)
+	matches := re.FindStringSubmatch(html)
+	if len(matches) >= 2 {
+		title := strings.TrimSpace(matches[1])
+		if title != "" {
+			parts := strings.Split(title, "|")
+			title = strings.TrimSpace(parts[0])
+			parts2 := strings.Split(title, "-")
+			title = strings.TrimSpace(parts2[0])
+			if title != "" {
+				return title, true
+			}
+		}
+	}
+	return "", false
 }
 
 func extractBullets(text, sectionStart, sectionEnd string) []string {

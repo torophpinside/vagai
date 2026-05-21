@@ -233,7 +233,8 @@ func CreateJob(c *gin.Context) {
 	job.Status = models.JobStatusNew
 
 	if err := db.Create(&job).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar vaga"})
+		log.Printf("Erro ao salvar vaga: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erro ao salvar vaga: %v", err)})
 		return
 	}
 
