@@ -352,35 +352,32 @@ func ExtractJobFromURL(url string) (map[string]string, error) {
 	}
 	pageText = strings.Join(cleaned, "\n")
 
-	if len(pageText) > 15000 {
-		pageText = pageText[:15000]
+	aiInput := pageText
+	if len(aiInput) > 6000 {
+		aiInput = aiInput[:6000]
 	}
 
-	prompt := fmt.Sprintf(`Extraia as informações da vaga de emprego abaixo.
+	prompt := fmt.Sprintf(`Extraia APENAS o titulo e a empresa da vaga abaixo.
 
-TEXTO EXTRAÍDO DA PÁGINA:
+TEXTO:
 %s
 
 URL: %s
 
-Responda ESTRITAMENTE em JSON válido no formato:
-{
-  "title": "titulo da vaga",
-  "company": "nome da empresa",
-  "description": "descricao completa da vaga extraida do texto"
-}
+Responda em JSON:
+{"title": "titulo", "company": "empresa"}
 
-IMPORTANTE: extraia a descricao real do texto acima, nao invente informacoes genericas. Se nao encontrar um campo, deixe string vazia.`, pageText, url)
+Se nao encontrar um campo, deixe string vazia.`, aiInput, url)
 
 	messages := []Message{
-		{Role: "system", Content: "Você é um especialista em extração de dados de páginas de emprego. Extraia APENAS informacoes que estao explicitamente no texto fornecido. Retorne apenas JSON válido."},
+		{Role: "system", Content: "Você extrai titulo e empresa de paginas de emprego. Retorne apenas JSON."},
 		{Role: "user", Content: prompt},
 	}
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	body, err := json.Marshal(ChatRequest{
-		Model:    "local-model",
-		Messages: messages,
+		Model:       "local-model",
+		Messages:    messages,
 		Temperature: 0.1,
 	})
 	if err != nil {
@@ -427,6 +424,12 @@ IMPORTANTE: extraia a descricao real do texto acima, nao invente informacoes gen
 			data["title"] = title
 		}
 	}
+
+	descMax := 50000
+	if len(pageText) > descMax {
+		pageText = pageText[:descMax]
+	}
+	data["description"] = pageText
 
 	return data, nil
 }
