@@ -666,7 +666,7 @@ func UploadResume(c *gin.Context) {
 		}()
 		select {
 		case <-done:
-		case <-time.After(180 * time.Second):
+		case <-time.After(240 * time.Second):
 			log.Printf("Timeout no processamento AI")
 		}
 	}
@@ -730,7 +730,7 @@ func AnalyzeResume(c *gin.Context) {
 		content = content[:8000]
 	}
 
-	c.Set("RequestTimeout", 180*time.Second)
+	c.Set("RequestTimeout", 240*time.Second)
 
 	analysisResult, aiErr := services.AnalyzeResumeWithAI(content)
 	if aiErr != nil {

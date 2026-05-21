@@ -80,7 +80,7 @@ export const addSite = (site) => api.post('/sites', site)
 export const updateSite = (id, data) => api.patch(`/sites/${id}`, data)
 export const deleteSite = (id) => api.delete(`/sites/${id}`)
 export const uploadResume = (formData) => api.post('/resumes/upload', formData, {
-  timeout: 180000
+  timeout: 240000
 })
 export const extractJob = (url) => api.post('/jobs/extract', { url }).then(res => res.data)
 export const createJob = (data) => api.post('/jobs', data)

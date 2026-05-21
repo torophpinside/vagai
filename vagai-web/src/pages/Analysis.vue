@@ -221,7 +221,7 @@ const analyzeResume = async () => {
   formData.append('file', resumeFile.value)
   formData.append('type', 'analysis')
   try {
-    const response = await api.post('/resumes/analyze', formData, { timeout: 180000 })
+    const response = await api.post('/resumes/analyze', formData, { timeout: 240000 })
     currentAnalysis.value = response.data
     selectedId.value = response.data.id
     resumeFile.value = null

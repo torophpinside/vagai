@@ -45,7 +45,7 @@ func ProcessResumeContent(rawContent string) (string, error) {
 	}
 
 	client := &http.Client{
-		Timeout: 180 * time.Second,
+		Timeout: 240 * time.Second,
 	}
 
 	prompt := fmt.Sprintf(`Você é um assistente de recrutamento. Abaixo está o texto extraído de um currículo. 
@@ -250,7 +250,7 @@ func AnalyzeResumeWithAI(resumeContent string) (map[string]interface{}, error) {
 	}
 
 	client := &http.Client{
-		Timeout: 180 * time.Second,
+		Timeout: 240 * time.Second,
 	}
 
 	prompt := fmt.Sprintf(`Analise o currículo abaixo como um Analista de RH Sênior.

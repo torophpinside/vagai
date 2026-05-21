@@ -86,8 +86,8 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":8080",
 		Handler:      r,
-		ReadTimeout:  180 * time.Second,
-		WriteTimeout: 180 * time.Second,
+		ReadTimeout:  240 * time.Second,
+		WriteTimeout: 240 * time.Second,
 	}
 
 	log.Println("VagAI API rodando em :8080")
