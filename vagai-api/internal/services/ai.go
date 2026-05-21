@@ -334,6 +334,81 @@ texto livre aqui`, resumeContent)
 	return analysis, nil
 }
 
+func ExtractJobFromURL(url string) (map[string]string, error) {
+	htmlContent, err := fetchHTML(url)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao buscar página: %w", err)
+	}
+
+	if len(htmlContent) > 40000 {
+		htmlContent = htmlContent[:40000]
+	}
+
+	prompt := fmt.Sprintf(`Extraia as informações da vaga de emprego abaixo.
+
+HTML DA PÁGINA:
+%s
+
+URL: %s
+
+Responda ESTRITAMENTE em JSON válido no formato:
+{
+  "title": "titulo da vaga",
+  "company": "nome da empresa",
+  "description": "descricao da vaga"
+}`, htmlContent, url)
+
+	messages := []Message{
+		{Role: "system", Content: "Você é um especialista em extração de dados de páginas de emprego. Retorne apenas JSON válido."},
+		{Role: "user", Content: prompt},
+	}
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	body, err := json.Marshal(ChatRequest{
+		Model:    "local-model",
+		Messages: messages,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("LM Studio indisponível: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result ChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("erro AI: %v", result.Error)
+	}
+	if len(result.Choices) == 0 {
+		return nil, fmt.Errorf("sem resposta da AI")
+	}
+
+	responseText := result.Choices[0].Message.Content
+	responseText = strings.TrimPrefix(responseText, "```json")
+	responseText = strings.TrimPrefix(responseText, "```")
+	responseText = strings.TrimSuffix(responseText, "```")
+	responseText = strings.TrimSpace(responseText)
+
+	var data map[string]string
+	if err := json.Unmarshal([]byte(responseText), &data); err != nil {
+		return nil, fmt.Errorf("erro ao parsear JSON da AI: %w", err)
+	}
+
+	return data, nil
+}
+
 func extractBullets(text, sectionStart, sectionEnd string) []string {
 	start := strings.Index(text, sectionStart)
 	if start == -1 {

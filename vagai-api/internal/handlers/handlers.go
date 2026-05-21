@@ -167,6 +167,79 @@ func ListJobs(c *gin.Context) {
 	})
 }
 
+func ExtractJob(c *gin.Context) {
+	url := c.PostForm("url")
+	if url == "" {
+		var body struct {
+			URL string `json:"url"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || body.URL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "URL é obrigatória"})
+			return
+		}
+		url = body.URL
+	}
+
+	data, err := services.ExtractJobFromURL(url)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"title":       data["title"],
+		"company":     data["company"],
+		"description": data["description"],
+		"url":         url,
+	})
+}
+
+func CreateJob(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
+	var job models.Job
+	if err := c.ShouldBindJSON(&job); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if job.URL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "URL é obrigatória"})
+		return
+	}
+
+	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceJobs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   fmt.Sprintf("Limite de vagas atingido: %d/%d", current, maxLimit),
+			"current": current,
+			"limit":   maxLimit,
+		})
+		return
+	}
+
+	var existing models.Job
+	if err := db.Where("url = ? AND organization_id = ?", job.URL, orgID).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Vaga já cadastrada com esta URL"})
+		return
+	}
+
+	job.OrganizationID = orgID
+	job.Status = models.JobStatusNew
+
+	if err := db.Create(&job).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar vaga"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, job)
+}
+
 func GetJob(c *gin.Context) {
 	db := getDB(c)
 	orgID := c.GetUint("org_id")

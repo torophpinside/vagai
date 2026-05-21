@@ -61,6 +61,8 @@ func main() {
 		api.POST("/me/change-password", handlers.ChangePassword)
 		api.POST("/me/plan", handlers.ChangePlan)
 		api.GET("/jobs", handlers.ListJobs)
+		api.POST("/jobs", handlers.CreateJob)
+		api.POST("/jobs/extract", handlers.ExtractJob)
 		api.GET("/jobs/:id", handlers.GetJob)
 		api.PATCH("/jobs/:id", handlers.UpdateJobStatus)
 

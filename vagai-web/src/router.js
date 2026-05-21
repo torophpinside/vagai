@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from './pages/Dashboard.vue'
 import Jobs from './pages/Jobs.vue'
+import JobAdd from './pages/JobAdd.vue'
 import Matches from './pages/Matches.vue'
 import Applied from './pages/Applied.vue'
 import Analysis from './pages/Analysis.vue'
@@ -15,6 +16,7 @@ const routes = [
   { path: '/register', name: 'Register', component: Register, meta: { guest: true } },
   { path: '/', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/jobs', name: 'Jobs', component: Jobs, meta: { requiresAuth: true } },
+  { path: '/jobs/new', name: 'JobAdd', component: JobAdd, meta: { requiresAuth: true } },
   { path: '/matches', name: 'Matches', component: Matches, meta: { requiresAuth: true } },
   { path: '/applied', name: 'Applied', component: Applied, meta: { requiresAuth: true } },
   { path: '/analysis', name: 'Analysis', component: Analysis, meta: { requiresAuth: true } },

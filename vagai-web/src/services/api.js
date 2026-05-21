@@ -82,6 +82,8 @@ export const deleteSite = (id) => api.delete(`/sites/${id}`)
 export const uploadResume = (formData) => api.post('/resumes/upload', formData, {
   timeout: 180000
 })
+export const extractJob = (url) => api.post('/jobs/extract', { url }).then(res => res.data)
+export const createJob = (data) => api.post('/jobs', data)
 export const updateJobStatus = (id, status) => api.patch(`/jobs/${id}`, { status })
 export const updateMatch = (id, applied) => api.patch(`/matches/${id}`, { applied })
 export const deleteMatch = (id) => api.delete(`/matches/${id}`)

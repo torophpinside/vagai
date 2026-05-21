@@ -70,6 +70,10 @@
             </div>
           </template>
         </DropdownMenu>
+        <router-link to="/jobs/new" class="btn-primary flex items-center gap-2">
+          <Plus class="w-4 h-4" />
+          Adicionar Vaga
+        </router-link>
         <button class="btn-primary flex items-center gap-2">
           <RefreshCcw class="w-4 h-4" />
           Sincronizar
@@ -172,7 +176,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useJobs, useSites, updateJobStatus } from '../services/api'
-import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X, CheckCircle2, Search } from 'lucide-vue-next'
+import { ExternalLink, Trash2, RefreshCcw, Filter, ChevronDown, ChevronLeft, ChevronRight, X, CheckCircle2, Search, Plus } from 'lucide-vue-next'
 import DropdownMenu from '../components/DropdownMenu.vue'
 
 const queryClient = useQueryClient()
