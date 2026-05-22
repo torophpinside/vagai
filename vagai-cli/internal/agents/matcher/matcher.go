@@ -77,15 +77,6 @@ func Run(threshold int, force bool) error {
 
 	log.Printf("Processando %d vagas com %d currículos (max %d paralelas)", len(jobs), len(resumes), maxParallelAI)
 
-	if !force {
-		jobIDs := make([]uint, len(jobs))
-		for i, j := range jobs {
-			jobIDs[i] = j.ID
-		}
-		db.DB.Model(&models.Job{}).Where("id IN ?", jobIDs).Update("status", models.JobStatusAnalyzed)
-		log.Printf("%d vagas marcadas como analyzed (serão atualizadas para matched se houver match)", len(jobIDs))
-	}
-
 	jobsChan := make(chan jobTask, len(jobs)*len(resumes))
 	resultsChan := make(chan matchResult, len(jobs)*len(resumes))
 
@@ -140,10 +131,12 @@ func Run(threshold int, force bool) error {
 			log.Printf("Erro ao salvar match: %v", err)
 		} else {
 			matchCount++
+			newStatus := models.JobStatusAnalyzed
 			if result.score > float64(threshold) {
-				db.DB.Model(&job).Update("status", models.JobStatusMatched)
+				newStatus = models.JobStatusMatched
 			}
-			log.Printf("Match salvo: job=%d resume=%d score=%.2f", result.jobID, result.resumeID, result.score)
+			db.DB.Model(&job).Update("status", newStatus)
+			log.Printf("Match salvo: job=%d resume=%d score=%.2f status=%s", result.jobID, result.resumeID, result.score, newStatus)
 		}
 	}
 
