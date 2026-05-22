@@ -279,6 +279,28 @@ func UpdateJobStatus(c *gin.Context) {
 
 	job.Status = models.JobStatus(body.Status)
 	db.Save(&job)
+
+	if body.Status == "matched" {
+		var resume models.Resume
+		if err := db.Where("organization_id = ?", orgID).First(&resume).Error; err == nil {
+			var existingMatch models.Match
+			result := db.Where("job_id = ? AND resume_id = ?", job.ID, resume.ID).First(&existingMatch)
+			if result.Error != nil {
+				match := models.Match{
+					OrganizationID:  orgID,
+					JobID:           job.ID,
+					ResumeID:        resume.ID,
+					SimilarityScore: 100.00,
+				}
+				db.Create(&match)
+			} else {
+				existingMatch.SimilarityScore = 100.00
+				existingMatch.Applied = false
+				db.Save(&existingMatch)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, job)
 }
 

@@ -76,6 +76,7 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
+export const listSites = () => api.get('/sites').then(res => res.data)
 export const addSite = (site) => api.post('/sites', site)
 export const updateSite = (id, data) => api.patch(`/sites/${id}`, data)
 export const deleteSite = (id) => api.delete(`/sites/${id}`)

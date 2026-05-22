@@ -15,6 +15,39 @@
     <div class="glass-card p-10">
       <form @submit.prevent="handleExtract" class="space-y-6">
         <div class="space-y-2">
+          <label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Fonte</label>
+          <DropdownMenu v-model:open="siteOpen" width="w-64">
+            <template #trigger="{ open, toggle }">
+              <button @click="toggle" type="button" class="flex items-center gap-2 px-4 py-2.5 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all w-full">
+                <span class="text-sm flex-1 text-left" :class="selectedSite ? 'text-slate-300' : 'text-slate-500'">
+                  {{ selectedSite?.name || 'Nenhuma' }}
+                </span>
+                <ChevronDown class="w-3.5 h-3.5 text-slate-500 shrink-0" :class="open ? 'rotate-180' : ''" />
+              </button>
+            </template>
+            <template #default="{ close }">
+              <button @click="form.site_id = null; close()" type="button"
+                class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+                :class="form.site_id === null ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+              >
+                <div class="w-4 h-4 rounded-full border flex items-center justify-center transition-all" :class="form.site_id === null ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                  <div v-if="form.site_id === null" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                </div>
+                Nenhuma
+              </button>
+              <button v-for="site in sites" :key="site.id" @click="form.site_id = site.id; close()" type="button"
+                class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all"
+                :class="form.site_id === site.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'"
+              >
+                <div class="w-4 h-4 rounded-full border flex items-center justify-center transition-all" :class="form.site_id === site.id ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'">
+                  <div v-if="form.site_id === site.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                </div>
+                {{ site.name }}
+              </button>
+            </template>
+          </DropdownMenu>
+        </div>
+        <div class="space-y-2">
           <label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">URL da Vaga</label>
           <div class="flex gap-3">
             <input v-model="url" type="url" class="input-field flex-1 h-12" placeholder="https://..." required />
@@ -71,10 +104,11 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { extractJob, createJob } from '../services/api'
-import { ArrowLeft, Search, Loader2, CheckCircle2 } from 'lucide-vue-next'
+import { extractJob, createJob, listSites } from '../services/api'
+import DropdownMenu from '../components/DropdownMenu.vue'
+import { ArrowLeft, Search, Loader2, CheckCircle2, ChevronDown } from 'lucide-vue-next'
 
 const router = useRouter()
 const url = ref('')
@@ -82,12 +116,28 @@ const extracting = ref(false)
 const saving = ref(false)
 const error = ref('')
 const extracted = ref(false)
+const sites = ref([])
+const siteOpen = ref(false)
+
+const selectedSite = computed(() => {
+  return sites.value.find(s => s.id === form.site_id) || null
+})
 
 const form = reactive({
   title: '',
   company: '',
   url: '',
-  description: ''
+  description: '',
+  site_id: null
+})
+
+onMounted(async () => {
+  try {
+    const data = await listSites()
+    sites.value = data || []
+  } catch {
+    sites.value = []
+  }
 })
 
 const handleExtract = async () => {
@@ -115,7 +165,8 @@ const handleSave = async () => {
       title: form.title,
       company: form.company,
       url: form.url,
-      description: form.description
+      description: form.description,
+      site_id: form.site_id || null
     })
     router.push('/jobs')
   } catch (e) {
