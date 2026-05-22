@@ -122,7 +122,7 @@ func ListJobs(c *gin.Context) {
 	offset := (page - 1) * limit
 
 	var jobs []models.Job
-	query.Preload("Site").Offset(offset).Limit(limit).Find(&jobs)
+	query.Order("collected_at DESC").Preload("Site").Offset(offset).Limit(limit).Find(&jobs)
 
 	if jobs == nil {
 		jobs = []models.Job{}
