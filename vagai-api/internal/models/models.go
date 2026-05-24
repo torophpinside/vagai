@@ -88,7 +88,7 @@ type Subscription struct {
 	ID                   uint               `gorm:"primaryKey" json:"id"`
 	OrganizationID       uint               `gorm:"uniqueIndex;not null" json:"organization_id"`
 	PlanID               uint               `gorm:"index" json:"plan_id"`
-	StripeSubscriptionID string             `gorm:"size:255;uniqueIndex" json:"-"`
+	StripeSubscriptionID string             `gorm:"size:255" json:"-"`
 	Status               SubscriptionStatus `gorm:"size:20;default:trial" json:"status"`
 	CurrentPeriodStart   *time.Time         `json:"current_period_start"`
 	CurrentPeriodEnd     *time.Time         `json:"current_period_end"`

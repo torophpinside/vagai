@@ -28,7 +28,7 @@ Três agentes especializados:
 ## Estrutura
 
 ```
-job-hunter/
+vagai/
 ├── vagai-cli/          # CLI Go com agentes
 │   ├── cmd/            # Comandos: crawl, match, sites, schedule
 │   └── internal/agents/  # Crawler, Matcher, Registry
@@ -95,6 +95,32 @@ go run main.go match
 
 Sistema funcional para busca, matching, autenticação multi-tenancy e visualização via dashboard.
 
+## Testes
+
+### E2E (API)
+
+Testes de integração ponta a ponta em `vagai-api/internal/tests/e2e/`.
+
+**Pré-requisito:** Docker rodando.
+
+**Rodar todos:**
+```bash
+cd vagai-api
+go test -v -count=1 -timeout 10m ./internal/tests/e2e/
+```
+
+**Rodar um específico:**
+```bash
+go test -v -count=1 -timeout 10m -run TestRegister_Success ./internal/tests/e2e/
+```
+
+**Como funciona:**
+- `testcontainers-go` sobe um MySQL 8.0 limpo antes dos testes e o destrói ao final
+- `TestMain` executa migrações (`AutoMigrate`), seed dos planos, e inicia um servidor HTTP (`httptest`) com as mesmas rotas da API
+- Cada teste cria usuário real (org + subscription Free), obtém JWT e faz chamadas HTTP
+- Helpers: `registerUser(t, name, email, password, org)`, `doRequest(t, method, path, body, token)`, `parseBody(t, resp, &dest)`
+- 31 testes cobrindo: auth (registro, login, duplicata, /me, health), vagas (CRUD, duplicidade, paginação, marcar match), sites (CRUD, toggle ativo), matches (listagem, filtros)
+
 ## Próximos passos
 
 - **UI/UX** — refinamento visual da plataforma (animações, responsividade, temas)
@@ -103,7 +129,7 @@ Sistema funcional para busca, matching, autenticação multi-tenancy e visualiza
 - **Notificações** — alertas por email quando novos matches de alto score forem encontrados
 - **API Keys** — gerenciamento de chaves de API para integração externa
 - **Webhooks** — disparar eventos para serviços externos (novas vagas, matches, etc.)
-- **Testes E2E** — Playwright para fluxos críticos (login, registro, navegação)
+- **Testes E2E (frontend)** — Playwright para fluxos críticos (login, registro, navegação)
 
 ## Docs
 

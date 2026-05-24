@@ -204,6 +204,11 @@ func CreateJob(c *gin.Context) {
 		return
 	}
 
+	if job.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Título é obrigatório"})
+		return
+	}
+
 	if job.URL == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "URL é obrigatória"})
 		return
