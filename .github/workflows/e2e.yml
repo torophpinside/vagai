@@ -3,16 +3,12 @@ on: [push, pull_request]
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:27-git
-        options: --privileged
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: stable
           cache-dependency-path: vagai-api/go.sum
       - name: Run E2E tests
-        run: go test -v -count=1 -timeout 10m ./internal/tests/e2e/...
+        run: go test -v -count=1 -timeout 10m ./internal/tests/e2e/
         working-directory: vagai-api
