@@ -15,26 +15,27 @@ import (
 var c *cron.Cron
 var jobs = make(map[string]cron.EntryID)
 
-func AddSchedule(name, command, schedule string) error {
+func AddSchedule(name, command, schedule string, orgID uint) error {
 	if err := db.Init(); err != nil {
 		return fmt.Errorf("falha ao inicializar banco: %w", err)
 	}
 
 	sched := models.Schedule{
-		Name:     name,
-		Command:  command,
-		Schedule: schedule,
-		Active:   true,
+		Name:           name,
+		Command:        command,
+		Schedule:       schedule,
+		Active:         true,
+		OrganizationID: orgID,
 	}
 
 	if err := db.DB.Create(&sched).Error; err != nil {
 		return fmt.Errorf("falha ao adicionar schedule: %w", err)
 	}
 
-	log.Printf("Schedule adicionado: %s (%s) - %s", name, schedule, command)
+	log.Printf("Schedule adicionado: %s (org=%d) (%s) - %s", name, orgID, schedule, command)
 
 	if c != nil {
-		if err := addToCron(name, command, schedule); err != nil {
+		if err := addToCron(name, command, schedule, orgID); err != nil {
 			log.Printf("Erro ao adicionar ao cron: %v", err)
 		}
 	}
@@ -56,7 +57,7 @@ func ListSchedules() error {
 		if !s.Active {
 			status = "INATIVO"
 		}
-		fmt.Printf("[%s] %s\n", status, s.Name)
+		fmt.Printf("[%s] %s (org=%d)\n", status, s.Name, s.OrganizationID)
 		fmt.Printf("  Comando: %s\n", s.Command)
 		fmt.Printf("  Cron: %s\n", s.Schedule)
 		if s.NextRun != nil {
@@ -101,21 +102,29 @@ func RunScheduler() error {
 	var schedules []models.Schedule
 	db.DB.Where("active = ?", true).Find(&schedules)
 
+	// Group schedules by organization
+	orgSchedules := make(map[uint][]models.Schedule)
 	for _, s := range schedules {
-		if err := addToCron(s.Name, s.Command, s.Schedule); err != nil {
-			log.Printf("Erro ao adicionar %s: %v", s.Name, err)
+		orgSchedules[s.OrganizationID] = append(orgSchedules[s.OrganizationID], s)
+	}
+
+	for orgID, orgScheds := range orgSchedules {
+		for _, s := range orgScheds {
+			if err := addToCron(s.Name, s.Command, s.Schedule, orgID); err != nil {
+				log.Printf("Erro ao adicionar %s: %v", s.Name, err)
+			}
 		}
 	}
 
-	log.Printf("Scheduler iniciado com %d jobs", len(schedules))
+	log.Printf("Scheduler iniciado com %d jobs em %d organizações", len(schedules), len(orgSchedules))
 	c.Start()
 
 	select {}
 }
 
-func addToCron(name, command, schedule string) error {
+func addToCron(name, command, schedule string, orgID uint) error {
 	scheduleNormalized := normalizeSchedule(schedule)
-	
+
 	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	_, err := parser.Parse(scheduleNormalized)
 	if err != nil {
@@ -123,28 +132,28 @@ func addToCron(name, command, schedule string) error {
 	}
 
 	id, err := c.AddFunc(scheduleNormalized, func() {
-		runCommand(name, command)
+		runCommand(name, command, orgID)
 	})
 	if err != nil {
 		return fmt.Errorf("erro ao adicionar job: %w", err)
 	}
 
 	jobs[name] = id
-	log.Printf("Job adicionado ao cron: %s", name)
+	log.Printf("Job adicionado ao cron: %s (org=%d)", name, orgID)
 
 	return nil
 }
 
 func normalizeSchedule(schedule string) string {
 	schedule = strings.TrimSpace(schedule)
-	
+
 	schedule = strings.ReplaceAll(schedule, "@hourly", "0 * * * *")
 	schedule = strings.ReplaceAll(schedule, "@daily", "0 0 * * *")
 	schedule = strings.ReplaceAll(schedule, "@weekly", "0 0 * * 0")
 	schedule = strings.ReplaceAll(schedule, "@monthly", "0 0 1 * *")
 	schedule = strings.ReplaceAll(schedule, "@yearly", "0 0 1 1 *")
 	schedule = strings.ReplaceAll(schedule, "@annually", "0 0 1 1 *")
-	
+
 	if strings.HasPrefix(schedule, "@every ") {
 		duration := strings.TrimPrefix(schedule, "@every ")
 		parts := strings.Fields(duration)
@@ -178,12 +187,12 @@ func normalizeSchedule(schedule string) string {
 			}
 		}
 	}
-	
+
 	return schedule
 }
 
-func runCommand(name, command string) {
-	log.Printf("[%s] Executando: %s", name, command)
+func runCommand(name, command string, orgID uint) {
+	log.Printf("[%s] Executando: %s (org=%d)", name, command, orgID)
 
 	startTime := time.Now()
 	startedAt := startTime

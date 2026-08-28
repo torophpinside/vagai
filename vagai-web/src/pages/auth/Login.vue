@@ -84,7 +84,9 @@ async function handleLogin() {
     await login(email.value, password.value)
     router.push('/')
   } catch (err) {
-    error.value = err.response?.data?.error || 'Erro ao fazer login'
+    error.value = err.code === 'QUOTA_EXCEEDED'
+      ? err.message
+      : err.response?.data?.error || 'Erro ao fazer login'
   } finally {
     loading.value = false
   }

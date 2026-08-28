@@ -205,12 +205,13 @@ func GetMe(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"avatar": user.Avatar,
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"avatar":   user.Avatar,
 			"timezone": user.Timezone,
-			"role": membership.Role,
+			"city":     user.City,
+			"role":     membership.Role,
 		},
 		"organization": gin.H{
 			"id":            org.ID,
@@ -248,6 +249,7 @@ func UpdateProfile(c *gin.Context) {
 	var body struct {
 		Name     string `json:"name" binding:"omitempty,min=2,max=200"`
 		Timezone string `json:"timezone" binding:"omitempty"`
+		City     string `json:"city" binding:"omitempty,max=100"`
 	}
 
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -262,12 +264,27 @@ func UpdateProfile(c *gin.Context) {
 	if body.Timezone != "" {
 		updates["timezone"] = body.Timezone
 	}
+	if body.City != "" {
+		updates["city"] = body.City
+	}
 
 	if len(updates) > 0 {
 		DB.Model(&models.User{}).Where("id = ?", userID).Updates(updates)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Perfil atualizado"})
+	var user models.User
+	DB.First(&user, userID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"avatar":   user.Avatar,
+			"timezone": user.Timezone,
+			"city":     user.City,
+		},
+	})
 }
 
 func ChangePassword(c *gin.Context) {

@@ -53,6 +53,7 @@ type User struct {
 	PasswordHash    string         `gorm:"size:255;not null" json:"-"`
 	Avatar          string         `gorm:"size:500" json:"avatar"`
 	Timezone        string         `gorm:"size:50;default:America/Sao_Paulo" json:"timezone"`
+	City            string         `gorm:"size:100" json:"city"`
 	EmailVerifiedAt *time.Time     `json:"email_verified_at"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
@@ -139,7 +140,7 @@ type Site struct {
 
 type Job struct {
 	ID             uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID uint       `gorm:"index;not null" json:"organization_id"`
+	OrganizationID uint       `gorm:"index;not null;uniqueIndex:idx_job_url_org" json:"organization_id"`
 	SiteID         *uint      `gorm:"index" json:"site_id"`
 	Site           *Site      `gorm:"foreignKey:SiteID" json:"site,omitempty"`
 	Title          string     `gorm:"size:255" json:"title"`
@@ -157,16 +158,18 @@ type Resume struct {
 	Name           string    `gorm:"size:100" json:"name"`
 	FilePath       string    `gorm:"size:500" json:"file_path"`
 	Content        string    `gorm:"type:text" json:"content"`
+	Data           string    `gorm:"type:json" json:"data"`
 	Version        int       `json:"version"`
 	UploadedAt     time.Time `json:"uploaded_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Match struct {
 	ID              uint       `gorm:"primaryKey" json:"id"`
 	OrganizationID  uint       `gorm:"index;not null" json:"organization_id"`
-	JobID           uint       `gorm:"index" json:"job_id"`
+	JobID           uint       `gorm:"uniqueIndex:idx_match_job_resume" json:"job_id"`
 	Job             Job        `gorm:"foreignKey:JobID" json:"job,omitempty"`
-	ResumeID        uint       `gorm:"index" json:"resume_id"`
+	ResumeID        uint       `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
 	Resume          Resume     `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
 	SimilarityScore float64    `gorm:"type:decimal(5,2)" json:"similarity_score"`
 	KeywordsMatched string     `gorm:"type:json" json:"keywords_matched"`

@@ -6,12 +6,14 @@ import (
 	"log"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/anomalyco/vagai-cli/internal/agents/lmstudio"
 	"github.com/anomalyco/vagai-cli/internal/db"
 	"github.com/anomalyco/vagai-cli/internal/models"
+	"gorm.io/gorm/clause"
 )
 
 var useLMStudio = true
@@ -20,18 +22,25 @@ var idf map[string]float64
 const maxParallelAI = 2
 
 type jobTask struct {
-	job    models.Job
-	resume models.Resume
+	job      models.Job
+	resume   models.Resume
+	userCity string
 }
 
 type matchResult struct {
-	jobID         uint
-	resumeID      uint
-	score         float64
-	keywords      []string
-	reason        string
-	err           error
-	alreadyExists bool
+	jobID    uint
+	resumeID uint
+	score    float64
+	keywords []string
+	reason   string
+	err      error
+}
+
+// JobLocation armazena a localização analisada de uma vaga
+type JobLocation struct {
+	Type  string // "remote", "presencial", "hybrid", "unknown"
+	City  string // cidade extraída da descrição
+	State string // estado extraído
 }
 
 func Run(threshold int, force bool) error {
@@ -50,18 +59,16 @@ func Run(threshold int, force bool) error {
 		log.Printf("🚀 Conexão com LM Studio estabelecida com sucesso!")
 	}
 
-	var resumes []models.Resume
-	db.DB.Find(&resumes)
-
-	if len(resumes) == 0 {
-		log.Println("Nenhum currículo encontrado")
-		return nil
-	}
-
+	// Buscar todas as vagas novas de sites ativos, agrupadas por organização
 	var jobs []models.Job
-	query := db.DB.Where("status = ?", models.JobStatusNew).Joins("JOIN sites ON sites.id = jobs.site_id").Where("sites.active = ?", true)
+	query := db.DB.Where("status = ?", models.JobStatusNew).
+		Joins("JOIN sites ON sites.id = jobs.site_id").
+		Where("sites.active = ?", true).
+		Order("jobs.organization_id ASC")
 	if force {
-		query = db.DB.Joins("JOIN sites ON sites.id = jobs.site_id").Where("sites.active = ?", true)
+		query = db.DB.Joins("JOIN sites ON sites.id = jobs.site_id").
+			Where("sites.active = ?", true).
+			Order("jobs.organization_id ASC")
 	}
 	query.Find(&jobs)
 
@@ -69,6 +76,54 @@ func Run(threshold int, force bool) error {
 		log.Println("Nenhuma vaga nova para processar")
 		return nil
 	}
+
+	// Agrupar vagas por organização para derivar currículo e cidade de cada uma
+	orgJobs := make(map[uint][]models.Job)
+	for _, job := range jobs {
+		if job.OrganizationID == 0 {
+			// Sem org definida (ex.: fetch manual), pula sem organização associada
+			log.Printf("Vaga %d sem organization_id definida, ignorada", job.ID)
+			continue
+		}
+		orgJobs[job.OrganizationID] = append(orgJobs[job.OrganizationID], job)
+	}
+
+	var totalMatches int
+	for orgID, orgJobList := range orgJobs {
+		matches := runForOrg(orgID, orgJobList, threshold)
+		totalMatches += matches
+	}
+
+	log.Printf("Matcher Agent finalizado. %d matches encontrados", totalMatches)
+	return nil
+}
+
+func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
+	log.Printf("Processando %d vagas da organização %d", len(jobs), orgID)
+
+	// Buscar cidade do usuário da organização
+	var userCity string
+	var users []models.User
+	db.DB.Where("organization_id = ?", orgID).Find(&users)
+	for _, u := range users {
+		if u.City != "" {
+			userCity = u.City
+			break
+		}
+	}
+	if userCity != "" {
+		log.Printf("📍 Cidade do usuário (org %d): %s", orgID, userCity)
+	} else {
+		log.Printf("📍 Nenhuma cidade configurada na organização %d. Filtro de localização desativado.", orgID)
+	}
+
+	// Usar apenas o currículo mais recente da organização
+	var resume models.Resume
+	if err := db.DB.Where("organization_id = ?", orgID).Order("uploaded_at DESC").First(&resume).Error; err != nil {
+		log.Printf("Nenhum currículo encontrado para org %d", orgID)
+		return 0
+	}
+	resumes := []models.Resume{resume}
 
 	log.Printf("Construindo corpus TF-IDF com %d vagas e %d currículos...", len(jobs), len(resumes))
 	corpus := buildCorpus(jobs, resumes)
@@ -87,10 +142,7 @@ func Run(threshold int, force bool) error {
 		go func(workerID int) {
 			defer wg.Done()
 			for task := range jobsChan {
-				result := processTask(task.job, task.resume, threshold)
-				if result.err != nil && !result.alreadyExists {
-					log.Printf("Aviso no matching job=%d resume=%d: %v", task.job.ID, task.resume.ID, result.err)
-				}
+				result := processTask(task.job, task.resume, task.userCity, threshold)
 				resultsChan <- result
 			}
 		}(w)
@@ -99,7 +151,7 @@ func Run(threshold int, force bool) error {
 	go func() {
 		for _, job := range jobs {
 			for _, resume := range resumes {
-				jobsChan <- jobTask{job: job, resume: resume}
+				jobsChan <- jobTask{job: job, resume: resume, userCity: userCity}
 			}
 		}
 		close(jobsChan)
@@ -112,7 +164,8 @@ func Run(threshold int, force bool) error {
 
 	var matchCount int
 	for result := range resultsChan {
-		if result.alreadyExists {
+		if result.err != nil {
+			log.Printf("Aviso no matching job=%d resume=%d: %v", result.jobID, result.resumeID, result.err)
 			continue
 		}
 		// Buscar organization_id do job
@@ -127,8 +180,11 @@ func Run(threshold int, force bool) error {
 			KeywordsMatched: fmt.Sprintf(`["%s"]`, strings.Join(result.keywords, `", "`)),
 			AIReason:        result.reason,
 		}
-		if err := db.DB.Create(&match).Error; err != nil {
-			log.Printf("Erro ao salvar match: %v", err)
+		tx := db.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&match)
+		if tx.Error != nil {
+			log.Printf("Erro ao salvar match: %v", tx.Error)
+		} else if tx.RowsAffected == 0 {
+			log.Printf("Match duplicado ignorado: job=%d resume=%d", result.jobID, result.resumeID)
 		} else {
 			matchCount++
 			newStatus := models.JobStatusAnalyzed
@@ -140,27 +196,35 @@ func Run(threshold int, force bool) error {
 		}
 	}
 
-	log.Printf("Matcher Agent finalizado. %d matches encontrados", matchCount)
-	return nil
+	log.Printf("Matcher Agent finalizado para org %d. %d matches encontrados", orgID, matchCount)
+	return matchCount
 }
 
-func processTask(job models.Job, resume models.Resume, threshold int) matchResult {
+func processTask(job models.Job, resume models.Resume, userCity string, threshold int) matchResult {
 	result := matchResult{
 		jobID:    job.ID,
 		resumeID: resume.ID,
 	}
 
-	var existing models.Match
-	err := db.DB.Where("job_id = ? AND resume_id = ?", job.ID, resume.ID).First(&existing).Error
-	if err == nil {
-		result.alreadyExists = true
-		return result
-	}
+	// Analisar localização da vaga
+	jobLoc := analyzeJobLocation(job.Title+" "+job.Description, userCity)
 
-	score, keywords, reason, err := calculateMatchAI(job.Title, job.Description, resume.Content)
+	score, keywords, reason, err := calculateMatchAI(job.Title, job.Description, resume.Content, userCity, jobLoc)
 	if err != nil {
 		result.err = err
 		return result
+	}
+
+	// Aplicar penalidade de localização para vagas presenciais/hibridas fora da cidade
+	if userCity != "" && jobLoc.Type != "remote" && jobLoc.Type != "unknown" {
+		penalty := locationPenalty(jobLoc, userCity)
+		if penalty > 0 {
+			score = score - penalty
+			if score < 0 {
+				score = 0
+			}
+			reason += fmt.Sprintf(" [Penalidade localização: -%.0f pts]", penalty)
+		}
 	}
 
 	result.score = score
@@ -174,7 +238,7 @@ type AIResponse struct {
 	Reason string  `json:"reason"`
 }
 
-func calculateMatchAI(jobTitle, jobDesc, resumeContent string) (float64, []string, string, error) {
+func calculateMatchAI(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation) (float64, []string, string, error) {
 	if resumeContent == "" {
 		return 0, nil, "", fmt.Errorf("currículo vazio")
 	}
@@ -199,16 +263,26 @@ func calculateMatchAI(jobTitle, jobDesc, resumeContent string) (float64, []strin
 		resumeForPrompt = resumeForPrompt[:500]
 	}
 
-	prompt := fmt.Sprintf(`Analise se o currículo é adequado para a vaga. 
-VAGA: %s - %s
+	// Construir prompt com contexto de localização
+	locationContext := ""
+	if userCity != "" {
+		locationContext = fmt.Sprintf(`
+LOCALIZAÇÃO DO USUARIO: %s
+TIPO DA VAGA: %s
+CIDADE DA VAGA: %s`, userCity, jobLoc.Type, jobLoc.City)
+	}
+
+	prompt := fmt.Sprintf(`Analise se o currículo é adequado para a vaga.
+VAGA: %s - %s%s
 RESUMO CURRÍCULO: %s
-Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua explicação curta"}`, jobTitle, jobDesc, resumeForPrompt)
+Considere se a vaga é remota, presencial ou híbrida, e se a localização é compatível com a do usuário.
+Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua explicação curta"}`, jobTitle, jobDesc, locationContext, resumeForPrompt)
 
 	log.Printf("Chamando LM Studio para análise...")
 	response, err := lmstudio.Chat(prompt, "Você é um especialista em recruitment tech. Responda sempre em JSON.")
 	if err != nil {
 		log.Printf("⚠️ Erro ao chamar LM Studio: %v. Usando fallback algorítmico.", err)
-		return calculateMatchFallback(jobTitle, jobDesc, resumeContent)
+		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc)
 	}
 
 	log.Printf("Resposta da AI recebida. Processando...")
@@ -222,7 +296,7 @@ Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua expli
 	var aiResp AIResponse
 	if err := json.Unmarshal([]byte(response), &aiResp); err != nil {
 		log.Printf("⚠️ Erro ao decodificar JSON da AI: %v. Resposta bruta: %s. Usando fallback.", err, response)
-		return calculateMatchFallback(jobTitle, jobDesc, resumeContent)
+		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc)
 	}
 
 	log.Printf("✅ Análise AI concluída com sucesso. Score: %.2f", aiResp.Score)
@@ -231,7 +305,7 @@ Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua expli
 	return aiResp.Score, keywords, aiResp.Reason, nil
 }
 
-func calculateMatchFallback(jobTitle, jobDesc, resumeContent string) (float64, []string, string, error) {
+func calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation) (float64, []string, string, error) {
 	jobWords := extractWords(jobDesc)
 	resumeWords := extractWords(resumeContent)
 
@@ -250,9 +324,17 @@ func calculateMatchFallback(jobTitle, jobDesc, resumeContent string) (float64, [
 		skillScore = 100
 	}
 
-	loc := locationMatch(jobDesc, resumeContent)
+	loc := locationScore(jobLoc, userCity) / 100
 
-	score := 0.6*textual + 0.3*skillScore + 0.1*loc
+	// Ajustar peso da localização baseado no tipo da vaga
+	locWeight := 0.1
+	if userCity != "" && jobLoc.Type == "presencial" {
+		locWeight = 0.25
+	} else if userCity != "" && jobLoc.Type == "hybrid" {
+		locWeight = 0.15
+	}
+
+	score := 0.6*textual + 0.3*skillScore + locWeight*loc*100
 	if score > 100 {
 		score = 100
 	}
@@ -341,23 +423,170 @@ func cosineSimilarityTFIDF(text1, text2 string) float64 {
 	return dot / (math.Sqrt(norm1) * math.Sqrt(norm2)) * 100
 }
 
-func locationMatch(text1, text2 string) float64 {
-	locations := []string{
-		"remote", "remoto", "presencial", "hibrido", "híbrido",
-		"são paulo", "sp", "rio de janeiro", "rj",
-		"belo horizonte", "bh", "curitiba", "porto alegre",
-		"brasil", "brazil", "lisboa", "lisbon",
+// stripAccents remove acentos para permitir comparação insensível
+// (ex.: "Sao Paulo" == "são paulo")
+var accentReplacer = strings.NewReplacer(
+	"á", "a", "à", "a", "ã", "a", "â", "a", "ä", "a",
+	"é", "e", "è", "e", "ê", "e", "ë", "e",
+	"í", "i", "ì", "i", "î", "i", "ï", "i",
+	"ó", "o", "ò", "o", "õ", "o", "ô", "o", "ö", "o",
+	"ú", "u", "ù", "u", "û", "u", "ü", "u",
+	"ç", "c", "ñ", "n",
+)
+
+func stripAccents(s string) string {
+	return accentReplacer.Replace(strings.ToLower(s))
+}
+
+type cityPattern struct {
+	re        *regexp.Regexp
+	canonical string
+}
+
+// cityAliases mapeia grafias e siglas para o nome canônico da cidade.
+var cityAliases = []struct{ alias, canonical string }{
+	{"sao paulo", "sao paulo"}, {"sp", "sao paulo"},
+	{"rio de janeiro", "rio de janeiro"}, {"rj", "rio de janeiro"},
+	{"belo horizonte", "belo horizonte"}, {"bh", "belo horizonte"},
+	{"porto alegre", "porto alegre"}, {"poa", "porto alegre"},
+	{"florianopolis", "florianopolis"}, {"floripa", "florianopolis"},
+	{"curitiba", "curitiba"}, {"cwb", "curitiba"},
+	{"campinas", "campinas"},
+	{"brasilia", "brasilia"}, {"bsb", "brasilia"},
+	{"salvador", "salvador"}, {"ssa", "salvador"},
+	{"fortaleza", "fortaleza"},
+	{"recife", "recife"}, {"rec", "recife"},
+	{"manaus", "manaus"}, {"mao", "manaus"},
+	{"lisboa", "lisboa"}, {"lisbon", "lisboa"},
+	{"porto", "porto"},
+}
+
+// Padrões ordenados por especificidade (mais longos primeiro) para que
+// "porto alegre" vença "porto" e "são paulo" vença "sp".
+var cityPatterns = buildCityPatterns()
+
+func buildCityPatterns() []cityPattern {
+	patterns := make([]cityPattern, 0, len(cityAliases))
+	for _, entry := range cityAliases {
+		re, err := regexp.Compile(`\b` + regexp.QuoteMeta(entry.alias) + `\b`)
+		if err != nil {
+			continue
+		}
+		patterns = append(patterns, cityPattern{re: re, canonical: entry.canonical})
 	}
+	sort.Slice(patterns, func(i, j int) bool {
+		return len(patterns[i].canonical) > len(patterns[j].canonical)
+	})
+	return patterns
+}
 
-	t1 := strings.ToLower(text1)
-	t2 := strings.ToLower(text2)
-
-	for _, loc := range locations {
-		if strings.Contains(t1, loc) && strings.Contains(t2, loc) {
-			return 100
+// normalizeUserCity padroniza a cidade configurada pelo usuário
+// (ex.: "SP", "São Paulo" e "Sao Paulo" -> "sao paulo")
+func normalizeUserCity(userCity string) string {
+	stripped := stripAccents(strings.TrimSpace(userCity))
+	for _, entry := range cityAliases {
+		if stripped == entry.alias {
+			return entry.canonical
 		}
 	}
+	return stripped
+}
+
+var workModelMarkers = []struct {
+	marker string
+	model  string
+}{
+	{"hibrido", "hybrid"},
+	{"hybrid", "hybrid"},
+	{"presencial", "presencial"},
+	{"on-site", "presencial"},
+	{"onsite", "presencial"},
+	{"no escritorio", "presencial"},
+	{"home office", "remote"},
+	{"trabalho remoto", "remote"},
+	{"100% remote", "remote"},
+	{"remoto", "remote"},
+	{"remota", "remote"},
+	{"remotas", "remote"},
+	{"remotos", "remote"},
+	{"remote", "remote"},
+}
+
+// analyzeJobLocation analisa a descrição da vaga para determinar o tipo de localização.
+// A detecção usa fronteira de palavra e texto sem acentos para evitar falsos
+// positivos como "responsável" -> "sp" ou "informações" -> "for(taleza)".
+func analyzeJobLocation(description, _ string) JobLocation {
+	desc := stripAccents(description)
+
+	loc := JobLocation{Type: "unknown"}
+	for _, m := range workModelMarkers {
+		if strings.Contains(desc, m.marker) {
+			loc.Type = m.model
+			break
+		}
+	}
+
+	for _, p := range cityPatterns {
+		if p.re.MatchString(desc) {
+			loc.City = p.canonical
+			break
+		}
+	}
+
+	return loc
+}
+
+// locationPenalty calcula os pontos a deduzir do score quando a vaga é
+// presencial/híbrida e não é compatível com a cidade do usuário.
+func locationPenalty(jobLoc JobLocation, userCity string) float64 {
+	locScore := locationScore(jobLoc, userCity)
+
+	if jobLoc.City == "" {
+		// Vaga presencial/híbrida sem cidade identificável: penalidade parcial,
+		// pois não há como confirmar compatibilidade com a cidade configurada.
+		return 12
+	}
+	if locScore < 50 {
+		return (50 - locScore) * 0.8
+	}
 	return 0
+}
+
+// locationScore compara a localização da vaga com a cidade do usuário
+func locationScore(jobLoc JobLocation, userCity string) float64 {
+	if jobLoc.Type == "remote" || jobLoc.Type == "unknown" {
+		return 100
+	}
+
+	if jobLoc.City == "" {
+		return 50
+	}
+
+	userCityLower := normalizeUserCity(userCity)
+	jobCityLower := stripAccents(jobLoc.City)
+
+	if userCityLower == jobCityLower {
+		return 100
+	}
+
+	// Verificar se está no mesmo estado (simplificado)
+	stateMap := map[string][]string{
+		"são paulo":      {"campinas", "sorocaba", "santos", "rio preto", "ribeirão preto"},
+		"rio de janeiro": {"niterói", "petrópolis"},
+		"minas gerais":   {"belo horizonte", "uberlandia", "juiz de fora"},
+	}
+
+	for state, cities := range stateMap {
+		if userCityLower == state || jobCityLower == state {
+			for _, city := range cities {
+				if userCityLower == city || jobCityLower == city {
+					return 80
+				}
+			}
+		}
+	}
+
+	return 20
 }
 
 func extractKeywordsLMStudio(jobDesc, resumeContent string) []string {

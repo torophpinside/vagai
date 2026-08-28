@@ -92,3 +92,8 @@ export const updateProfile = (data) => api.patch('/me', data)
 export const changePassword = (data) => api.post('/me/change-password', data)
 export const changePlan = (planSlug) => api.post('/me/plan', { plan_slug: planSlug })
 export const deleteResumeAnalysis = (id) => api.delete(`/resume-analyses/${id}`)
+
+export const parseResume = (formData) => api.post('/resumes/parse', formData, { timeout: 240000 })
+export const getResumeData = (id) => api.get(`/resumes/${id}/data`).then(res => res.data)
+export const updateResumeData = (id, data) => api.put(`/resumes/${id}/data`, data)
+export const generateResumePDF = (id) => api.post(`/resumes/${id}/generate-pdf`, {}, { responseType: 'blob' })

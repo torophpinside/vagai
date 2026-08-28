@@ -1,6 +1,9 @@
 .env
 .vscode
 .opencode
+.specify
+.agents/*
+skills-lock.json
 vagai-api/uploads/resumes/*.pdf
 vagai-web/dist
 vagai-web/node_modules

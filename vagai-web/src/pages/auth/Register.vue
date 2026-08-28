@@ -111,7 +111,9 @@ async function handleRegister() {
     await register(name.value, email.value, password.value, organization.value)
     router.push('/')
   } catch (err) {
-    error.value = err.response?.data?.error || 'Erro ao criar conta'
+    error.value = err.code === 'QUOTA_EXCEEDED'
+      ? err.message
+      : err.response?.data?.error || 'Erro ao criar conta'
   } finally {
     loading.value = false
   }

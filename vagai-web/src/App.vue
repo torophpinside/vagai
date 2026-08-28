@@ -34,6 +34,10 @@
             <FileText class="w-5 h-5" />
             <span>Análise</span>
           </router-link>
+          <router-link to="/resume-editor/new" class="nav-link" active-class="active">
+            <FileEdit class="w-5 h-5" />
+            <span>Currículo</span>
+          </router-link>
           <router-link to="/settings" class="nav-link" active-class="active">
             <SettingsIcon class="w-5 h-5" />
             <span>Configurações</span>
@@ -111,6 +115,7 @@ import {
   CheckCircle2,
   Send,
   FileText,
+  FileEdit,
   Settings as SettingsIcon,
   User,
   ChevronDown,

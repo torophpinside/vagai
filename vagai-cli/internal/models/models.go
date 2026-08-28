@@ -28,6 +28,19 @@ type Organization struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+type User struct {
+	ID           uint           `gorm:"primaryKey" json:"id"`
+	Name         string         `gorm:"size:200;not null" json:"name"`
+	Email        string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
+	PasswordHash string         `gorm:"size:255;not null" json:"-"`
+	Avatar       string         `gorm:"size:500" json:"avatar"`
+	Timezone     string         `gorm:"size:50;default:America/Sao_Paulo" json:"timezone"`
+	City         string         `gorm:"size:100" json:"city"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
 type Plan struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	Name            string    `gorm:"size:100;not null" json:"name"`
@@ -59,13 +72,13 @@ type Site struct {
 
 type Job struct {
 	ID             uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID uint       `gorm:"index;default:0" json:"organization_id"`
+	OrganizationID uint       `gorm:"index;default:0;uniqueIndex:idx_job_url_org" json:"organization_id"`
 	SiteID         *uint      `gorm:"index" json:"site_id"`
 	Site           *Site      `gorm:"foreignKey:SiteID" json:"site,omitempty"`
 	Title          string     `gorm:"size:255" json:"title"`
 	Company        string     `gorm:"size:255" json:"company"`
 	Description    string     `gorm:"type:text" json:"description"`
-	URL            string     `gorm:"size:500;uniqueIndex" json:"url"`
+	URL            string     `gorm:"size:500;uniqueIndex:idx_job_url_org" json:"url"`
 	PostedDate     *time.Time `json:"posted_date"`
 	CollectedAt    time.Time  `gorm:"autoCreateTime" json:"collected_at"`
 	Status         JobStatus  `gorm:"size:20;default:new" json:"status"`
@@ -84,9 +97,9 @@ type Resume struct {
 type Match struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID  uint      `gorm:"index;default:0" json:"organization_id"`
-	JobID           uint      `gorm:"index" json:"job_id"`
+	JobID           uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"job_id"`
 	Job             Job       `gorm:"foreignKey:JobID" json:"job,omitempty"`
-	ResumeID        uint      `gorm:"index" json:"resume_id"`
+	ResumeID        uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
 	Resume          Resume    `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
 	SimilarityScore float64   `gorm:"type:decimal(5,2)" json:"similarity_score"`
 	KeywordsMatched string    `gorm:"type:json" json:"keywords_matched"`

@@ -13,7 +13,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "match",
 	Short: "Executa o matching de vagas com currículos",
-	Long:  `Compara vagas coletadas com os currículos disponíveis`,
+	Long:  `Compara vagas coletadas com os currículos disponíveis. A organização é derivada automaticamente de cada vaga/site.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return matcher.Run(threshold, force)
 	},

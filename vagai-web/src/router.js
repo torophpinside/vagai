@@ -10,6 +10,7 @@ import Team from './pages/Team.vue'
 import Billing from './pages/Billing.vue'
 import Login from './pages/auth/Login.vue'
 import Register from './pages/auth/Register.vue'
+import ResumeEditor from './pages/ResumeEditor.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
@@ -22,7 +23,8 @@ const routes = [
   { path: '/analysis', name: 'Analysis', component: Analysis, meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/settings/team', name: 'Team', component: Team, meta: { requiresAuth: true } },
-  { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } }
+  { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } },
+  { path: '/resume-editor/:id', name: 'ResumeEditor', component: ResumeEditor, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

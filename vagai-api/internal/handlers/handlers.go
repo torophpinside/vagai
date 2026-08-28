@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,12 +18,77 @@ import (
 	"github.com/anomalyco/vagai-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var DB *gorm.DB
 
 func SetDB(db *gorm.DB) {
 	DB = db
+}
+
+// trackingParams são parâmetros de query que devem ser removidos na normalização
+var trackingParams = map[string]bool{
+	"utm_source": true, "utm_medium": true, "utm_campaign": true,
+	"utm_term": true, "utm_content": true, "ref": true,
+	"source": true, "fbclid": true, "gclid": true,
+	"hsa_cam": true, "hsa_grp": true, "hsa_mt": true,
+	"hsa_src": true, "hsa_ad": true, "hsa_acc": true,
+	"hsa_net": true, "hsa_ver": true, "mc_cid": true,
+	"mc_eid": true, "yclid": true, "msclkid": true,
+}
+
+// NormalizeURL normaliza URLs para evitar duplicatas por diferenças
+// insignificantes (query params de tracking, trailing slashes, etc.)
+func NormalizeURL(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return rawURL
+	}
+
+	if strings.HasPrefix(rawURL, "//") {
+		rawURL = "https:" + rawURL
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	parsed.Scheme = "https"
+
+	host := parsed.Hostname()
+	if strings.HasPrefix(host, "www.") {
+		host = host[4:]
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		host = host + ":" + port
+	}
+	parsed.Host = host
+
+	q := parsed.Query()
+	modified := false
+	for key := range q {
+		if trackingParams[strings.ToLower(key)] {
+			q.Del(key)
+			modified = true
+		}
+	}
+	if modified {
+		parsed.RawQuery = q.Encode()
+	} else {
+		parsed.RawQuery = ""
+	}
+
+	parsed.Fragment = ""
+
+	path := parsed.Path
+	if path != "/" && strings.HasSuffix(path, "/") {
+		path = strings.TrimRight(path, "/")
+	}
+	parsed.Path = path
+
+	return parsed.String()
 }
 
 func getDB(c *gin.Context) *gorm.DB {
@@ -168,8 +234,8 @@ func ListJobs(c *gin.Context) {
 }
 
 func ExtractJob(c *gin.Context) {
-	url := c.PostForm("url")
-	if url == "" {
+	jobURL := c.PostForm("url")
+	if jobURL == "" {
 		var body struct {
 			URL string `json:"url"`
 		}
@@ -177,10 +243,12 @@ func ExtractJob(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "URL é obrigatória"})
 			return
 		}
-		url = body.URL
+		jobURL = body.URL
 	}
 
-	data, err := services.ExtractJobFromURL(url)
+	jobURL = NormalizeURL(jobURL)
+
+	data, err := services.ExtractJobFromURL(jobURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -190,7 +258,7 @@ func ExtractJob(c *gin.Context) {
 		"title":       data["title"],
 		"company":     data["company"],
 		"description": data["description"],
-		"url":         url,
+		"url":         jobURL,
 	})
 }
 
@@ -213,6 +281,8 @@ func CreateJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "URL é obrigatória"})
 		return
 	}
+
+	job.URL = NormalizeURL(job.URL)
 
 	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceJobs)
 	if err != nil {
@@ -288,21 +358,16 @@ func UpdateJobStatus(c *gin.Context) {
 	if body.Status == "matched" {
 		var resume models.Resume
 		if err := db.Where("organization_id = ?", orgID).First(&resume).Error; err == nil {
-			var existingMatch models.Match
-			result := db.Where("job_id = ? AND resume_id = ?", job.ID, resume.ID).First(&existingMatch)
-			if result.Error != nil {
-				match := models.Match{
-					OrganizationID:  orgID,
-					JobID:           job.ID,
-					ResumeID:        resume.ID,
-					SimilarityScore: 100.00,
-				}
-				db.Create(&match)
-			} else {
-				existingMatch.SimilarityScore = 100.00
-				existingMatch.Applied = false
-				db.Save(&existingMatch)
+			match := models.Match{
+				OrganizationID:  orgID,
+				JobID:           job.ID,
+				ResumeID:        resume.ID,
+				SimilarityScore: 100.00,
 			}
+			db.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "job_id"}, {Name: "resume_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"similarity_score", "applied"}),
+			}).Create(&match)
 		}
 	}
 
@@ -312,7 +377,7 @@ func UpdateJobStatus(c *gin.Context) {
 func ListMatches(c *gin.Context) {
 	db := getDB(c)
 	orgID := c.GetUint("org_id")
-	threshold, _ := strconv.Atoi(c.DefaultQuery("threshold", "1"))
+	threshold, _ := strconv.Atoi(c.DefaultQuery("threshold", "65"))
 	sortOrder := c.DefaultQuery("sort", "desc")
 	appliedFilter := c.DefaultQuery("applied", "false")
 
@@ -677,25 +742,6 @@ func UploadResume(c *gin.Context) {
 	content, err := services.ExtractTextFromFile(filePath)
 	if err != nil {
 		log.Printf("Erro na extração: %v", err)
-	}
-
-	if content != "" {
-		log.Printf("Processando conteúdo com AI...")
-		done := make(chan bool, 1)
-		go func() {
-			processedContent, aiErr := services.ProcessResumeContent(content)
-			if aiErr == nil {
-				content = processedContent
-			} else {
-				log.Printf("Erro na AI: %v", aiErr)
-			}
-			done <- true
-		}()
-		select {
-		case <-done:
-		case <-time.After(240 * time.Second):
-			log.Printf("Timeout no processamento AI")
-		}
 	}
 
 	var resume models.Resume

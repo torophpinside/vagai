@@ -5,8 +5,40 @@
       <p class="text-slate-400">Personalize seu scanner, gerencie sua equipe e seu plano.</p>
     </div>
 
+    <!-- Perfil do Usuário -->
+    <div class="glass-card p-10">
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+          <MapPin class="w-6 h-6" />
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-white font-outfit">Seu Perfil</h2>
+          <p class="text-sm text-slate-400">Configure sua localização para melhor matching</p>
+        </div>
+      </div>
+
+      <form @submit.prevent="handleUpdateProfile" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-2">
+            <label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Nome</label>
+            <input v-model="profileForm.name" type="text" class="input-field w-full h-12" placeholder="Seu nome" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Cidade</label>
+            <input v-model="profileForm.city" type="text" class="input-field w-full h-12" placeholder="ex: São Paulo, Rio de Janeiro" />
+            <p class="text-xs text-slate-500 ml-1">Usada para filtrar vagas presenciais e híbridas</p>
+          </div>
+        </div>
+        <button type="submit" class="h-10 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-900/20 active:scale-95 flex items-center justify-center gap-2" :disabled="profileMutation.isPending.value">
+          <CheckCircle2 v-if="!profileMutation.isPending.value" class="w-4 h-4" />
+          <div v-else class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          {{ profileMutation.isPending.value ? 'Salvando...' : 'Salvar Perfil' }}
+        </button>
+      </form>
+    </div>
+
     <!-- Quick Links -->
-    <div class="grid grid-cols-2 gap-6">
+    <div class="grid grid-cols-3 gap-6">
       <router-link to="/settings/team" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
@@ -26,6 +58,17 @@
           <div>
             <h3 class="font-bold text-white">Billing</h3>
             <p class="text-sm text-slate-400">Plano, pagamentos e limites</p>
+          </div>
+        </div>
+      </router-link>
+      <router-link to="/resume-editor/new" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors">
+            <FileEdit class="w-6 h-6" />
+          </div>
+          <div>
+            <h3 class="font-bold text-white">Criar seu Currículo</h3>
+            <p class="text-sm text-slate-400">Importe, edite e gere PDF</p>
           </div>
         </div>
       </router-link>
@@ -173,9 +216,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { addSite, updateSite, deleteSite, uploadResume, useSites, useResumes } from '../services/api'
+import { addSite, updateSite, deleteSite, uploadResume, useSites, useResumes, useMe, updateProfile } from '../services/api'
+import { useAuth } from '../composables/auth'
 import { 
   Globe, 
   Plus, 
@@ -188,20 +232,45 @@ import {
   ExternalLink,
   Users,
   CreditCard,
-  Power
+  Power,
+  FileEdit,
+  MapPin
 } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
+const { updateUser } = useAuth()
 const newSite = ref({ name: '', url: '' })
 const resumeFile = ref(null)
 
 const resumesQuery = useResumes()
 const sitesQuery = useSites()
+const meQuery = useMe()
 
 const resumes = resumesQuery.data
 const sites = sitesQuery.data
 const resumesLoading = resumesQuery.isLoading
 const sitesLoading = sitesQuery.isLoading
+
+const profileForm = ref({ name: '', city: '' })
+
+watch(() => meQuery.data?.value, (resp) => {
+  if (resp?.user) {
+    profileForm.value = {
+      name: resp.user.name || '',
+      city: resp.user.city || ''
+    }
+  }
+}, { immediate: true })
+
+const profileMutation = useMutation({
+  mutationFn: updateProfile,
+  onSuccess: (response) => {
+    queryClient.invalidateQueries({ queryKey: ['me'] })
+    if (response?.data?.user) {
+      updateUser(response.data.user)
+    }
+  }
+})
 
 const siteMutation = useMutation({
   mutationFn: addSite,
@@ -249,6 +318,9 @@ const handleUploadResume = () => {
     formData.append('file', resumeFile.value)
     resumeMutation.mutate(formData)
   }
+}
+const handleUpdateProfile = () => {
+  profileMutation.mutate(profileForm.value)
 }
 
 const formatDate = (dateStr) => {

@@ -81,6 +81,11 @@ func main() {
 		api.GET("/resume-analyses", handlers.ListResumeAnalyses)
 		api.GET("/resume-analyses/:id", handlers.GetResumeAnalysis)
 		api.DELETE("/resume-analyses/:id", handlers.DeleteResumeAnalysis)
+
+		api.POST("/resumes/parse", handlers.ParseResume)
+		api.GET("/resumes/:id/data", handlers.GetResumeData)
+		api.PUT("/resumes/:id/data", handlers.UpdateResumeData)
+		api.POST("/resumes/:id/generate-pdf", handlers.GenerateResumePDFHandler)
 	}
 
 	srv := &http.Server{

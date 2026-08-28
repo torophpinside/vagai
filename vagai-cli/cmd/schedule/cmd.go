@@ -11,6 +11,7 @@ var (
 	scheduleName    string
 	scheduleCommand string
 	scheduleCron    string
+	scheduleOrgID   uint
 )
 
 var Cmd = &cobra.Command{
@@ -26,7 +27,10 @@ var AddCmd = &cobra.Command{
 		if scheduleName == "" || scheduleCommand == "" || scheduleCron == "" {
 			return fmt.Errorf("nome, comando e schedule são obrigatórios")
 		}
-		return scheduler.AddSchedule(scheduleName, scheduleCommand, scheduleCron)
+		if scheduleOrgID == 0 {
+			return fmt.Errorf("organization ID (--org) é obrigatório")
+		}
+		return scheduler.AddSchedule(scheduleName, scheduleCommand, scheduleCron, scheduleOrgID)
 	},
 }
 
@@ -66,9 +70,11 @@ func init() {
 	AddCmd.Flags().StringVarP(&scheduleName, "name", "n", "", "Nome do schedule")
 	AddCmd.Flags().StringVarP(&scheduleCommand, "command", "c", "", "Comando a executar")
 	AddCmd.Flags().StringVarP(&scheduleCron, "schedule", "s", "", "Expressão cron (ex: @hourly, */30 * * * *)")
+	AddCmd.Flags().UintVar(&scheduleOrgID, "org", 0, "Organization ID (obrigatório)")
 	AddCmd.MarkFlagRequired("name")
 	AddCmd.MarkFlagRequired("command")
 	AddCmd.MarkFlagRequired("schedule")
+	AddCmd.MarkFlagRequired("org")
 
 	RemoveCmd.Flags().StringVarP(&scheduleName, "name", "n", "", "Nome do schedule")
 	RemoveCmd.MarkFlagRequired("name")

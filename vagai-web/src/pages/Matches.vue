@@ -111,6 +111,13 @@
           </div>
 
           <div class="mt-8 space-y-6">
+            <!-- Technologies & Languages -->
+            <div v-if="match.job?.description" class="flex flex-wrap gap-2">
+              <div v-for="tech in extractTechnologies(match.job.description)" :key="tech" class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-300 font-medium">
+                {{ tech }}
+              </div>
+            </div>
+
             <!-- Description Preview -->
             <div v-if="match.job?.description" class="bg-slate-900/50 border border-white/5 rounded-2xl p-4">
               <div class="text-xs text-slate-500 font-bold uppercase tracking-widest mb-2">Descrição da Vaga</div>
@@ -183,7 +190,7 @@ import DropdownMenu from '../components/DropdownMenu.vue'
 const filters = reactive({
   sort: 'desc',
   site: [],
-  threshold: 1,
+  threshold: 65,
   applied: 'false',
   page: 1,
   limit: 20
@@ -260,6 +267,39 @@ const parseKeywords = (kws) => {
     return Array.isArray(parsed) ? parsed : []
   } catch (e) {
     return kws.split(',').map(s => s.trim())
+  }
+}
+
+const extractTechnologies = (description) => {
+  if (!description) return []
+  try {
+    const text = description.toLowerCase()
+    const techs = [
+      'python', 'javascript', 'typescript', 'java', 'go', 'golang', 'rust', 'c++', 'c#', 'csharp', 
+      'ruby', 'php', 'swift', 'kotlin', 'scala', 'sql', 'r', 'matlab', 'perl', 'shell', 'bash',
+      'react', 'vue', 'angular', 'svelte', 'next.js', 'nuxt', 'node', 'node.js', 'deno', 'bun',
+      'django', 'flask', 'fastapi', 'spring', 'spring boot', 'express', 'nestjs', 'koa', 'gin',
+      'docker', 'kubernetes', 'k8s', 'aws', 'azure', 'gcp', 'google cloud', 'terraform', 'ansible',
+      'linux', 'unix', 'mysql', 'postgresql', 'postgres', 'mongodb', 'redis', 'elasticsearch',
+      'git', 'github', 'gitlab', 'bitbucket', 'ci/cd', 'jenkins', 'github actions', 'gitlab ci',
+      'devops', 'agile', 'scrum', 'kanban', 'api', 'rest', 'graphql', 'grpc', 'microservices',
+      'machine learning', 'ml', 'ai', 'data science', 'pandas', 'numpy', 'tensorflow', 'pytorch',
+      'html', 'css', 'sass', 'tailwind', 'bootstrap', 'webpack', 'vite', 'esbuild',
+      'jest', 'vitest', 'cypress', 'playwright', 'testing library'
+    ]
+    
+    const found = []
+    for (const tech of techs) {
+      const escaped = tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const pattern = new RegExp(`\\b${escaped}\\b`, 'i')
+      if (pattern.test(text) && !found.includes(tech)) {
+        found.push(tech)
+      }
+    }
+    
+    return found.slice(0, 8)
+  } catch (e) {
+    return []
   }
 }
 </script>

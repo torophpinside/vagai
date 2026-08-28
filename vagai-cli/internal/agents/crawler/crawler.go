@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -168,7 +169,7 @@ func crawlSite(site models.Site) error {
 
 			// Verifica se a vaga já existe
 			var existingJob models.Job
-			if err := db.DB.Where("url = ?", link).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND organization_id = ?", link, site.OrganizationID).First(&existingJob).Error; err == nil {
 				if existingJob.Description == "" {
 					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
 					fetchJobDetails(&existingJob, site, client)
@@ -254,7 +255,7 @@ func crawlSite(site models.Site) error {
 			}
 
 			var existingJob models.Job
-			if err := db.DB.Where("url = ?", link).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND organization_id = ?", link, site.OrganizationID).First(&existingJob).Error; err == nil {
 				if existingJob.Description == "" {
 					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
 					fetchJobDetails(&existingJob, site, client)
@@ -303,34 +304,96 @@ func crawlSite(site models.Site) error {
 	return nil
 }
 
-// normalizeURL normaliza URLs relativas e absolutas
+// trackingParams são parâmetros de query que devem ser removidos na normalização
+var trackingParams = map[string]bool{
+	"utm_source": true, "utm_medium": true, "utm_campaign": true,
+	"utm_term": true, "utm_content": true, "ref": true,
+	"source": true, "fbclid": true, "gclid": true,
+	"hsa_cam": true, "hsa_grp": true, "hsa_mt": true,
+	"hsa_src": true, "hsa_ad": true, "hsa_acc": true,
+	"hsa_net": true, "hsa_ver": true, "mc_cid": true,
+	"mc_eid": true, "yclid": true, "msclkid": true,
+}
+
+// NormalizeURL normaliza URLs para evitar duplicatas por diferenças
+// insignificantes (query params de tracking, trailing slashes, etc.)
+func NormalizeURL(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return rawURL
+	}
+
+	// URLs protocol-relative: //example.com/path
+	if strings.HasPrefix(rawURL, "//") {
+		rawURL = "https:" + rawURL
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	// Forçar HTTPS
+	parsed.Scheme = "https"
+
+	// Remover www. prefix
+	host := parsed.Hostname()
+	if strings.HasPrefix(host, "www.") {
+		host = host[4:]
+	}
+	// Preservar porta não-padrão
+	if port := parsed.Port(); port != "" && port != "443" {
+		host = host + ":" + port
+	}
+	parsed.Host = host
+
+	// Remover parâmetros de tracking/analytics
+	q := parsed.Query()
+	modified := false
+	for key := range q {
+		if trackingParams[strings.ToLower(key)] {
+			q.Del(key)
+			modified = true
+		}
+	}
+	if modified {
+		parsed.RawQuery = q.Encode()
+	} else {
+		parsed.RawQuery = ""
+	}
+
+	// Remover fragment
+	parsed.Fragment = ""
+
+	// Remover trailing slash (exceto raiz)
+	path := parsed.Path
+	if path != "/" && strings.HasSuffix(path, "/") {
+		path = strings.TrimRight(path, "/")
+	}
+	parsed.Path = path
+
+	return parsed.String()
+}
+
+// normalizeURL mantido para compatibilidade interna - delega para NormalizeURL
 func normalizeURL(href, baseURL string) string {
 	href = strings.TrimSpace(href)
-	
-	if strings.HasPrefix(href, "http") {
-		// Remove query params do LinkedIn
-		if strings.Contains(href, "linkedin.com/jobs/view/") {
-			parts := strings.Split(href, "?")
-			href = strings.TrimSuffix(parts[0], "/")
-			return href
-		}
-		return href
-	}
 
-	// URL relativa
+	// URL relativa ao host: /path
 	if strings.HasPrefix(href, "/") {
-		// Extrai domínio do baseURL
 		parts := strings.Split(baseURL, "/")
 		if len(parts) >= 3 {
-			return parts[0] + "//" + parts[2] + href
+			href = parts[0] + "//" + parts[2] + href
 		}
+	} else if !strings.HasPrefix(href, "http") {
+		// Relativa ao diretório atual: path -> baseURL/path
+		if !strings.HasSuffix(baseURL, "/") {
+			baseURL = baseURL + "/"
+		}
+		href = baseURL + href
 	}
 
-	// Relativa ao diretório atual
-	if !strings.HasSuffix(baseURL, "/") {
-		baseURL = baseURL + "/"
-	}
-	return baseURL + href
+	return NormalizeURL(href)
 }
 
 func fetchJobDetails(job *models.Job, site models.Site, client *http.Client) error {
@@ -511,10 +574,10 @@ func crawlWorkana(site models.Site) error {
 			descRaw, _ := result["description"].(string)
 			description := stripHTML(descRaw)
 
-			jobURL := "https://www.workana.com/job/" + slug
+			jobURL := NormalizeURL("https://www.workana.com/job/" + slug)
 
 			var existingJob models.Job
-			if err := db.DB.Where("url = ?", jobURL).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&existingJob).Error; err == nil {
 				continue
 			}
 
@@ -605,11 +668,13 @@ func crawlRemoteOKAPI(site models.Site) error {
 		jobURL, _ := item["url"].(string)
 
 		if jobURL == "" {
-			jobURL = "https://remoteok.com/remote-jobs/" + id
+			jobURL = NormalizeURL("https://remoteok.com/remote-jobs/" + id)
+		} else {
+			jobURL = NormalizeURL(jobURL)
 		}
 
 		var job models.Job
-		if err := db.DB.Where("url = ?", jobURL).First(&job).Error; err == nil {
+		if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&job).Error; err == nil {
 			continue
 		}
 
@@ -688,6 +753,7 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 		if !ok || jobURL == "" {
 			continue
 		}
+		jobURL = NormalizeURL(jobURL)
 
 		title, _ := item["title"].(string)
 		description, _ := item["description"].(string)
@@ -697,7 +763,7 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 		}
 
 		var job models.Job
-		if err := db.DB.Where("url = ?", jobURL).First(&job).Error; err == nil {
+		if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&job).Error; err == nil {
 			continue
 		}
 

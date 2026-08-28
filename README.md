@@ -23,6 +23,7 @@ Três agentes especializados:
 | Frontend | Vue 3 + Vite + TailwindCSS |
 | Banco | MySQL 8 + Redis 7 |
 | IA | LM Studio (local) |
+| BI | Metabase (local) |
 | Infra | Docker + docker-compose |
 
 ## Estrutura
@@ -45,6 +46,10 @@ vagai/
 │       ├── pages/      # Dashboard, Vagas, Matches
 │       └── components/ # Gráficos, tabelas, filtros
 │
+├── metabase/           # BI Dashboards (Metabase)
+│   ├── README.md       # Documentação dos dashboards
+│   └── setup/          # Views SQL e scripts de setup
+│
 ├── docker-compose.yml  # Orquestração completa
 └── docs/SPECS.md       # Especificação detalhada
 ```
@@ -63,7 +68,27 @@ vagai/
 docker-compose up -d
 ```
 
-Isso sobe MySQL, Redis, API, Web e o agendador de tarefas.
+Isso sobe MySQL, Redis, API, Web, agendador de tarefas e **Metabase** (BI).
+
+### Acessar Metabase (BI)
+
+Após subir o ambiente, acesse http://localhost:3001:
+
+| Item | Valor |
+|------|-------|
+| Email | admin@vagai.com |
+| Senha | vagai-admin-2024 |
+
+O Metabase já vem configurado com **30 relatórios** em **7 dashboards**:
+1. Pipeline de Vagas
+2. Qualidade dos Matches
+3. Receita & Assinaturas
+4. Crescimento de Usuários
+5. Saúde do Sistema
+6. Insights de Resumes
+7. Performance dos Sites
+
+Documentação completa: [`metabase/README.md`](metabase/README.md)
 
 ### Adicionar sites
 
@@ -87,6 +112,7 @@ go run main.go match
 - **Matching com IA** — LM Studio para análise semântica de compatibilidade
 - **Fallback tradicional** — similaridade textual quando IA não está disponível
 - **Dashboard** — gráficos de vagas por tecnologia, empresa, tempo
+- **Metabase** — 30 relatórios de BI com dashboards interativos
 - **Agendamento** — coleta automática via cron
 - **Multi-tenancy** — isolamento de dados por usuário/empresa
 - **Planos** — Free e Pro com limites diferenciados

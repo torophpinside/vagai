@@ -11,6 +11,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./metabase/setup/01-create-views.sql:/docker-entrypoint-initdb.d/01-create-views.sql
     networks:
       - vagai-net
     healthcheck:
@@ -93,8 +94,32 @@ services:
     command: [ "schedule", "run" ]
     restart: unless-stopped
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: vagai-metabase
+    ports:
+      - "3001:3000"
+    environment:
+      MB_DB_TYPE: mysql
+      MB_DB_DBNAME: vagai
+      MB_DB_PORT: 3306
+      MB_DB_USER: vagai
+      MB_DB_PASS: vagai
+      MB_DB_HOST: mysql
+      MB_EMBEDDING_APP_ORIGIN: "*"
+    volumes:
+      - metabase_data:/metabase-data
+      - ./metabase/setup:/metabase-setup
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - vagai-net
+    restart: unless-stopped
+
 volumes:
   mysql_data:
+  metabase_data:
 
 networks:
   vagai-net:
