@@ -38,7 +38,7 @@
     </div>
 
     <!-- Quick Links -->
-    <div class="grid grid-cols-3 gap-6">
+    <div class="grid grid-cols-2 gap-6">
       <router-link to="/settings/team" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
@@ -58,17 +58,6 @@
           <div>
             <h3 class="font-bold text-white">Billing</h3>
             <p class="text-sm text-slate-400">Plano, pagamentos e limites</p>
-          </div>
-        </div>
-      </router-link>
-      <router-link to="/resume-editor/new" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
-        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors">
-            <FileEdit class="w-6 h-6" />
-          </div>
-          <div>
-            <h3 class="font-bold text-white">Criar seu Currículo</h3>
-            <p class="text-sm text-slate-400">Importe, edite e gere PDF</p>
           </div>
         </div>
       </router-link>
@@ -145,70 +134,36 @@
 
     <div class="glass-card p-10">
       <div class="flex items-center gap-3 mb-8">
-        <div class="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
-          <FileText class="w-6 h-6" />
+        <div class="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-400">
+          <Ban class="w-6 h-6" />
         </div>
-        <h2 class="text-2xl font-bold text-white font-outfit">Seu Currículo</h2>
+        <div>
+          <h2 class="text-2xl font-bold text-white font-outfit">Palavras-chave de bloqueio</h2>
+          <p class="text-sm text-slate-400">Vagas que citarem essas palavras perdem 3 pontos no score de match.</p>
+        </div>
       </div>
 
-      <form @submit.prevent="handleUploadResume" class="space-y-6">
-        <div class="group relative h-48 border-2 border-dashed border-white/10 hover:border-indigo-500/50 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 cursor-pointer overflow-hidden">
-          <input type="file" @change="handleFileChange" class="absolute inset-0 opacity-0 cursor-pointer z-10" accept=".pdf,.txt,.docx" />
-          <div class="flex flex-col items-center gap-3 group-hover:scale-110 transition-transform duration-500">
-            <div class="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center text-slate-500">
-              <Upload class="w-6 h-6" />
-            </div>
-            <div class="text-center">
-              <p class="text-white font-bold">{{ resumeFile ? resumeFile.name : 'Clique ou arraste seu arquivo' }}</p>
-              <p class="text-xs text-slate-500 mt-1">PDF, TXT ou DOCX (Max. 10MB)</p>
-            </div>
-          </div>
+      <div class="space-y-6">
+        <div class="flex gap-3">
+          <input v-model="newKeyword" @keyup.enter="addKeyword" type="text" class="input-field flex-1 h-12" placeholder="ex: freela, CLT, bilingue..." />
+          <button type="button" @click="addKeyword" class="h-12 px-5 bg-red-600/80 hover:bg-red-500 text-white font-bold rounded-xl transition-all flex items-center gap-2">
+            <Plus class="w-5 h-5" /> Adicionar
+          </button>
         </div>
-        
-        <button type="submit" class="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2" :disabled="!resumeFile || resumeMutation.isPending.value">
-          <CheckCircle2 v-if="!resumeMutation.isPending.value" class="w-5 h-5" />
-          <div v-else class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-          {{ resumeMutation.isPending.value ? 'Enviando...' : 'Fazer Upload' }}
-        </button>
-      </form>
-    </div>
 
-    <div class="glass-card p-10">
-      <div class="flex items-center justify-between mb-10">
-        <h2 class="text-2xl font-bold text-white font-outfit">Currículos Ativos</h2>
-        <History class="text-slate-500 w-6 h-6" />
-      </div>
-
-  <div v-if="resumesLoading" class="flex justify-center py-12">
-    <div class="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-  </div>
-  <div v-else-if="!resumes || !resumes.length" class="text-center py-20 bg-slate-950/30 rounded-3xl border border-white/5">
-    <div class="text-slate-500 mb-4 flex justify-center">
-      <FileX class="w-12 h-12 opacity-20" />
-    </div>
-    <p class="text-slate-400 font-medium">Nenhum currículo cadastrado no sistema.</p>
-  </div>
-  <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div v-for="resume in resumes" :key="resume.id" class="bg-slate-950/50 border border-white/5 rounded-3xl p-6 hover:border-indigo-500/30 transition-all duration-300 group">
-          <div class="flex justify-between items-start mb-6">
-            <div class="flex gap-4">
-              <div class="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400">
-                <FileText class="w-6 h-6" />
-              </div>
-              <div>
-                <h3 class="font-bold text-white text-lg group-hover:text-indigo-400 transition-colors">{{ resume.name }}</h3>
-                <p class="text-xs text-slate-500 mt-1">ID #{{ resume.id }} • {{ formatDate(resume.uploaded_at) }}</p>
-              </div>
-            </div>
-            <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">Ativo</span>
-          </div>
-          
-          <div v-if="resume.content" class="space-y-3">
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Conteúdo Extraído</div>
-            <div class="bg-slate-900/50 border border-white/5 p-4 rounded-2xl text-xs text-slate-400 leading-relaxed max-h-40 overflow-y-auto custom-scrollbar">
-              {{ resume.content }}
-            </div>
-          </div>
+        <div v-if="keywordsLoading" class="flex justify-center py-8">
+          <div class="w-8 h-8 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
+        </div>
+        <div v-else-if="!keywords.length" class="text-center py-10 bg-slate-950/30 rounded-2xl border border-white/5">
+          <p class="text-slate-400 font-medium">Nenhuma palavra de bloqueio configurada.</p>
+        </div>
+        <div v-else class="flex flex-wrap gap-3">
+          <span v-for="(kw, i) in keywords" :key="`${kw}-${i}`" class="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-300 font-medium">
+            {{ kw }}
+            <button @click="removeKeyword(i)" class="text-red-400/60 hover:text-red-300 transition-colors" :title="`Remover ${kw}`">
+              <X class="w-4 h-4" />
+            </button>
+          </span>
         </div>
       </div>
     </div>
@@ -216,40 +171,42 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { addSite, updateSite, deleteSite, uploadResume, useSites, useResumes, useMe, updateProfile } from '../services/api'
+import { addSite, updateSite, deleteSite, useSites, useMe, updateProfile, useNegativeKeywords, updateNegativeKeywords } from '../services/api'
 import { useAuth } from '../composables/auth'
-import { 
-  Globe, 
-  Plus, 
-  FileText, 
-  Upload, 
-  CheckCircle2, 
-  History, 
-  FileX,
+import {
+  Globe,
+  Plus,
   Trash2,
   ExternalLink,
   Users,
   CreditCard,
   Power,
-  FileEdit,
-  MapPin
+  MapPin,
+  Ban,
+  X
 } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
 const { updateUser } = useAuth()
 const newSite = ref({ name: '', url: '' })
-const resumeFile = ref(null)
+const newKeyword = ref('')
+const keywords = ref([])
 
-const resumesQuery = useResumes()
 const sitesQuery = useSites()
 const meQuery = useMe()
+const negativeKeywordsQuery = useNegativeKeywords()
 
-const resumes = resumesQuery.data
 const sites = sitesQuery.data
-const resumesLoading = resumesQuery.isLoading
 const sitesLoading = sitesQuery.isLoading
+const keywordsLoading = negativeKeywordsQuery.isLoading
+
+watch(() => negativeKeywordsQuery.data?.value, (list) => {
+  if (Array.isArray(list)) {
+    keywords.value = [...list]
+  }
+}, { immediate: true })
 
 const profileForm = ref({ name: '', city: '' })
 
@@ -294,14 +251,6 @@ const toggleSiteMutation = useMutation({
   }
 })
 
-const resumeMutation = useMutation({
-  mutationFn: uploadResume,
-  onSuccess: () => {
-    resumeFile.value = null
-    queryClient.invalidateQueries({ queryKey: ['resumes'] })
-  }
-})
-
 const handleAddSite = () => siteMutation.mutate(newSite.value)
 const handleDeleteSite = (id) => {
   if (confirm('Remover esta fonte?')) {
@@ -311,24 +260,31 @@ const handleDeleteSite = (id) => {
 const toggleSiteActive = (site) => {
   toggleSiteMutation.mutate({ id: site.id, data: { active: !site.active } })
 }
-const handleFileChange = (e) => { resumeFile.value = e.target.files[0] }
-const handleUploadResume = () => {
-  if (resumeFile.value) {
-    const formData = new FormData()
-    formData.append('file', resumeFile.value)
-    resumeMutation.mutate(formData)
-  }
-}
+
 const handleUpdateProfile = () => {
   profileMutation.mutate(profileForm.value)
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  }).format(new Date(dateStr))
+const keywordMutation = useMutation({
+  mutationFn: updateNegativeKeywords,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['negative-keywords'] })
+  }
+})
+
+const addKeyword = () => {
+  const trimmed = newKeyword.value.trim()
+  if (!trimmed) return
+  if (!keywords.value.some(k => k.toLowerCase() === trimmed.toLowerCase())) {
+    keywords.value.push(trimmed)
+    keywordMutation.mutate(keywords.value)
+  }
+  newKeyword.value = ''
+}
+
+const removeKeyword = (index) => {
+  if (index < 0 || index >= keywords.value.length) return
+  keywords.value.splice(index, 1)
+  keywordMutation.mutate(keywords.value)
 }
 </script>

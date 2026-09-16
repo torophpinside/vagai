@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -135,7 +136,7 @@ func checkPlanLimit(db *gorm.DB, orgID uint, resource planResource) (allowed boo
 	case resourceSites:
 		db.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&count)
 	case resourceResumes:
-		db.Model(&models.Resume{}).Where("organization_id = ?", orgID).Count(&count)
+		db.Model(&models.Resume{}).Where("organization_id = ? AND file_path <> ''", orgID).Count(&count)
 	case resourceJobs:
 		db.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&count)
 	}
@@ -250,7 +251,8 @@ func ExtractJob(c *gin.Context) {
 
 	data, err := services.ExtractJobFromURL(jobURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Erro ao extrair vaga de %s: %v", jobURL, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Não foi possível extrair a vaga desta URL"})
 		return
 	}
 
@@ -309,7 +311,7 @@ func CreateJob(c *gin.Context) {
 
 	if err := db.Create(&job).Error; err != nil {
 		log.Printf("Erro ao salvar vaga: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erro ao salvar vaga: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar vaga"})
 		return
 	}
 
@@ -355,23 +357,166 @@ func UpdateJobStatus(c *gin.Context) {
 	job.Status = models.JobStatus(body.Status)
 	db.Save(&job)
 
+	var org models.Organization
+	if err := db.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar organização"})
+		return
+	}
+	var negativeKeywords []string
+	if org.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(org.NegativeKeywords), &negativeKeywords); err != nil {
+			log.Printf("Erro ao decodificar negative_keywords: %v", err)
+		}
+	}
+
 	if body.Status == "matched" {
-		var resume models.Resume
-		if err := db.Where("organization_id = ?", orgID).First(&resume).Error; err == nil {
-			match := models.Match{
-				OrganizationID:  orgID,
-				JobID:           job.ID,
-				ResumeID:        resume.ID,
-				SimilarityScore: 100.00,
+		var resumes []models.Resume
+		if err := db.Where("organization_id = ?", orgID).Find(&resumes).Error; err == nil {
+			for i := range resumes {
+				resume := &resumes[i]
+				if resume.Data == "" && resume.Content == "" {
+					continue
+				}
+
+				var resumeData services.ResumeData
+				if resume.Data != "" {
+					if err := json.Unmarshal([]byte(resume.Data), &resumeData); err != nil {
+						continue
+					}
+				}
+
+				result := services.MatchResumeToJob(resumeData, resume.Content, job.Title, job.Description, negativeKeywords)
+				if result.Score <= 0 {
+					continue
+				}
+
+				keywordsJSON, _ := json.Marshal(result.KeywordsMatched)
+				match := models.Match{
+					OrganizationID:  orgID,
+					JobID:           job.ID,
+					ResumeID:        &resume.ID,
+					SimilarityScore: result.Score,
+					KeywordsMatched: string(keywordsJSON),
+					AIReason: fmt.Sprintf(
+						"Match calculado a partir dos dados do curriculo gravados no banco (%d termos-chave em comum).",
+						len(result.KeywordsMatched),
+					),
+				}
+				db.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "job_id"}, {Name: "resume_id"}},
+					DoUpdates: clause.AssignmentColumns([]string{"similarity_score", "keywords_matched", "ai_reason"}),
+				}).Create(&match)
 			}
-			db.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "job_id"}, {Name: "resume_id"}},
-				DoUpdates: clause.AssignmentColumns([]string{"similarity_score", "applied"}),
-			}).Create(&match)
 		}
 	}
 
 	c.JSON(http.StatusOK, job)
+}
+
+func RematchMatches(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
+	threshold := 65
+	if t, err := strconv.Atoi(c.DefaultQuery("threshold", "65")); err == nil && t > 0 {
+		threshold = t
+	}
+
+	var resume models.Resume
+	if err := db.Where("organization_id = ?", orgID).
+		Where("data <> '' OR content <> ''").
+		Order("uploaded_at DESC").
+		First(&resume).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Nenhum curriculo com dados salvo. Salve seu curriculo no editor antes de reanalisar."})
+		return
+	}
+
+	var resumeData services.ResumeData
+	if resume.Data != "" {
+		if err := json.Unmarshal([]byte(resume.Data), &resumeData); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao decodificar dados do curriculo"})
+			return
+		}
+	}
+
+	var org models.Organization
+	if err := db.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar organização"})
+		return
+	}
+	var negativeKeywords []string
+	if org.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(org.NegativeKeywords), &negativeKeywords); err != nil {
+			log.Printf("Erro ao decodificar negative_keywords: %v", err)
+		}
+	}
+
+	var jobs []models.Job
+	if err := db.Where("organization_id = ? AND status IN ?", orgID, []string{"new", "matched"}).
+		Find(&jobs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar vagas"})
+		return
+	}
+
+	var userCity string
+	var user models.User
+	if err := db.Where("organization_id = ? AND city <> ''", orgID).First(&user).Error; err == nil {
+		userCity = user.City
+	}
+
+	created, updated, excluded := 0, 0, 0
+	for _, job := range jobs {
+		loc := services.AnalyzeJobLocation(job.Title + " " + job.Description)
+		if !services.LocationAllowedToMatch(loc, userCity) {
+			db.Model(&job).Update("status", models.JobStatusUnmatched)
+			excluded++
+			continue
+		}
+
+		result := services.MatchResumeToJob(resumeData, resume.Content, job.Title, job.Description, negativeKeywords)
+		if result.Score <= 0 {
+			continue
+		}
+
+		keywordsJSON, _ := json.Marshal(result.KeywordsMatched)
+		match := models.Match{
+			OrganizationID:  orgID,
+			JobID:           job.ID,
+			ResumeID:        &resume.ID,
+			SimilarityScore: result.Score,
+			KeywordsMatched: string(keywordsJSON),
+			AIReason: fmt.Sprintf(
+				"Match recalculado contra o curriculo mais recente (%d termos-chave em comum).",
+				len(result.KeywordsMatched),
+			),
+		}
+		res := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "job_id"}, {Name: "resume_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"similarity_score", "keywords_matched", "ai_reason"}),
+		}).Create(&match)
+		if res.Error != nil {
+			continue
+		}
+		if res.RowsAffected == 0 {
+			updated++
+		} else {
+			created++
+		}
+
+		newStatus := models.JobStatusAnalyzed
+		if result.Score >= float64(threshold) {
+			newStatus = models.JobStatusMatched
+		}
+		db.Model(&job).Update("status", newStatus)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"resume_id":       resume.ID,
+		"jobs_processed":  len(jobs),
+		"matches_created": created,
+		"matches_updated": updated,
+		"jobs_excluded_location": excluded,
+	})
 }
 
 func ListMatches(c *gin.Context) {
@@ -639,20 +784,17 @@ func UpdateSite(c *gin.Context) {
 
 func AddSite(c *gin.Context) {
 	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
 	var site models.Site
 	if err := c.ShouldBindJSON(&site); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	orgID, _ := c.Get("org_id")
-
-	// Usa organization_id do JWT se não fornecido
-	if site.OrganizationID == 0 {
-		if orgID != nil {
-			site.OrganizationID = orgID.(uint)
-		}
-	}
+	// A organização é sempre derivada do JWT autenticado: ignora qualquer valor
+	// enviado no body, impedindo um usuário de criar um site em outra organização.
+	site.OrganizationID = orgID
 
 	allowed, current, maxLimit, err := checkPlanLimit(db, site.OrganizationID, resourceSites)
 	if err != nil {
@@ -661,9 +803,9 @@ func AddSite(c *gin.Context) {
 	}
 	if !allowed {
 		c.JSON(http.StatusForbidden, gin.H{
-			"error":  fmt.Sprintf("Limite de sites atingido: %d/%d", current, maxLimit),
+			"error":   fmt.Sprintf("Limite de sites atingido: %d/%d", current, maxLimit),
 			"current": current,
-			"limit":  maxLimit,
+			"limit":   maxLimit,
 		})
 		return
 	}
@@ -712,6 +854,23 @@ func UploadResume(c *gin.Context) {
 
 	orgID := c.GetUint("org_id")
 
+	// Validação de upload (tamanho + magic bytes) antes de persistir.
+	ufh, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao processar arquivo"})
+		return
+	}
+	if err := validateUpload(file.Filename, file.Size, ufh); err != nil {
+		ufh.Close()
+		if errors.Is(err, errUploadTooLarge) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	ufh.Close()
+
 	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceResumes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
@@ -732,7 +891,7 @@ func UploadResume(c *gin.Context) {
 		return
 	}
 
-	filePath := filepath.Join(uploadDir, time.Now().Format("20060102150405")+"_"+file.Filename)
+	filePath := filepath.Join(uploadDir, time.Now().Format("20060102150405")+"_"+sanitizeFilename(file.Filename))
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao salvar arquivo"})
 		return
@@ -746,7 +905,7 @@ func UploadResume(c *gin.Context) {
 
 	var resume models.Resume
 	resume.OrganizationID = orgID
-	resume.Name = file.Filename
+	resume.Name = truncateName(file.Filename, 255)
 	resume.FilePath = filePath
 	resume.Content = content
 	resume.UploadedAt = time.Now()
@@ -769,11 +928,21 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 
-	ext := strings.ToLower(file.Filename)
-	if !strings.Contains(ext, ".pdf") && !strings.Contains(ext, ".doc") && !strings.Contains(ext, ".docx") && !strings.Contains(ext, ".txt") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Tipo de arquivo não suportado"})
+	afh, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao processar arquivo"})
 		return
 	}
+	if err := validateUpload(file.Filename, file.Size, afh); err != nil {
+		afh.Close()
+		if errors.Is(err, errUploadTooLarge) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	afh.Close()
 
 	tmpDir := "./uploads/resumes"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
@@ -781,7 +950,7 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 
-	filePath := filepath.Join(tmpDir, "analysis_"+time.Now().Format("20060102150405")+"_"+file.Filename)
+	filePath := filepath.Join(tmpDir, "analysis_"+time.Now().Format("20060102150405")+"_"+sanitizeFilename(file.Filename))
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao salvar arquivo"})
 		return
@@ -819,7 +988,7 @@ func AnalyzeResume(c *gin.Context) {
 
 	analysis := models.ResumeAnalysis{
 		OrganizationID: orgID,
-		FileName:       file.Filename,
+		FileName:       truncateName(file.Filename, 255),
 		FullAnalysis:   fullAnalysis,
 		Strengths:      string(strengths),
 		Weaknesses:     string(weaknesses),
@@ -832,7 +1001,7 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Análise salva: ID=%d, File=%s", analysis.ID, file.Filename)
+	log.Printf("Análise salva: ID=%d, File=%s", analysis.ID, analysis.FileName)
 
 	var parsedStrengths, parsedWeaknesses, parsedSuggestions []string
 	json.Unmarshal([]byte(analysis.Strengths), &parsedStrengths)
@@ -895,6 +1064,54 @@ func formatAnalysisResponse(a models.ResumeAnalysis) gin.H {
 	}
 }
 
+func GetNegativeKeywords(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
+	var org models.Organization
+	if err := db.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+		return
+	}
+
+	var keywords []string
+	if org.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(org.NegativeKeywords), &keywords); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao decodificar palavras-chave"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, keywords)
+}
+
+func UpdateNegativeKeywords(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
+	var body struct {
+		Keywords []string `json:"keywords"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	keywordsJSON, err := json.Marshal(body.Keywords)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar palavras-chave"})
+		return
+	}
+
+	if err := db.Model(&models.Organization{}).Where("id = ?", orgID).Update("negative_keywords", string(keywordsJSON)).Error; err != nil {
+		log.Printf("Erro ao atualizar palavras-chave: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar palavras-chave"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Palavras-chave atualizadas com sucesso"})
+}
+
 func ListResumeAnalyses(c *gin.Context) {
 	db := getDB(c)
 	orgID := c.GetUint("org_id")
@@ -945,4 +1162,44 @@ func toStringSlice(v interface{}) []string {
 		return result
 	}
 	return nil
+}
+
+func PrepareInterview(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	orgID := c.MustGet("orgID").(uint)
+
+	var req struct {
+		JobID    uint `json:"job_id"`
+		ResumeID uint `json:"resume_id"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+
+	if req.JobID == 0 || req.ResumeID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JobID e ResumeID são obrigatórios"})
+		return
+	}
+
+	var job models.Job
+	if err := db.Where("id = ? AND organization_id = ?", req.JobID, orgID).First(&job).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
+		return
+	}
+
+	var resume models.Resume
+	if err := db.Where("id = ? AND organization_id = ?", req.ResumeID, orgID).First(&resume).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Currículo não encontrado"})
+		return
+	}
+
+	prep, err := services.GenerateInterviewPrep(job.Description, resume.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar preparação: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"preparation": prep})
 }

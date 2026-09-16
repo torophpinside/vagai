@@ -1,0 +1,5 @@
+.git
+Dockerfile*
+vagai
+.env*
+*.log

@@ -21,6 +21,7 @@ type Organization struct {
 	Name             string         `gorm:"size:200;not null" json:"name"`
 	Slug             string         `gorm:"size:100;uniqueIndex;not null" json:"slug"`
 	Plan             string         `gorm:"size:50;default:free" json:"plan"`
+	NegativeKeywords string         `gorm:"type:json" json:"negative_keywords"`
 	StripeCustomerID string         `gorm:"size:255" json:"-"`
 	TrialEndsAt      *time.Time     `json:"trial_ends_at"`
 	CreatedAt        time.Time      `json:"created_at"`
@@ -90,6 +91,7 @@ type Resume struct {
 	Name           string    `gorm:"size:100" json:"name"`
 	FilePath       string    `gorm:"size:500" json:"file_path"`
 	Content        string    `gorm:"type:text" json:"content"`
+	Data           string    `gorm:"type:json" json:"data"`
 	Version        int       `json:"version"`
 	UploadedAt     time.Time `json:"uploaded_at"`
 }
@@ -99,8 +101,8 @@ type Match struct {
 	OrganizationID  uint      `gorm:"index;default:0" json:"organization_id"`
 	JobID           uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"job_id"`
 	Job             Job       `gorm:"foreignKey:JobID" json:"job,omitempty"`
-	ResumeID        uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
-	Resume          Resume    `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
+	ResumeID        *uint     `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
+	Resume          *Resume   `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
 	SimilarityScore float64   `gorm:"type:decimal(5,2)" json:"similarity_score"`
 	KeywordsMatched string    `gorm:"type:json" json:"keywords_matched"`
 	AIReason        string    `gorm:"type:text" json:"ai_reason"`

@@ -84,10 +84,10 @@ func GenerateRefreshToken(userID, orgID uint) (string, error) {
 	return token.SignedString([]byte(getJWTSecret() + "_refresh"))
 }
 
+// getJWTSecret retorna o segredo JWT configurado via variável de ambiente.
+// Não existe mais fallback hardcoded: o servidor só inicia se JWT_SECRET estiver
+// definido (validação feita no main), então retornar string vazia aqui só ocorre
+// em executáveis auxiliares/contextos de teste.
 func getJWTSecret() string {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return "vagai-super-secret-key-change-in-production"
-	}
-	return secret
+	return os.Getenv("JWT_SECRET")
 }

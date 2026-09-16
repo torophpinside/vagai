@@ -109,7 +109,10 @@
             <tr v-for="job in jobs" :key="job.id" class="hover:bg-white/5 transition-colors group">
               <td class="px-8 py-6">
                 <div class="flex flex-col">
-                  <span class="text-white font-bold group-hover:text-indigo-400 transition-colors">{{ job.title }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-white font-bold group-hover:text-indigo-400 transition-colors">{{ job.title }}</span>
+                    <span class="text-[10px] text-slate-500 font-mono bg-slate-800/60 px-1.5 py-0.5 rounded">#{{ job.id }}</span>
+                  </div>
                   <span class="text-xs text-slate-500 font-mono mt-1">{{ job.url.substring(0, 50) }}...</span>
                 </div>
               </td>

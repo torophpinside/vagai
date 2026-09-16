@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,11 +28,21 @@ func ParseResume(c *gin.Context) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if ext != ".pdf" && ext != ".docx" && ext != ".txt" && ext != ".doc" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Tipo de arquivo nao suportado. Use PDF, DOCX ou TXT"})
+	pfh, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao processar arquivo"})
 		return
 	}
+	if err := validateUpload(file.Filename, file.Size, pfh); err != nil {
+		pfh.Close()
+		if errors.Is(err, errUploadTooLarge) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	pfh.Close()
 
 	tmpDir := "./uploads/resumes/tmp"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
@@ -39,7 +50,7 @@ func ParseResume(c *gin.Context) {
 		return
 	}
 
-	filePath := filepath.Join(tmpDir, fmt.Sprintf("parse_%d_%s", time.Now().UnixNano(), file.Filename))
+	filePath := filepath.Join(tmpDir, fmt.Sprintf("parse_%d_%s", time.Now().UnixNano(), sanitizeFilename(file.Filename)))
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao salvar arquivo"})
 		return
@@ -68,6 +79,42 @@ func ParseResume(c *gin.Context) {
 		return
 	}
 
+	resumeIDStr := c.PostForm("resume_id")
+	if resumeIDStr != "" {
+		resumeID, err := strconv.ParseUint(resumeIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID de curriculo invalido"})
+			return
+		}
+
+		var resume models.Resume
+		if err := db.Where("id = ? AND organization_id = ?", resumeID, orgID).First(&resume).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar curriculo"})
+			}
+			return
+		}
+
+		resume.Content = rawText
+		resume.Data = string(dataJSON)
+		resume.Version++
+		resume.UpdatedAt = time.Now()
+
+		if err := db.Save(&resume).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar curriculo"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Curriculo atualizado com sucesso",
+			"resume":  resume,
+			"data":    resumeData,
+		})
+		return
+	}
+
 	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceResumes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
@@ -84,7 +131,7 @@ func ParseResume(c *gin.Context) {
 
 	resume := models.Resume{
 		OrganizationID: orgID,
-		Name:           file.Filename,
+		Name:           truncateName(file.Filename, 255),
 		FilePath:       filePath,
 		Content:        rawText,
 		Data:           string(dataJSON),
@@ -100,6 +147,47 @@ func ParseResume(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Curriculo parseado com sucesso",
+		"resume":  resume,
+		"data":    resumeData,
+	})
+}
+
+func CreateResume(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+
+	var resumeData services.ResumeData
+	if err := c.ShouldBindJSON(&resumeData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados invalidos: " + err.Error()})
+		return
+	}
+
+	dataJSON, err := json.Marshal(resumeData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao serializar dados"})
+		return
+	}
+
+	name := "Curriculo"
+	if resumeData.PersonalInfo.Name != "" {
+		name = resumeData.PersonalInfo.Name
+	}
+
+	resume := models.Resume{
+		OrganizationID: orgID,
+		Name:           name,
+		Data:           string(dataJSON),
+		Version:        1,
+		UploadedAt:     time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+	if err := db.Create(&resume).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar curriculo"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Curriculo criado com sucesso",
 		"resume":  resume,
 		"data":    resumeData,
 	})
@@ -146,6 +234,44 @@ func GetResumeData(c *gin.Context) {
 		"data":      resumeData,
 		"version":   resume.Version,
 	})
+}
+
+func DeleteResume(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalido"})
+		return
+	}
+
+	var resume models.Resume
+	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&resume).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar curriculo"})
+		}
+		return
+	}
+
+	db.Model(&models.Match{}).
+		Where("organization_id = ? AND resume_id = ?", orgID, resume.ID).
+		Update("resume_id", gorm.Expr("NULL"))
+	db.Where("organization_id = ? AND resume_id = ?", orgID, resume.ID).Delete(&models.ResumeAnalysis{})
+
+	if err := db.Delete(&resume).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao excluir curriculo"})
+		return
+	}
+
+	if resume.FilePath != "" {
+		if err := os.Remove(resume.FilePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Aviso ao remover arquivo do curriculo: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Curriculo excluido com sucesso"})
 }
 
 func UpdateResumeData(c *gin.Context) {

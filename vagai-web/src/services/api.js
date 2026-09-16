@@ -76,6 +76,10 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
+export const useNegativeKeywords = () => {
+  return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data) })
+}
+
 export const listSites = () => api.get('/sites').then(res => res.data)
 export const addSite = (site) => api.post('/sites', site)
 export const updateSite = (id, data) => api.patch(`/sites/${id}`, data)
@@ -88,12 +92,16 @@ export const createJob = (data) => api.post('/jobs', data)
 export const updateJobStatus = (id, status) => api.patch(`/jobs/${id}`, { status })
 export const updateMatch = (id, applied) => api.patch(`/matches/${id}`, { applied })
 export const deleteMatch = (id) => api.delete(`/matches/${id}`)
+export const rematchMatches = () => api.post('/matches/rematch').then(res => res.data)
 export const updateProfile = (data) => api.patch('/me', data)
 export const changePassword = (data) => api.post('/me/change-password', data)
 export const changePlan = (planSlug) => api.post('/me/plan', { plan_slug: planSlug })
+export const updateNegativeKeywords = (keywords) => api.put('/negative-keywords', { keywords }).then(res => res.data)
 export const deleteResumeAnalysis = (id) => api.delete(`/resume-analyses/${id}`)
 
 export const parseResume = (formData) => api.post('/resumes/parse', formData, { timeout: 240000 })
+export const createResume = (data) => api.post('/resumes', data)
+export const deleteResume = (id) => api.delete(`/resumes/${id}`)
 export const getResumeData = (id) => api.get(`/resumes/${id}/data`).then(res => res.data)
 export const updateResumeData = (id, data) => api.put(`/resumes/${id}/data`, data)
 export const generateResumePDF = (id) => api.post(`/resumes/${id}/generate-pdf`, {}, { responseType: 'blob' })

@@ -6,6 +6,13 @@
         <p class="text-slate-400">Correspondências inteligentes baseadas no seu currículo.</p>
       </div>
       <div class="flex items-center gap-4">
+        <button @click="reanalyze" :disabled="isRematching"
+          class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw class="w-4 h-4" :class="isRematching ? 'animate-spin' : ''" />
+          <span class="text-sm">{{ isRematching ? 'Reanalisando...' : 'Re-analisar' }}</span>
+        </button>
+
         <DropdownMenu v-model:open="siteOpen" position="bottom-right">
           <template #trigger="{ open, toggle }">
             <button @click="toggle" class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 transition-all whitespace-nowrap">
@@ -60,6 +67,8 @@
             </button>
           </template>
         </DropdownMenu>
+
+        <p v-if="rematchError" class="text-xs text-red-400 max-w-[200px]">{{ rematchError }}</p>
       </div>
     </div>
 
@@ -168,7 +177,7 @@
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { useMatches, useSites, updateJobStatus, updateMatch } from '../services/api'
+import { useMatches, useSites, updateJobStatus, updateMatch, rematchMatches } from '../services/api'
 import { 
   Building2, 
   Calendar, 
@@ -183,7 +192,8 @@ import {
   X,
   ChevronDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-vue-next'
 import DropdownMenu from '../components/DropdownMenu.vue'
 
@@ -202,6 +212,23 @@ watch([() => filters.site, () => filters.sort, () => filters.threshold], () => {
 
 const siteOpen = ref(false)
 const sortOpen = ref(false)
+const isRematching = ref(false)
+const rematchError = ref('')
+
+const reanalyze = async () => {
+  isRematching.value = true
+  rematchError.value = ''
+  try {
+    await rematchMatches()
+    queryClient.invalidateQueries({ queryKey: ['matches'] })
+    queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    queryClient.invalidateQueries({ queryKey: ['stats'] })
+  } catch (e) {
+    rematchError.value = e.response?.data?.error || 'Erro ao reanalisar matches'
+  } finally {
+    isRematching.value = false
+  }
+}
 
 const sortLabel = computed(() => {
   return filters.sort === 'desc' ? 'Maior similaridade' : 'Menor similaridade'

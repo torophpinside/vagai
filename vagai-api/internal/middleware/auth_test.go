@@ -214,13 +214,14 @@ func TestGetJWTSecret_Env(t *testing.T) {
 	}
 }
 
-func TestGetJWTSecret_Default(t *testing.T) {
+func TestGetJWTSecret_Unset(t *testing.T) {
 	os.Unsetenv("JWT_SECRET")
 
+	// Segurança: sem fallback hardcoded. O servidor não inicia sem JWT_SECRET
+	// (validação no main), então aqui o retorno é vazio.
 	secret := getJWTSecret()
-	expected := "vagai-super-secret-key-change-in-production"
-	if secret != expected {
-		t.Errorf("getJWTSecret() = %v, expected %v", secret, expected)
+	if secret != "" {
+		t.Errorf("getJWTSecret() = %v, expected empty when JWT_SECRET unset", secret)
 	}
 }
 

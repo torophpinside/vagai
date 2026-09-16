@@ -1,0 +1,5 @@
+.git
+Dockerfile*
+.env*
+uploads/
+*.log

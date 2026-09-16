@@ -3,15 +3,14 @@ services:
     image: mysql:8
     container_name: vagai-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: vagai
       MYSQL_USER: vagai
-      MYSQL_PASSWORD: vagai
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-vagai}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./metabase/setup/01-create-views.sql:/docker-entrypoint-initdb.d/01-create-views.sql
     networks:
       - vagai-net
     healthcheck:
@@ -45,11 +44,14 @@ services:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_USER: vagai
-      DB_PASSWORD: vagai
+      DB_PASSWORD: ${MYSQL_PASSWORD:-vagai}
       DB_NAME: vagai
       LMSTUDIO_URL: http://127.0.0.1:1234
-      JWT_SECRET: vagai-super-secret-change-in-production
+      # JWT_SECRET é obrigatório (mínimo 32 caracteres). A API não inicia sem ele.
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-secure-string-at-least-32-characters}
       REDIS_URL: redis://127.0.0.1:6379
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -82,7 +84,7 @@ services:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_USER: vagai
-      DB_PASSWORD: vagai
+      DB_PASSWORD: ${MYSQL_PASSWORD:-vagai}
       DB_NAME: vagai
       LMSTUDIO_URL: http://127.0.0.1:1234
     depends_on:
@@ -94,32 +96,8 @@ services:
     command: [ "schedule", "run" ]
     restart: unless-stopped
 
-  metabase:
-    image: metabase/metabase:latest
-    container_name: vagai-metabase
-    ports:
-      - "3001:3000"
-    environment:
-      MB_DB_TYPE: mysql
-      MB_DB_DBNAME: vagai
-      MB_DB_PORT: 3306
-      MB_DB_USER: vagai
-      MB_DB_PASS: vagai
-      MB_DB_HOST: mysql
-      MB_EMBEDDING_APP_ORIGIN: "*"
-    volumes:
-      - metabase_data:/metabase-data
-      - ./metabase/setup:/metabase-setup
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - vagai-net
-    restart: unless-stopped
-
 volumes:
   mysql_data:
-  metabase_data:
 
 networks:
   vagai-net:

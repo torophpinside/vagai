@@ -57,6 +57,12 @@ func Run(targetSite string) error {
 func crawlSite(site models.Site) error {
 	log.Printf("Buscando vagas em: %s", site.URL)
 
+	// SSRF guard: nunca busca URLs apontando para redes privadas/reservadas.
+	if err := validateFetchURL(site.URL); err != nil {
+		log.Printf("URL bloqueada por segurança: %v", err)
+		return err
+	}
+
 	if site.OrganizationID > 0 {
 		allowed, current, maxLimit, err := db.CheckJobsLimit(site.OrganizationID)
 		if err != nil {
@@ -398,6 +404,11 @@ func normalizeURL(href, baseURL string) string {
 
 func fetchJobDetails(job *models.Job, site models.Site, client *http.Client) error {
 	log.Printf("Buscando detalhes em: %s", job.URL)
+
+	// SSRF guard: cada URL de vaga descoberta também é validada antes do fetch.
+	if err := validateFetchURL(job.URL); err != nil {
+		return err
+	}
 
 	req, err := http.NewRequest("GET", job.URL, nil)
 	if err != nil {

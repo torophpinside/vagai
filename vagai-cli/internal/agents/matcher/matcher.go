@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -22,9 +23,96 @@ var idf map[string]float64
 const maxParallelAI = 2
 
 type jobTask struct {
-	job      models.Job
-	resume   models.Resume
-	userCity string
+	job              models.Job
+	resume           models.Resume
+	userCity         string
+	negativeKeywords []string
+}
+
+// ResumeData espelha o JSON estruturado gravado pelo editor de currículos
+// (coluna resumes.data da API) para permitir matching quando não há texto bruto.
+type ResumeData struct {
+	PersonalInfo   ResumePersonalInfo `json:"personal_info"`
+	Summary        string             `json:"summary"`
+	Experience     []ResumeExperience `json:"experience"`
+	Education      []ResumeEducation  `json:"education"`
+	Skills         []string           `json:"skills"`
+	Languages      []string           `json:"languages"`
+	Certifications []string           `json:"certifications"`
+}
+
+type ResumePersonalInfo struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Location string `json:"location"`
+	Linkedin string `json:"linkedin"`
+	Website  string `json:"website"`
+}
+
+type ResumeExperience struct {
+	Company     string `json:"company"`
+	Role        string `json:"role"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	Description string `json:"description"`
+}
+
+type ResumeEducation struct {
+	Institution string `json:"institution"`
+	Degree      string `json:"degree"`
+	Field       string `json:"field"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	Notes       string `json:"notes"`
+}
+
+// resumeText retorna o conteúdo textual do currículo para matching. Usa o texto
+// bruto extraído quando disponível; caso contrário, deriva um texto a partir dos
+// dados estruturados gravados no banco (curriculos criados/editados na web).
+func resumeText(resume models.Resume) string {
+	if resume.Content != "" {
+		return resume.Content
+	}
+	if resume.Data == "" {
+		return ""
+	}
+
+	var data ResumeData
+	if err := json.Unmarshal([]byte(resume.Data), &data); err != nil {
+		return ""
+	}
+
+	var b strings.Builder
+	writeField := func(s string) {
+		if s != "" {
+			b.WriteString(s)
+			b.WriteString(". ")
+		}
+	}
+	writeField(data.PersonalInfo.Name)
+	writeField(data.PersonalInfo.Location)
+	writeField(data.Summary)
+	for _, s := range data.Skills {
+		writeField(s)
+	}
+	for _, l := range data.Languages {
+		writeField(l)
+	}
+	for _, c := range data.Certifications {
+		writeField(c)
+	}
+	for _, e := range data.Experience {
+		writeField(e.Role)
+		writeField(e.Company)
+		writeField(e.Description)
+	}
+	for _, e := range data.Education {
+		writeField(e.Degree)
+		writeField(e.Field)
+		writeField(e.Institution)
+	}
+	return strings.TrimSpace(b.String())
 }
 
 type matchResult struct {
@@ -34,6 +122,7 @@ type matchResult struct {
 	keywords []string
 	reason   string
 	err      error
+	exclude  bool
 }
 
 // JobLocation armazena a localização analisada de uma vaga
@@ -117,12 +206,23 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		log.Printf("📍 Nenhuma cidade configurada na organização %d. Filtro de localização desativado.", orgID)
 	}
 
+	// Palavras-chave de bloqueio configuradas na organização
+	var org models.Organization
+	var negativeKeywords []string
+	if err := db.DB.First(&org, orgID).Error; err == nil {
+		negativeKeywords = loadNegativeKeywords(org.NegativeKeywords)
+	}
+	if len(negativeKeywords) > 0 {
+		log.Printf("⛔ Palavras-chave de bloqueio (org %d): %v", orgID, negativeKeywords)
+	}
+
 	// Usar apenas o currículo mais recente da organização
 	var resume models.Resume
 	if err := db.DB.Where("organization_id = ?", orgID).Order("uploaded_at DESC").First(&resume).Error; err != nil {
 		log.Printf("Nenhum currículo encontrado para org %d", orgID)
 		return 0
 	}
+	resume.Content = resumeText(resume)
 	resumes := []models.Resume{resume}
 
 	log.Printf("Construindo corpus TF-IDF com %d vagas e %d currículos...", len(jobs), len(resumes))
@@ -142,7 +242,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		go func(workerID int) {
 			defer wg.Done()
 			for task := range jobsChan {
-				result := processTask(task.job, task.resume, task.userCity, threshold)
+				result := processTask(task.job, task.resume, task.userCity, task.negativeKeywords, threshold)
 				resultsChan <- result
 			}
 		}(w)
@@ -151,7 +251,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 	go func() {
 		for _, job := range jobs {
 			for _, resume := range resumes {
-				jobsChan <- jobTask{job: job, resume: resume, userCity: userCity}
+				jobsChan <- jobTask{job: job, resume: resume, userCity: userCity, negativeKeywords: negativeKeywords}
 			}
 		}
 		close(jobsChan)
@@ -172,10 +272,16 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		var job models.Job
 		db.DB.First(&job, result.jobID)
 
+		if result.exclude {
+			db.DB.Model(&job).Update("status", models.JobStatusUnmatched)
+			log.Printf("Vaga excluída por regra de localização: job=%d %s", result.jobID, result.reason)
+			continue
+		}
+
 		match := models.Match{
 			OrganizationID:  job.OrganizationID,
 			JobID:           result.jobID,
-			ResumeID:        result.resumeID,
+			ResumeID:        &result.resumeID,
 			SimilarityScore: result.score,
 			KeywordsMatched: fmt.Sprintf(`["%s"]`, strings.Join(result.keywords, `", "`)),
 			AIReason:        result.reason,
@@ -200,7 +306,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 	return matchCount
 }
 
-func processTask(job models.Job, resume models.Resume, userCity string, threshold int) matchResult {
+func processTask(job models.Job, resume models.Resume, userCity string, negativeKeywords []string, threshold int) matchResult {
 	result := matchResult{
 		jobID:    job.ID,
 		resumeID: resume.ID,
@@ -208,6 +314,12 @@ func processTask(job models.Job, resume models.Resume, userCity string, threshol
 
 	// Analisar localização da vaga
 	jobLoc := analyzeJobLocation(job.Title+" "+job.Description, userCity)
+
+	if !locationAllowedToMatch(jobLoc, userCity) {
+		result.exclude = true
+		result.reason = fmt.Sprintf("Cidade incompatível: %s (tipo=%s, configurado: %s)", jobLoc.City, jobLoc.Type, userCity)
+		return result
+	}
 
 	score, keywords, reason, err := calculateMatchAI(job.Title, job.Description, resume.Content, userCity, jobLoc)
 	if err != nil {
@@ -227,10 +339,68 @@ func processTask(job models.Job, resume models.Resume, userCity string, threshol
 		}
 	}
 
+	// Aplicar penalidade por palavras-chave de bloqueio
+	if kwPenalty := negativeKeywordPenalty(job.Title+" "+job.Description, negativeKeywords); kwPenalty > 0 {
+		score = score - kwPenalty
+		if score < 0 {
+			score = 0
+		}
+		reason += fmt.Sprintf(" [Penalidade palavras-chave: -%.0f pts]", kwPenalty)
+	}
+
 	result.score = score
 	result.keywords = keywords
 	result.reason = reason
 	return result
+}
+
+const negativeKeywordScorePenalty = 3.0
+
+// loadNegativeKeywords decodifica a coluna JSON negative_keywords da organização.
+func loadNegativeKeywords(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var kws []string
+	if err := json.Unmarshal([]byte(raw), &kws); err != nil {
+		log.Printf("Erro ao decodificar negative_keywords: %v", err)
+		return nil
+	}
+	return kws
+}
+
+// normalizeKeyword normaliza uma palavra-chave nas mesmas regras do texto da
+// vaga: minúsculas, sem acentos e com caracteres não alfanuméricos virados em
+// espaço, para casar com fronteira de palavra.
+var nonWord = regexp.MustCompile(`[^a-z0-9]+`)
+
+func normalizeKeyword(s string) string {
+	return strings.TrimSpace(nonWord.ReplaceAllString(stripAccents(s), " "))
+}
+
+// negativeKeywordPenalty calcula o desconto por palavras-chave de bloqueio.
+// Cada palavra-chave distinta presente na vaga (título + descrição) desconta
+// 3 pontos, uma única vez, usando fronteira de palavra para evitar falsos
+// positivos (ex.: "go" dentro de "golang" ou "governança").
+func negativeKeywordPenalty(combinedJobText string, keywords []string) float64 {
+	if combinedJobText == "" {
+		return 0
+	}
+	normalizedText := normalizeKeyword(combinedJobText)
+	seen := make(map[string]bool, len(keywords))
+	var penalty float64
+	for _, kw := range keywords {
+		normKw := normalizeKeyword(kw)
+		if normKw == "" || seen[normKw] {
+			continue
+		}
+		seen[normKw] = true
+		re := regexp.MustCompile(`\b` + regexp.QuoteMeta(normKw) + `\b`)
+		if re.MatchString(normalizedText) {
+			penalty += negativeKeywordScorePenalty
+		}
+	}
+	return penalty
 }
 
 type AIResponse struct {
@@ -287,22 +457,46 @@ Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua expli
 
 	log.Printf("Resposta da AI recebida. Processando...")
 
-	first := strings.Index(response, "{")
-	last := strings.LastIndex(response, "}")
-	if first != -1 && last != -1 && last > first {
-		response = response[first : last+1]
-	}
-
-	var aiResp AIResponse
-	if err := json.Unmarshal([]byte(response), &aiResp); err != nil {
-		log.Printf("⚠️ Erro ao decodificar JSON da AI: %v. Resposta bruta: %s. Usando fallback.", err, response)
+	aiScore, aiReason := extractAIResult(response)
+	if aiScore <= 0 || aiScore > 100 {
+		log.Printf("⚠️ Falha ao decodificar score da AI. Resposta bruta: %.400s. Usando fallback.", response)
 		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc)
 	}
 
-	log.Printf("✅ Análise AI concluída com sucesso. Score: %.2f", aiResp.Score)
+	log.Printf("✅ Análise AI concluída com sucesso. Score: %.2f", aiScore)
 	keywords := extractKeywordsLMStudio(jobDesc, resumeContent)
 
-	return aiResp.Score, keywords, aiResp.Reason, nil
+	return aiScore, keywords, aiReason, nil
+}
+
+// extractAIResult tenta extrair {score, reason} da resposta do modelo. Primeiro
+// tenta JSON estrito; se falhar (modelo costuma quebrar "reason" em varias
+// linhas sem escape), usa regex tolerante sobre o JSON parcial.
+func extractAIResult(response string) (float64, string) {
+	first := strings.Index(response, "{")
+	last := strings.LastIndex(response, "}")
+	if first != -1 && last != -1 && last > first {
+		block := response[first : last+1]
+		var parsed AIResponse
+		if err := json.Unmarshal([]byte(block), &parsed); err == nil {
+			return parsed.Score, strings.TrimSpace(parsed.Reason)
+		}
+	}
+
+	scoreRe := regexp.MustCompile(`"score"\s*:\s*(\d+(?:\.\d+)?)`)
+	reasonRe := regexp.MustCompile(`(?s)"reason"\s*:\s*"(.*?)"\s*[},]`)
+
+	var score float64
+	var reason string
+	if m := scoreRe.FindStringSubmatch(response); len(m) > 1 {
+		if s, err := strconv.ParseFloat(m[1], 64); err == nil {
+			score = s
+		}
+	}
+	if m := reasonRe.FindStringSubmatch(response); len(m) > 1 {
+		reason = strings.TrimSpace(m[1])
+	}
+	return score, reason
 }
 
 func calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation) (float64, []string, string, error) {
@@ -443,7 +637,10 @@ type cityPattern struct {
 	canonical string
 }
 
-// cityAliases mapeia grafias e siglas para o nome canônico da cidade.
+// cityAliases mapeia grafias e siglas para o nome canônico da cidade/estado.
+// Siglas de estados ambíguas ("go", "se", "am", "mt", "pa"... que colidem com
+// palavras comuns ou "Go" da linguagem) foram deixadas de fora para evitar
+// falsos positivos na detecção.
 var cityAliases = []struct{ alias, canonical string }{
 	{"sao paulo", "sao paulo"}, {"sp", "sao paulo"},
 	{"rio de janeiro", "rio de janeiro"}, {"rj", "rio de janeiro"},
@@ -452,17 +649,99 @@ var cityAliases = []struct{ alias, canonical string }{
 	{"florianopolis", "florianopolis"}, {"floripa", "florianopolis"},
 	{"curitiba", "curitiba"}, {"cwb", "curitiba"},
 	{"campinas", "campinas"},
+	{"sorocaba", "sorocaba"},
+	{"santos", "santos"},
 	{"brasilia", "brasilia"}, {"bsb", "brasilia"},
 	{"salvador", "salvador"}, {"ssa", "salvador"},
 	{"fortaleza", "fortaleza"},
 	{"recife", "recife"}, {"rec", "recife"},
 	{"manaus", "manaus"}, {"mao", "manaus"},
+	{"londrina", "londrina"},
+	{"maringa", "maringa"},
+	{"cascavel", "cascavel"},
+	{"ponta grossa", "ponta grossa"},
+	{"foz do iguacu", "foz do iguacu"},
+	{"joinville", "joinville"},
+	{"blumenau", "blumenau"},
+	{"goiania", "goiania"},
+	{"uberlandia", "uberlandia"},
+	{"niteroi", "niteroi"},
+	{"vitoria", "vitoria"},
+	{"belem", "belem"},
+	{"cuiaba", "cuiaba"},
+	{"campo grande", "campo grande"},
+	{"teresina", "teresina"},
+	{"sao luis", "sao luis"},
+	{"maceio", "maceio"},
+	{"joao pessoa", "joao pessoa"},
+	{"natal", "natal"},
 	{"lisboa", "lisboa"}, {"lisbon", "lisboa"},
 	{"porto", "porto"},
+	{"parana", "parana"}, {"pr", "parana"},
+	{"santa catarina", "santa catarina"}, {"sc", "santa catarina"},
+	{"rio grande do sul", "rio grande do sul"}, {"rs", "rio grande do sul"},
+	{"minas gerais", "minas gerais"}, {"mg", "minas gerais"},
+	{"espirito santo", "espirito santo"}, {"es", "espirito santo"},
+	{"bahia", "bahia"},
+	{"ceara", "ceara"}, {"ce", "ceara"},
+	{"pernambuco", "pernambuco"}, {"pe", "pernambuco"},
+	{"distrito federal", "distrito federal"}, {"df", "distrito federal"},
+	{"mato grosso do sul", "mato grosso do sul"},
+	{"rio grande do norte", "rio grande do norte"},
+	{"tocantins", "tocantins"},
+	{"maranhao", "maranhao"},
+	{"paraiba", "paraiba"},
+	{"alagoas", "alagoas"},
+	{"piaui", "piaui"},
+	{"amazonas", "amazonas"},
+	{"para", "para"},
+	{"goias", "goias"},
+	{"mato grosso", "mato grosso"},
+	{"mato grosso do sul", "mato grosso do sul"},
 }
 
-// Padrões ordenados por especificidade (mais longos primeiro) para que
-// "porto alegre" vença "porto" e "são paulo" vença "sp".
+// stateOfCity relaciona cada cidade canônica com a UF canônica, permitindo que
+// uma vaga que mencione apenas a UF (ex.: "Híbrido - Paraná") seja aceita para
+// quem configura uma cidade daquele estado (ex.: Curitiba).
+var stateOfCity = map[string]string{
+	"curitiba": "parana", "londrina": "parana", "maringa": "parana",
+	"cascavel": "parana", "ponta grossa": "parana", "foz do iguacu": "parana",
+	"florianopolis": "santa catarina", "joinville": "santa catarina", "blumenau": "santa catarina",
+	"porto alegre": "rio grande do sul",
+	"sao paulo": "sao paulo", "campinas": "sao paulo", "sorocaba": "sao paulo", "santos": "sao paulo",
+	"rio de janeiro": "rio de janeiro", "niteroi": "rio de janeiro",
+	"belo horizonte": "minas gerais", "uberlandia": "minas gerais",
+	"vitoria": "espirito santo",
+	"salvador": "bahia",
+	"fortaleza": "ceara",
+	"recife": "pernambuco",
+	"brasilia": "distrito federal",
+	"manaus": "amazonas",
+	"belem": "para",
+	"cuiaba": "mato grosso",
+	"campo grande": "mato grosso do sul",
+	"goiania": "goias",
+	"natal": "rio grande do norte",
+	"joao pessoa": "paraiba",
+	"maceio": "alagoas",
+	"teresina": "piaui",
+	"sao luis": "maranhao",
+}
+
+// isStateName indica se o valor canônico representa uma UF (e não uma cidade).
+func isStateName(canonical string) bool {
+	switch canonical {
+	case "parana", "santa catarina", "rio grande do sul", "minas gerais",
+		"espirito santo", "bahia", "ceara", "pernambuco", "distrito federal",
+		"mato grosso", "mato grosso do sul", "goias", "amazonas", "para",
+		"rio grande do norte", "tocantins", "maranhao", "paraiba", "alagoas", "piaui":
+		return true
+	}
+	return false
+}
+
+// Padrões ordenados para que cidades vençam UFs e termos mais longos vençam
+// os mais curtos ("porto alegre" > "porto", "florianopolis" > "sc").
 var cityPatterns = buildCityPatterns()
 
 func buildCityPatterns() []cityPattern {
@@ -475,21 +754,54 @@ func buildCityPatterns() []cityPattern {
 		patterns = append(patterns, cityPattern{re: re, canonical: entry.canonical})
 	}
 	sort.Slice(patterns, func(i, j int) bool {
+		// Cidades primeiro, depois UFs; dentro do mesmo grupo, o canônico mais
+		// longo primeiro para evitar que "sc" vença "florianopolis".
+		stateI, stateJ := isStateName(patterns[i].canonical), isStateName(patterns[j].canonical)
+		if stateI != stateJ {
+			return !stateI
+		}
 		return len(patterns[i].canonical) > len(patterns[j].canonical)
 	})
 	return patterns
 }
 
 // normalizeUserCity padroniza a cidade configurada pelo usuário
-// (ex.: "SP", "São Paulo" e "Sao Paulo" -> "sao paulo")
+// (ex.: "SP", "São Paulo", "Curitiba, PR" e "Sao Paulo" -> "sao paulo").
 func normalizeUserCity(userCity string) string {
 	stripped := stripAccents(strings.TrimSpace(userCity))
-	for _, entry := range cityAliases {
-		if stripped == entry.alias {
-			return entry.canonical
+	fields := strings.FieldsFunc(stripped, func(r rune) bool {
+		return r == ',' || r == '-' || r == ' ' || r == '.'
+	})
+	for _, alias := range sortedAliases() {
+		for _, f := range fields {
+			if f == alias {
+				return aliasCanonical(alias)
+			}
 		}
 	}
 	return stripped
+}
+
+// sortedAliases devolve as grafias em ordem decrescente de tamanho para que
+// "porto alegre" vença "porto" e "rio de janeiro" vença "rio".
+func sortedAliases() []string {
+	aliases := make([]string, 0, len(cityAliases))
+	for _, entry := range cityAliases {
+		aliases = append(aliases, entry.alias)
+	}
+	sort.Slice(aliases, func(i, j int) bool {
+		return len(aliases[i]) > len(aliases[j])
+	})
+	return aliases
+}
+
+func aliasCanonical(alias string) string {
+	for _, entry := range cityAliases {
+		if entry.alias == alias {
+			return entry.canonical
+		}
+	}
+	return alias
 }
 
 var workModelMarkers = []struct {
@@ -536,6 +848,46 @@ func analyzeJobLocation(description, _ string) JobLocation {
 	return loc
 }
 
+// locationAllowedToMatch aplica a regra de cidade do usuário. Vagas
+// presenciais/híbridas só podem ser matchadas se a cidade detectada for a
+// mesma configurada (ou a UF pertencente). Vagas remotas valem para qualquer
+// cidade; vagas sem modelo declarado não são bloqueadas (a penalidade é
+// aplicada na pontuação).
+func locationAllowedToMatch(jobLoc JobLocation, userCity string) bool {
+	if normalizeUserCity(userCity) == "" {
+		return true
+	}
+	switch jobLoc.Type {
+	case "presencial", "hybrid":
+		if jobLoc.City == "" {
+			return true
+		}
+		return sameCityOrState(jobLoc.City, userCity)
+	default:
+		return true
+	}
+}
+
+// sameCityOrState compara a cidade detectada da vaga com a configurada.
+// A correspondência por UF é aceita somente quando a vaga menciona a própria
+// UF do usuário (ex.: "Híbrido - Paraná" para quem configura Curitiba).
+func sameCityOrState(jobCity, userCity string) bool {
+	user := normalizeUserCity(userCity)
+	job := stripAccents(strings.TrimSpace(jobCity))
+	if user == "" || job == "" {
+		return user == job
+	}
+	if user == job {
+		return true
+	}
+	if isStateName(job) {
+		if userState, ok := stateOfCity[user]; ok {
+			return userState == job
+		}
+	}
+	return false
+}
+
 // locationPenalty calcula os pontos a deduzir do score quando a vaga é
 // presencial/híbrida e não é compatível com a cidade do usuário.
 func locationPenalty(jobLoc JobLocation, userCity string) float64 {
@@ -552,38 +904,24 @@ func locationPenalty(jobLoc JobLocation, userCity string) float64 {
 	return 0
 }
 
-// locationScore compara a localização da vaga com a cidade do usuário
+// locationScore compara a localização da vaga com a cidade do usuário.
+// Remotas valem 100. Presenciais/híbridas em cidade diferente valem 20;
+// sem cidade detectada valem 50. Sem modelo declarado com cidade diferente
+// também penaliza (20), mantendo o match porém com desconto.
 func locationScore(jobLoc JobLocation, userCity string) float64 {
-	if jobLoc.Type == "remote" || jobLoc.Type == "unknown" {
+	if jobLoc.Type == "remote" {
 		return 100
 	}
 
 	if jobLoc.City == "" {
+		if jobLoc.Type == "unknown" {
+			return 100
+		}
 		return 50
 	}
 
-	userCityLower := normalizeUserCity(userCity)
-	jobCityLower := stripAccents(jobLoc.City)
-
-	if userCityLower == jobCityLower {
+	if sameCityOrState(jobLoc.City, userCity) {
 		return 100
-	}
-
-	// Verificar se está no mesmo estado (simplificado)
-	stateMap := map[string][]string{
-		"são paulo":      {"campinas", "sorocaba", "santos", "rio preto", "ribeirão preto"},
-		"rio de janeiro": {"niterói", "petrópolis"},
-		"minas gerais":   {"belo horizonte", "uberlandia", "juiz de fora"},
-	}
-
-	for state, cities := range stateMap {
-		if userCityLower == state || jobCityLower == state {
-			for _, city := range cities {
-				if userCityLower == city || jobCityLower == city {
-					return 80
-				}
-			}
-		}
 	}
 
 	return 20

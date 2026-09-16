@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -27,6 +28,16 @@ func RateLimit(maxRequests int, window time.Duration) gin.HandlerFunc {
 		ip := c.ClientIP()
 
 		limiter.mu.Lock()
+		// Limpeza oportunista: descarta janelas expiradas quando o mapa cresce,
+		// evitando vazamento de memória com clientes distintos.
+		if len(limiter.clients) > 10000 {
+			for k, cl := range limiter.clients {
+				if time.Now().After(cl.resetAt) {
+					delete(limiter.clients, k)
+				}
+			}
+		}
+
 		client, exists := limiter.clients[ip]
 		if !exists || time.Now().After(client.resetAt) {
 			client = &clientLimit{
@@ -47,7 +58,7 @@ func RateLimit(maxRequests int, window time.Duration) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("X-RateLimit-Remaining", string(rune(maxRequests-client.count)))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(maxRequests-client.count))
 		c.Next()
 	}
 }

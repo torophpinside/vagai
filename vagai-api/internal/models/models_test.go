@@ -154,9 +154,10 @@ func TestJobModel(t *testing.T) {
 
 func TestMatchModel(t *testing.T) {
 	now := time.Now()
+	resumeID := uint(1)
 	match := Match{
 		JobID:           1,
-		ResumeID:        1,
+		ResumeID:        &resumeID,
 		SimilarityScore: 85.5,
 		KeywordsMatched: `["go", "api"]`,
 		Applied:         false,

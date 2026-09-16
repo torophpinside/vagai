@@ -1,8 +1,16 @@
 <template>
   <div class="space-y-8">
-    <div>
-      <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Criar seu Curriculo</h1>
-      <p class="text-slate-400">Importe um curriculo existente ou comece do zero. Edite todos os campos e gere um PDF profissional.</p>
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Criar seu Curriculo</h1>
+        <p class="text-slate-400">Importe um curriculo existente ou comece do zero. Edite todos os campos e gere um PDF profissional.</p>
+        <span v-if="resumeId" class="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-300">
+          <CircleCheck class="w-3.5 h-3.5" /> Salvo no servidor
+        </span>
+        <span v-else class="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300">
+          <CircleAlert class="w-3.5 h-3.5" /> Não salvo no servidor
+        </span>
+      </div>
     </div>
 
     <!-- Error message -->
@@ -11,13 +19,16 @@
       <button @click="errorMsg = ''" class="text-xs text-slate-500 mt-2 hover:text-white">Fechar</button>
     </div>
 
-    <!-- Upload Step (if no resume loaded) -->
-    <div v-if="!resumeData" class="glass-card p-10">
+    <!-- Upload / Update Resume (always at top) -->
+    <div class="glass-card p-10">
       <div class="flex items-center gap-3 mb-8">
         <div class="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
           <Upload class="w-6 h-6" />
         </div>
-        <h2 class="text-2xl font-bold text-white font-outfit">Importar Curriculo</h2>
+        <div>
+          <h2 class="text-2xl font-bold text-white font-outfit">Importar Curriculo</h2>
+          <p class="text-sm text-slate-400">{{ resumeData ? 'Atualize o curriculo atual importando um novo arquivo' : 'Importe um curriculo existente para comecar' }}</p>
+        </div>
       </div>
 
       <form @submit.prevent="handleParse" class="space-y-6">
@@ -45,7 +56,7 @@
         </button>
       </form>
 
-      <div class="mt-6 text-center">
+      <div v-if="!resumeData" class="mt-6 text-center">
         <button
           @click="startEmpty"
           class="text-sm text-slate-500 hover:text-indigo-400 transition-colors underline underline-offset-4"
@@ -74,12 +85,13 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { Upload, FileSearch } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { Upload, FileSearch, CircleCheck, CircleAlert } from 'lucide-vue-next'
 import ResumeForm from '../components/ResumeForm.vue'
-import { parseResume, getResumeData, updateResumeData, generateResumePDF } from '../services/api'
+import { parseResume, getResumeData, updateResumeData, generateResumePDF, createResume } from '../services/api'
 
 const route = useRoute()
+const router = useRouter()
 const resumeFormRef = ref(null)
 
 const resumeId = ref(null)
@@ -162,6 +174,9 @@ const handleParse = async () => {
   try {
     const formData = new FormData()
     formData.append('file', parseFile.value)
+    if (resumeId.value) {
+      formData.append('resume_id', resumeId.value)
+    }
     const response = await parseResume(formData)
 
     const body = response.data || response
@@ -210,30 +225,50 @@ const startEmpty = () => {
   resumeData.value = makeEmptyData()
 }
 
-const handleSave = async (data) => {
-  if (!resumeId.value) {
-    saveToStorage(data)
-    showSaveMessage('Rascunho salvo localmente')
-    return
+const navigateToCreated = (id) => {
+  if (route.params.id === 'new' || !route.params.id) {
+    router.replace({ params: { id: String(id) } })
   }
-  try {
+}
+
+const ensureResumeSaved = async (data) => {
+  if (resumeId.value) {
     await updateResumeData(resumeId.value, data)
+    return resumeId.value
+  }
+  const response = await createResume(data)
+  const body = response.data || response
+  resumeId.value = body.resume?.id || null
+  if (!resumeId.value) {
+    throw new Error('Falha ao criar curriculo no servidor')
+  }
+  navigateToCreated(resumeId.value)
+  return resumeId.value
+}
+
+const handleSave = async (data) => {
+  try {
+    await ensureResumeSaved(data)
     saveToStorage(data)
     showSaveMessage('Curriculo salvo com sucesso!')
   } catch (e) {
     console.error('Erro ao salvar:', e)
     saveToStorage(data)
-    showSaveMessage('Salvo localmente (erro ao sincronizar)')
+    showSaveMessage(e.response?.data?.error || 'Salvo localmente (erro ao sincronizar)')
   }
 }
 
 const handleGeneratePDF = async () => {
-  if (!resumeId.value) {
-    errorMsg.value = 'Facaa o parse e salve o curriculo antes de gerar o PDF.'
-    return
-  }
   try {
-    const response = await generateResumePDF(resumeId.value)
+    let id = resumeId.value
+    if (!id && resumeFormRef.value && typeof resumeFormRef.value.getFormData === 'function') {
+      id = await ensureResumeSaved(resumeFormRef.value.getFormData())
+    }
+    if (!id) {
+      errorMsg.value = 'Salve o curriculo antes de gerar o PDF.'
+      return
+    }
+    const response = await generateResumePDF(id)
     const blob = new Blob([response.data], { type: 'application/pdf' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -245,7 +280,7 @@ const handleGeneratePDF = async () => {
     document.body.removeChild(a)
   } catch (e) {
     console.error('Erro ao gerar PDF:', e)
-    errorMsg.value = 'Erro ao gerar PDF. Tente novamente.'
+    errorMsg.value = e.response?.data?.error || 'Erro ao gerar PDF. Tente novamente.'
   }
 }
 

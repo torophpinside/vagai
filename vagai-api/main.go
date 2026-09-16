@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/anomalyco/vagai-api/internal/handlers"
@@ -18,6 +19,12 @@ import (
 var DB *gorm.DB
 
 func main() {
+	// Segurança: JWT_SECRET é obrigatório (mínimo 32 caracteres). Sem fallback
+	// hardcoded — aborta a inicialização se não estiver configurado.
+	if len(os.Getenv("JWT_SECRET")) < 32 {
+		log.Fatal("JWT_SECRET não configurado. Defina JWT_SECRET (mínimo 32 caracteres) para iniciar a API. Abortando por segurança.")
+	}
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		getEnv("DB_USER", "vagai"),
 		getEnv("DB_PASSWORD", "vagai"),
@@ -37,7 +44,27 @@ func main() {
 	handlers.SetDB(db)
 
 	r := gin.Default()
+	r.MaxMultipartMemory = 16 << 20
 
+	// Segurança: nenhum proxy é confiável por padrão. Se estiver atrás de um
+	// proxy reverso, defina TRUSTED_PROXIES com os CIDRs dele (separados por
+	// vírgula) para que c.ClientIP() use o X-Forwarded-For de fontes confiáveis.
+	if proxies := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(proxies) != "" {
+		var cidrs []string
+		for _, p := range strings.Split(proxies, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				cidrs = append(cidrs, p)
+			}
+		}
+		if err := r.SetTrustedProxies(cidrs); err != nil {
+			log.Fatalf("TRUSTED_PROXIES inválido: %v", err)
+		}
+	} else {
+		_ = r.SetTrustedProxies(nil)
+	}
+
+	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.CORS(parseOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))))
 	r.Use(middleware.RateLimit(100, time.Minute))
 
 	r.GET("/health", func(c *gin.Context) {
@@ -56,6 +83,8 @@ func main() {
 	{
 		api.GET("/stats", handlers.GetStats)
 		api.GET("/plans", handlers.ListPlans)
+		api.GET("/negative-keywords", handlers.GetNegativeKeywords)
+		api.PUT("/negative-keywords", handlers.UpdateNegativeKeywords)
 		api.GET("/me", handlers.GetMe)
 		api.PATCH("/me", handlers.UpdateProfile)
 		api.POST("/me/change-password", handlers.ChangePassword)
@@ -69,6 +98,7 @@ func main() {
 		api.GET("/matches", handlers.ListMatches)
 		api.PATCH("/matches/:id", handlers.UpdateMatch)
 		api.DELETE("/matches/:id", handlers.DeleteMatch)
+		api.POST("/matches/rematch", handlers.RematchMatches)
 
 		api.GET("/sites", handlers.ListSites)
 		api.POST("/sites", handlers.AddSite)
@@ -76,6 +106,8 @@ func main() {
 		api.DELETE("/sites/:id", handlers.DeleteSite)
 
 		api.GET("/resumes", handlers.ListResumes)
+		api.POST("/resumes", handlers.CreateResume)
+		api.DELETE("/resumes/:id", handlers.DeleteResume)
 		api.POST("/resumes/upload", handlers.UploadResume)
 		api.POST("/resumes/analyze", handlers.AnalyzeResume)
 		api.GET("/resume-analyses", handlers.ListResumeAnalyses)
@@ -157,4 +189,19 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// parseOrigins converte uma lista separada por vírgula de origens permitidas
+// em um slice. Retorna nil quando vazio (nenhuma origem cross-origin liberada).
+func parseOrigins(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var origins []string
+	for _, o := range strings.Split(raw, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			origins = append(origins, o)
+		}
+	}
+	return origins
 }

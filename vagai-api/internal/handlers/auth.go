@@ -340,6 +340,17 @@ func ChangePlan(c *gin.Context) {
 		return
 	}
 
+	// Paywall: upgrade para plano pago exige assinatura Stripe ativa. Sem isso,
+	// qualquer usuário poderia se auto-promover a Pro sem pagar.
+	if (plan.PriceMonthly > 0 || plan.PriceYearly > 0) && org.Plan != plan.Slug {
+		var sub models.Subscription
+		if err := DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub).Error; err != nil ||
+			sub.StripeSubscriptionID == "" || sub.Status != models.SubStatusActive {
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": "Para ativar um plano pago, conclua a assinatura pelo checkout. Contate o suporte se você já pagou."})
+			return
+		}
+	}
+
 	org.Plan = plan.Slug
 	if err := DB.Save(&org).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar plano"})

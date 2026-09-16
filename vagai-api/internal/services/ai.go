@@ -41,6 +41,53 @@ type ChatResponse struct {
 	Error any `json:"error"`
 }
 
+func callLMStudio(prompt string) (string, error) {
+	client := &http.Client{
+		Timeout: 240 * time.Second,
+	}
+
+	messages := []Message{
+		{Role: "system", Content: "Você é um assistente de IA especializado em RH e recrutamento."},
+		{Role: "user", Content: prompt},
+	}
+
+	body, err := json.Marshal(ChatRequest{
+		Model:    "local-model",
+		Messages: messages,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(body))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("LM Studio indisponível: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result ChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if result.Error != nil {
+		return "", fmt.Errorf("erro AI: %v", result.Error)
+	}
+
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("sem resposta da AI")
+	}
+
+	return result.Choices[0].Message.Content, nil
+}
+
 func ProcessResumeContent(rawContent string) (string, error) {
 	if rawContent == "" {
 		return "", fmt.Errorf("conteúdo vazio")
@@ -205,12 +252,26 @@ Responda ESTRITAMENTE em JSON válido no formato:
 }
 
 // fetchHTML busca o conteúdo HTML de uma URL
-func fetchHTML(url string) (string, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+func fetchHTML(rawURL string) (string, error) {
+	// SSRF guard: bloqueia esquemas não-HTTP e hosts apontando para redes
+	// privadas/loopback/link-local antes de qualquer conexão ser aberta.
+	if err := validateFetchURL(rawURL); err != nil {
+		return "", err
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return fmt.Errorf("muitos redirecionamentos")
+			}
+			// Cada hop de redirecionamento também precisa passar pela mesma
+			// validação, para impedir redirect para 127.0.0.1/metadados.
+			return validateFetchURL(req.URL.String())
+		},
+	}
+
+	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -319,6 +380,12 @@ texto livre aqui`, resumeContent)
 
 	rawText := strings.TrimSpace(result.Choices[0].Message.Content)
 
+	// A resposta pode vir em JSON estruturado (com ou sem code fences). Se for,
+	// usa direto — cobre respostas no formato {"strengths": [...], ...}.
+	if parsed, ok := parseStructuredAnalysis(rawText); ok {
+		return parsed, nil
+	}
+
 	analysis := map[string]interface{}{
 		"strengths":   extractBullets(rawText, "PONTOS FORTES", "PONTOS DE ATENÇÃO"),
 		"weaknesses":  extractBullets(rawText, "PONTOS DE ATENÇÃO", "SUGESTÕES DE MELHORIA"),
@@ -334,6 +401,35 @@ texto livre aqui`, resumeContent)
 	}
 
 	return analysis, nil
+}
+
+// parseStructuredAnalysis tenta extrair um objeto JSON da resposta da IA.
+// Suporta respostas puras, em code fences (```json ... ```) ou embutidas em texto.
+func parseStructuredAnalysis(rawText string) (map[string]interface{}, bool) {
+	s := strings.TrimSpace(rawText)
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	s = strings.TrimSpace(s)
+
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start == -1 || end == -1 || end <= start {
+		return nil, false
+	}
+
+	var analysis map[string]interface{}
+	if err := json.Unmarshal([]byte(s[start:end+1]), &analysis); err != nil {
+		return nil, false
+	}
+
+	if _, ok := analysis["fullAnalysis"]; !ok {
+		if _, ok := analysis["strengths"]; !ok {
+			return nil, false
+		}
+	}
+
+	return analysis, true
 }
 
 func ExtractJobFromURL(url string) (map[string]string, error) {
@@ -514,4 +610,29 @@ func extractBullets(text, sectionStart, sectionEnd string) []string {
 		}
 	}
 	return items
+}
+
+func GenerateInterviewPrep(jobDescription string, resumeContent string) (string, error) {
+	prompt := fmt.Sprintf(`You are an expert interview coach. Based on the following job description and candidate resume, generate a comprehensive interview preparation guide.
+
+Job Description:
+%s
+
+Candidate Resume:
+%s
+
+Please provide:
+1. Top 5 most likely technical questions and suggested high-impact answers.
+2. Top 3 behavioral questions based on the job's requirements and the candidate's experience.
+3. A "Red Flag" section: gaps between the resume and job requirements and how to address them.
+4. 3 strategic questions the candidate should ask the interviewer to show deep interest and competence.
+
+Format the output in clear Markdown.`, jobDescription, resumeContent)
+
+	result, err := callLMStudio(prompt)
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
