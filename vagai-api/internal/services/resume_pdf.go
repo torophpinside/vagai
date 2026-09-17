@@ -37,13 +37,13 @@ type EducationEntry struct {
 }
 
 type ResumeData struct {
-	PersonalInfo    PersonalInfo     `json:"personal_info"`
-	Summary         string           `json:"summary"`
-	Experience      []ExperienceEntry `json:"experience"`
-	Education       []EducationEntry  `json:"education"`
-	Skills          []string          `json:"skills"`
-	Languages       []string          `json:"languages"`
-	Certifications  []string          `json:"certifications"`
+	PersonalInfo   PersonalInfo      `json:"personal_info"`
+	Summary        string            `json:"summary"`
+	Experience     []ExperienceEntry `json:"experience"`
+	Education      []EducationEntry  `json:"education"`
+	Skills         []string          `json:"skills"`
+	Languages      []string          `json:"languages"`
+	Certifications []string          `json:"certifications"`
 }
 
 func GenerateResumePDF(data ResumeData) ([]byte, error) {

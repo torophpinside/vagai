@@ -11,7 +11,7 @@ import (
 
 func TestListJobs_WithoutDB(t *testing.T) {
 	t.Skip("Skipping test that requires database connection")
-	
+
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)

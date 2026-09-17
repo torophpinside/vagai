@@ -511,10 +511,10 @@ func RematchMatches(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"resume_id":       resume.ID,
-		"jobs_processed":  len(jobs),
-		"matches_created": created,
-		"matches_updated": updated,
+		"resume_id":              resume.ID,
+		"jobs_processed":         len(jobs),
+		"matches_created":        created,
+		"matches_updated":        updated,
 		"jobs_excluded_location": excluded,
 	})
 }
@@ -1162,44 +1162,4 @@ func toStringSlice(v interface{}) []string {
 		return result
 	}
 	return nil
-}
-
-func PrepareInterview(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
-	orgID := c.MustGet("orgID").(uint)
-
-	var req struct {
-		JobID    uint `json:"job_id"`
-		ResumeID uint `json:"resume_id"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
-		return
-	}
-
-	if req.JobID == 0 || req.ResumeID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JobID e ResumeID são obrigatórios"})
-		return
-	}
-
-	var job models.Job
-	if err := db.Where("id = ? AND organization_id = ?", req.JobID, orgID).First(&job).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
-		return
-	}
-
-	var resume models.Resume
-	if err := db.Where("id = ? AND organization_id = ?", req.ResumeID, orgID).First(&resume).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Currículo não encontrado"})
-		return
-	}
-
-	prep, err := services.GenerateInterviewPrep(job.Description, resume.Content)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar preparação: " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"preparation": prep})
 }

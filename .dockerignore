@@ -1,0 +1,10 @@
+.git
+.opencode
+.specify
+.agents
+*.log
+.env*
+.DS_Store
+Thumbs.db
+node_modules/
+dist/

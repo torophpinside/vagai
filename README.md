@@ -87,6 +87,7 @@ go run main.go match
 - **Matching com IA** — LM Studio para análise semântica de compatibilidade
 - **Fallback tradicional** — similaridade textual quando IA não está disponível
 - **Dashboard** — gráficos de vagas por tecnologia, empresa, tempo
+- **Preparação para entrevista** — gera perguntas (tecnologia, fundamentos, arquitetura) para vagas candidatadas, com sabatina interativa, autoavaliação, acompanhamento de progresso e verificação das respostas por IA com nota geral (0–10) e feedback persistidos (IA com fallback determinístico; `POST /api/interview-prep/:id/verify`)
 - **Agendamento** — coleta automática via cron
 - **Multi-tenancy** — isolamento de dados por usuário/empresa
 - **Planos** — Free e Pro com limites diferenciados

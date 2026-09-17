@@ -1,6 +1,7 @@
+Dockerfile
+.dockerignore
 .git
-Dockerfile*
-node_modules
-dist
-.env*
 *.log
+.env*
+node_modules/
+dist/

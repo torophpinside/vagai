@@ -152,6 +152,12 @@ func runMigrations(db *gorm.DB) error {
 		&models.Match{},
 		&models.ResumeAnalysis{},
 		&models.AgentLog{},
+		&models.InterviewPreparation{},
+		&models.InterviewQuestion{},
+		&models.PracticeEntry{},
+		&models.PreparationVerification{},
+		&models.AIAnalysisResult{},
+		&models.PreparationVerificationHistory{},
 	)
 }
 
@@ -221,6 +227,12 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 		api.GET("/resume-analyses", handlers.ListResumeAnalyses)
 		api.GET("/resume-analyses/:id", handlers.GetResumeAnalysis)
 		api.DELETE("/resume-analyses/:id", handlers.DeleteResumeAnalysis)
+		api.GET("/interview-prep", handlers.ListInterviewPreps)
+		api.POST("/interview-prep", handlers.CreateInterviewPrep)
+		api.GET("/interview-prep/:id", handlers.GetInterviewPrep)
+		api.PATCH("/interview-prep/:id/questions/:questionId", handlers.UpdateQuestionStatus)
+		api.POST("/interview-prep/:id/questions/:questionId/answers", handlers.SaveQuestionAnswer)
+		api.POST("/interview-prep/:id/verify", handlers.VerifyInterviewPrep)
 	}
 
 	return r
@@ -253,8 +265,8 @@ func registerUser(t *testing.T, name, email, password, org string) (string, uint
 	}
 
 	var result struct {
-		Token        string `json:"token"`
-		User         struct {
+		Token string `json:"token"`
+		User  struct {
 			ID uint `json:"id"`
 		} `json:"user"`
 	}

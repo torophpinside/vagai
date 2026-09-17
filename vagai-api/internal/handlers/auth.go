@@ -221,14 +221,14 @@ func GetMe(c *gin.Context) {
 			"trial_ends_at": org.TrialEndsAt,
 		},
 		"plan": gin.H{
-			"name":             plan.Name,
-			"slug":             plan.Slug,
-			"price_monthly":    plan.PriceMonthly,
-			"price_yearly":     plan.PriceYearly,
-			"max_jobs":         plan.MaxJobs,
-			"max_resumes":      plan.MaxResumes,
-			"max_sites":        plan.MaxSites,
-			"features":         plan.Features,
+			"name":          plan.Name,
+			"slug":          plan.Slug,
+			"price_monthly": plan.PriceMonthly,
+			"price_yearly":  plan.PriceYearly,
+			"max_jobs":      plan.MaxJobs,
+			"max_resumes":   plan.MaxResumes,
+			"max_sites":     plan.MaxSites,
+			"features":      plan.Features,
 		},
 		"usage": gin.H{
 			"jobs":    jobCount,
@@ -236,8 +236,8 @@ func GetMe(c *gin.Context) {
 			"sites":   siteCount,
 		},
 		"subscription": gin.H{
-			"status":              sub.Status,
-			"current_period_end":  sub.CurrentPeriodEnd,
+			"status":               sub.Status,
+			"current_period_end":   sub.CurrentPeriodEnd,
 			"cancel_at_period_end": sub.CancelAtPeriodEnd,
 		},
 	})
@@ -345,7 +345,7 @@ func ChangePlan(c *gin.Context) {
 	if (plan.PriceMonthly > 0 || plan.PriceYearly > 0) && org.Plan != plan.Slug {
 		var sub models.Subscription
 		if err := DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub).Error; err != nil ||
-			sub.StripeSubscriptionID == "" || sub.Status != models.SubStatusActive {
+			sub.StripeSubscriptionID == nil || *sub.StripeSubscriptionID == "" || sub.Status != models.SubStatusActive {
 			c.JSON(http.StatusPaymentRequired, gin.H{"error": "Para ativar um plano pago, conclua a assinatura pelo checkout. Contate o suporte se você já pagou."})
 			return
 		}
@@ -366,13 +366,13 @@ func ChangePlan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Plano alterado para " + plan.Name,
 		"plan": gin.H{
-			"name":           plan.Name,
-			"slug":           plan.Slug,
-			"price_monthly":  plan.PriceMonthly,
-			"max_jobs":       plan.MaxJobs,
-			"max_resumes":    plan.MaxResumes,
-			"max_sites":      plan.MaxSites,
-			"features":       plan.Features,
+			"name":          plan.Name,
+			"slug":          plan.Slug,
+			"price_monthly": plan.PriceMonthly,
+			"max_jobs":      plan.MaxJobs,
+			"max_resumes":   plan.MaxResumes,
+			"max_sites":     plan.MaxSites,
+			"features":      plan.Features,
 		},
 	})
 }

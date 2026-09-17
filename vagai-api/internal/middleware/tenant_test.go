@@ -21,7 +21,7 @@ func TestTenantScope(t *testing.T) {
 
 func TestScopedDB_WithOrgID(t *testing.T) {
 	t.Skip("Skipping test that requires real DB connection")
-	
+
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Set("org_id", uint(42))
@@ -54,7 +54,7 @@ func TestScopedDB_WithoutOrgID(t *testing.T) {
 
 func TestGetScopedDB_WithScopedDB(t *testing.T) {
 	t.Skip("Skipping test that requires real gorm.DB instance")
-	
+
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Set("scoped_db", nil)
 
@@ -66,7 +66,7 @@ func TestGetScopedDB_WithScopedDB(t *testing.T) {
 
 func TestGetScopedDB_WithDB(t *testing.T) {
 	t.Skip("Skipping test that requires real gorm.DB instance")
-	
+
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Set("db", nil)
 
@@ -87,7 +87,7 @@ func TestGetScopedDB_NoDB(t *testing.T) {
 
 func TestScopedDB_Integration(t *testing.T) {
 	t.Skip("Skipping test that requires real DB connection")
-	
+
 	w := httptest.NewRecorder()
 	_, router := gin.CreateTestContext(w)
 

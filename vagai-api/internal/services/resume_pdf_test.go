@@ -85,10 +85,10 @@ func TestIsPresentDate(t *testing.T) {
 
 func TestFormatDateRange(t *testing.T) {
 	tests := []struct {
-		name      string
-		start     string
-		end       string
-		want      string
+		name  string
+		start string
+		end   string
+		want  string
 	}{
 		{name: "both empty", start: "", end: "", want: ""},
 		{name: "only end", start: "", end: "2020-01-01", want: "01/2020"},

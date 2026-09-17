@@ -169,10 +169,10 @@ func TestMatchResumeToJob_NegativeKeywordsClampedAtZero(t *testing.T) {
 
 func TestNegativeKeywordPenalty_Unit(t *testing.T) {
 	cases := []struct {
-		name    string
-		text    string
-		kw      []string
-		want    float64
+		name string
+		text string
+		kw   []string
+		want float64
 	}{
 		{"empty text", "", []string{"freela"}, 0},
 		{"keyword absent", "desenvolvedor senior", []string{"freela"}, 0},

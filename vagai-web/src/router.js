@@ -11,6 +11,8 @@ import Billing from './pages/Billing.vue'
 import Login from './pages/auth/Login.vue'
 import Register from './pages/auth/Register.vue'
 import ResumeEditor from './pages/ResumeEditor.vue'
+import InterviewPrep from './pages/InterviewPrep.vue'
+import InterviewPreparations from './pages/InterviewPreparations.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
@@ -24,7 +26,9 @@ const routes = [
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/settings/team', name: 'Team', component: Team, meta: { requiresAuth: true } },
   { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } },
-  { path: '/resume-editor/:id', name: 'ResumeEditor', component: ResumeEditor, meta: { requiresAuth: true } }
+  { path: '/resume-editor/:id', name: 'ResumeEditor', component: ResumeEditor, meta: { requiresAuth: true } },
+  { path: '/interview-prep', name: 'InterviewPreparations', component: InterviewPreparations, meta: { requiresAuth: true } },
+  { path: '/interview-prep/:id', name: 'InterviewPrep', component: InterviewPrep, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

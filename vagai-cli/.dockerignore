@@ -1,5 +1,8 @@
+Dockerfile
+.dockerignore
 .git
-Dockerfile*
-vagai
-.env*
 *.log
+.env*
+vagai
+*.test
+*.out

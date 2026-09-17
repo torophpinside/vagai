@@ -94,10 +94,10 @@ func TestOrganizationModel(t *testing.T) {
 
 func TestUserModel(t *testing.T) {
 	user := User{
-		Name:     "Test User",
-		Email:    "test@example.com",
+		Name:         "Test User",
+		Email:        "test@example.com",
 		PasswordHash: "hashedpassword",
-		Timezone: "America/Sao_Paulo",
+		Timezone:     "America/Sao_Paulo",
 	}
 
 	if user.Name != "Test User" {

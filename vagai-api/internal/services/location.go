@@ -7,8 +7,8 @@ import (
 )
 
 type JobLocation struct {
-	Type  string
-	City  string
+	Type string
+	City string
 }
 
 var cityAliases = []struct{ alias, canonical string }{
@@ -74,24 +74,24 @@ var stateOfCity = map[string]string{
 	"cascavel": "parana", "ponta grossa": "parana", "foz do iguacu": "parana",
 	"florianopolis": "santa catarina", "joinville": "santa catarina", "blumenau": "santa catarina",
 	"porto alegre": "rio grande do sul",
-	"sao paulo": "sao paulo", "campinas": "sao paulo", "sorocaba": "sao paulo", "santos": "sao paulo",
+	"sao paulo":    "sao paulo", "campinas": "sao paulo", "sorocaba": "sao paulo", "santos": "sao paulo",
 	"rio de janeiro": "rio de janeiro", "niteroi": "rio de janeiro",
 	"belo horizonte": "minas gerais", "uberlandia": "minas gerais",
-	"vitoria": "espirito santo",
-	"salvador": "bahia",
-	"fortaleza": "ceara",
-	"recife": "pernambuco",
-	"brasilia": "distrito federal",
-	"manaus": "amazonas",
-	"belem": "para",
-	"cuiaba": "mato grosso",
+	"vitoria":      "espirito santo",
+	"salvador":     "bahia",
+	"fortaleza":    "ceara",
+	"recife":       "pernambuco",
+	"brasilia":     "distrito federal",
+	"manaus":       "amazonas",
+	"belem":        "para",
+	"cuiaba":       "mato grosso",
 	"campo grande": "mato grosso do sul",
-	"goiania": "goias",
-	"natal": "rio grande do norte",
-	"joao pessoa": "paraiba",
-	"maceio": "alagoas",
-	"teresina": "piaui",
-	"sao luis": "maranhao",
+	"goiania":      "goias",
+	"natal":        "rio grande do norte",
+	"joao pessoa":  "paraiba",
+	"maceio":       "alagoas",
+	"teresina":     "piaui",
+	"sao luis":     "maranhao",
 }
 
 func isStateName(canonical string) bool {

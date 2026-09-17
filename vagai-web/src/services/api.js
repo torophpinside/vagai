@@ -67,6 +67,10 @@ export const useResumeAnalyses = () => {
   return useQuery({ queryKey: ['resume-analyses'], queryFn: () => api.get('/resume-analyses').then(res => res.data) })
 }
 
+export const useInterviewPreps = () => {
+  return useQuery({ queryKey: ['interview-preps'], queryFn: () => api.get('/interview-prep').then(res => res.data) })
+}
+
 
 export const useMe = () => {
   return useQuery({ queryKey: ['me'], queryFn: () => api.get('/me').then(res => res.data) })
@@ -105,3 +109,10 @@ export const deleteResume = (id) => api.delete(`/resumes/${id}`)
 export const getResumeData = (id) => api.get(`/resumes/${id}/data`).then(res => res.data)
 export const updateResumeData = (id, data) => api.put(`/resumes/${id}/data`, data)
 export const generateResumePDF = (id) => api.post(`/resumes/${id}/generate-pdf`, {}, { responseType: 'blob' })
+
+export const generateInterviewPrep = (matchId) => api.post('/interview-prep', { match_id: matchId }, { timeout: 240000 }).then(res => res.data)
+export const listInterviewPreps = (filter = {}) => api.get('/interview-prep', { params: filter }).then(res => res.data)
+export const getInterviewPrep = (id) => api.get(`/interview-prep/${id}`).then(res => res.data)
+export const updateQuestionStatus = (prepId, questionId, status) => api.patch(`/interview-prep/${prepId}/questions/${questionId}`, { status }).then(res => res.data)
+export const saveQuestionAnswer = (prepId, questionId, answer, selfAssessment, timeSpentSeconds = 0) => api.post(`/interview-prep/${prepId}/questions/${questionId}/answers`, { answer, self_assessment: selfAssessment, time_spent_seconds: timeSpentSeconds }).then(res => res.data)
+export const verifyInterviewPrep = (prepId) => api.post(`/interview-prep/${prepId}/verify`).then(res => res.data)

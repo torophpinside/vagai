@@ -99,7 +99,7 @@ type Subscription struct {
 	ID                   uint               `gorm:"primaryKey" json:"id"`
 	OrganizationID       uint               `gorm:"uniqueIndex;not null" json:"organization_id"`
 	PlanID               uint               `gorm:"index" json:"plan_id"`
-	StripeSubscriptionID string             `gorm:"size:255" json:"-"`
+	StripeSubscriptionID *string            `gorm:"size:255" json:"-"`
 	Status               SubscriptionStatus `gorm:"size:20;default:trial" json:"status"`
 	CurrentPeriodStart   *time.Time         `json:"current_period_start"`
 	CurrentPeriodEnd     *time.Time         `json:"current_period_end"`
@@ -133,19 +133,19 @@ type AuditLog struct {
 }
 
 type Site struct {
-	ID                uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID    uint       `gorm:"index;not null" json:"organization_id"`
-	Name              string     `gorm:"size:100;not null" json:"name"`
-	URL               string     `gorm:"size:500;not null" json:"url"`
-	SelectorLinks     string     `gorm:"size:255" json:"selector_links"`
-	SelectorCompany   string     `gorm:"size:255" json:"selector_company"`
-	SelectorDescription string   `gorm:"size:255" json:"selector_description"`
-	DelaySeconds      int        `gorm:"default:2" json:"delay_seconds"`
-	RespectRobots     bool       `gorm:"default:true" json:"respect_robots"`
-	Active            bool       `gorm:"default:true" json:"active"`
-	LastCrawl         *time.Time `json:"last_crawl"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                  uint       `gorm:"primaryKey" json:"id"`
+	OrganizationID      uint       `gorm:"index;not null" json:"organization_id"`
+	Name                string     `gorm:"size:100;not null" json:"name"`
+	URL                 string     `gorm:"size:500;not null" json:"url"`
+	SelectorLinks       string     `gorm:"size:255" json:"selector_links"`
+	SelectorCompany     string     `gorm:"size:255" json:"selector_company"`
+	SelectorDescription string     `gorm:"size:255" json:"selector_description"`
+	DelaySeconds        int        `gorm:"default:2" json:"delay_seconds"`
+	RespectRobots       bool       `gorm:"default:true" json:"respect_robots"`
+	Active              bool       `gorm:"default:true" json:"active"`
+	LastCrawl           *time.Time `json:"last_crawl"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type Job struct {
@@ -208,4 +208,130 @@ type AgentLog struct {
 	Action         string    `gorm:"size:255" json:"action"`
 	Details        string    `gorm:"type:json" json:"details"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+// InterviewCategory categoriza as perguntas da preparação de entrevista.
+type InterviewCategory string
+
+const (
+	CategoryTechnology   InterviewCategory = "technology"
+	CategoryFoundations  InterviewCategory = "foundations"
+	CategoryArchitecture InterviewCategory = "architecture"
+)
+
+// InterviewQuestionStatus acompanha o progresso da prática (sabatina).
+type InterviewQuestionStatus string
+
+const (
+	QuestionStatusPending   InterviewQuestionStatus = "pending"
+	QuestionStatusPracticed InterviewQuestionStatus = "practiced"
+	QuestionStatusMastered  InterviewQuestionStatus = "mastered"
+)
+
+// InterviewPreparationSource indica a origem da geração das perguntas.
+type InterviewPreparationSource string
+
+const (
+	SourceAI       InterviewPreparationSource = "ai"
+	SourceTemplate InterviewPreparationSource = "template"
+)
+
+// InterviewPreparation é o conjunto de perguntas de uma vaga candidatada.
+// Relação 1:1 com o Match aplicado (uniqueIndex em MatchID).
+type InterviewPreparation struct {
+	ID             uint                       `gorm:"primaryKey" json:"id"`
+	OrganizationID uint                       `gorm:"index;not null" json:"organization_id"`
+	MatchID        uint                       `gorm:"uniqueIndex;not null" json:"match_id"`
+	JobID          uint                       `gorm:"index;not null" json:"job_id"`
+	Title          string                     `gorm:"size:255" json:"title"`
+	Company        string                     `gorm:"size:255" json:"company"`
+	Description    string                     `gorm:"type:text" json:"description"`
+	TechStack      string                     `gorm:"type:json" json:"tech_stack"`
+	Source         InterviewPreparationSource `gorm:"size:20;not null" json:"source"`
+	GeneratedAt    time.Time                  `gorm:"autoCreateTime" json:"generated_at"`
+	CreatedAt      time.Time                  `json:"created_at"`
+	UpdatedAt      time.Time                  `json:"updated_at"`
+}
+
+// IsFinalized checks if all associated questions have been answered.
+func (p *InterviewPreparation) IsFinalized(db *gorm.DB) bool {
+	var count int64
+	db.Model(&InterviewQuestion{}).
+		Where("preparation_id = ? AND status = ?", p.ID, QuestionStatusPending).
+		Count(&count)
+	return count == 0
+}
+
+// BeforeSave garante que a coluna JSON TechStack nunca receba string vazia
+// (MySQL rejeita como JSON inválido), seguindo o padrão de Organization.
+func (p *InterviewPreparation) BeforeSave(*gorm.DB) error {
+	if p.TechStack == "" {
+		p.TechStack = "[]"
+	}
+	return nil
+}
+
+// InterviewQuestion é uma pergunta da preparação (N:1 com InterviewPreparation).
+type InterviewQuestion struct {
+	ID             uint                    `gorm:"primaryKey" json:"id"`
+	OrganizationID uint                    `gorm:"index;not null" json:"organization_id"`
+	PreparationID  uint                    `gorm:"index;not null" json:"preparation_id"`
+	Category       InterviewCategory       `gorm:"size:20;not null" json:"category"`
+	Topic          string                  `gorm:"size:100" json:"topic"`
+	Text           string                  `gorm:"type:text;not null" json:"text"`
+	AnswerGuide    string                  `gorm:"type:text" json:"answer_guide"`
+	Status         InterviewQuestionStatus `gorm:"size:20;default:pending" json:"status"`
+	Position       int                     `json:"position"`
+	CreatedAt      time.Time               `json:"created_at"`
+	UpdatedAt      time.Time               `json:"updated_at"`
+}
+
+// PracticeEntry registra a resposta escrita opcional do candidato (1:1 com a
+// pergunta — sobrescreve a resposta anterior). O progresso real vive em
+// InterviewQuestion.Status.
+type PracticeEntry struct {
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID   uint      `gorm:"index;not null" json:"organization_id"`
+	QuestionID       uint      `gorm:"uniqueIndex;not null" json:"question_id"`
+	Answer           string    `gorm:"type:text" json:"answer"`
+	SelfAssessment   string    `gorm:"size:20" json:"self_assessment"`
+	TimeSpentSeconds int       `gorm:"default:0" json:"time_spent_seconds"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// PreparationVerificationStatus acompanha o ciclo de verificação das respostas
+// de uma preparação (FR-001/FR-007).
+type PreparationVerificationStatus string
+
+const (
+	VerificationPending  PreparationVerificationStatus = "pending"
+	VerificationRunning  PreparationVerificationStatus = "running"
+	VerificationVerified PreparationVerificationStatus = "verified"
+	VerificationOutdated PreparationVerificationStatus = "outdated"
+)
+
+// VerificationSource indica a origem do resultado da verificação.
+type VerificationSource string
+
+const (
+	VerificationSourceAI       VerificationSource = "ai"
+	VerificationSourceTemplate VerificationSource = "template"
+)
+
+// PreparationVerification guarda o resultado ATUAL da verificação (1:1 com a
+// preparação via uniqueIndex). Nunca há histórico — a verificação nova
+// substitui a anterior atomically (FR-005).
+type PreparationVerification struct {
+	ID             uint                          `gorm:"primaryKey" json:"id"`
+	OrganizationID uint                          `gorm:"uniqueIndex:idx_prep_verification;not null" json:"organization_id"`
+	PreparationID  uint                          `gorm:"uniqueIndex:idx_prep_verification;not null" json:"preparation_id"`
+	Status         PreparationVerificationStatus `gorm:"size:20;default:pending" json:"status"`
+	Score          float64                       `gorm:"type:decimal(4,1)" json:"score"`
+	Feedback       string                        `gorm:"type:text" json:"feedback"`
+	Source         VerificationSource            `gorm:"size:20;default:template" json:"source"`
+	StartedAt      *time.Time                    `json:"started_at"`
+	VerifiedAt     *time.Time                    `json:"verified_at"`
+	CreatedAt      time.Time                     `json:"created_at"`
+	UpdatedAt      time.Time                     `json:"updated_at"`
 }

@@ -235,6 +235,11 @@ vagai match --threshold 70
 | GET    | `/api/resume-analyses`| Lista análises de currículo realizadas           |
 | GET    | `/api/resume-analyses/:id` | Detalhe de uma análise                       |
 | DELETE | `/api/resume-analyses/:id` | Remove uma análise                           |
+| GET    | `/api/interview-prep` | Lista preparações (param: `match_id`), com `progress` |
+| POST   | `/api/interview-prep` | Gera/regenera preparação a partir de `match_id` candidatado |
+| GET    | `/api/interview-prep/:id` | Detalhe da preparação com perguntas       |
+| PATCH  | `/api/interview-prep/:id/questions/:questionId` | Atualiza status da pergunta (pending/practiced/mastered) |
+| POST   | `/api/interview-prep/:id/questions/:questionId/answers` | Salva resposta + autoavaliação |
 
 **Autenticação:** (opcional) API Key via header `X-API-Key`
 
@@ -414,6 +419,16 @@ services:
 - Estatísticas de linguagens mais requisitadas (top 10)
 - Estatísticas de tecnologias mais requisitadas (top 10)
 - Barras de progresso visuais no frontend
+
+### Sprint 10: Concluído ✅
+- Verificação de respostas da Preparação por IA: ao responder todas as questões, dispara verificação assíncrona com nota geral (0–10) e feedback persistidos (1:1 com a preparação)
+- Nota e feedback na sabatina (`vagai-web/src/pages/InterviewPrep.vue`) e badge na listagem (`InterviewPreparations.vue`)
+- Estados da verificação: `pending → running → verified`; edição de resposta após verificação marca `outdated`
+- Endpoint `POST /api/interview-prep/:id/verify` (idempotente; 400 com `remaining` quando incompleta)
+- DTO com bloco `verification` e contagens `answered`/`remaining` no `progress` (FR-008)
+- Falha de IA → retry (≤60s por tentativa, no máx. 1) e depois fallback determinístico (`source=template`) — nunca bloqueia o usuário
+- Self-heal: verificação `running` órfã (>5 min) volta a `pending` e é retomada na leitura
+- Registro único vigente por preparação (substituição sem duplicação); isolamento por tenant (404 para outra organização)
 
 ---
 

@@ -50,7 +50,7 @@ func TestListMatches_AfterMatchingJob(t *testing.T) {
 
 	var result struct {
 		Data []struct {
-			ID              uint   `json:"id"`
+			ID              uint    `json:"id"`
 			SimilarityScore float64 `json:"similarity_score"`
 		} `json:"data"`
 	}

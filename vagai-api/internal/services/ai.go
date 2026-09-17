@@ -41,13 +41,16 @@ type ChatResponse struct {
 	Error any `json:"error"`
 }
 
+// callLMStudio resolve a URL do LM Studio a cada chamada (lazy, via
+// currentLMStudioURL): permite forçar fallback em testes via env var após o
+// init do pacote. Uso exclusivo da correção por pergunta (AnalyzeQuestionAnswer).
 func callLMStudio(prompt string) (string, error) {
 	client := &http.Client{
 		Timeout: 240 * time.Second,
 	}
 
 	messages := []Message{
-		{Role: "system", Content: "Você é um assistente de IA especializado em RH e recrutamento."},
+		{Role: "system", Content: "Você é um assistente de IA especializado em RH e recrutamento. Responda SEMPRE em Português do Brasil (PT-BR), independentemente do idioma do texto fornecido."},
 		{Role: "user", Content: prompt},
 	}
 
@@ -59,7 +62,7 @@ func callLMStudio(prompt string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", currentLMStudioURL()+"/v1/chat/completions", bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
 	}
@@ -86,6 +89,68 @@ func callLMStudio(prompt string) (string, error) {
 	}
 
 	return result.Choices[0].Message.Content, nil
+}
+
+func AnalyzeQuestionAnswer(question, answer string) (string, error) {
+	_, feedback, err := AnalyzeQuestionAnswerScored(question, answer)
+	return feedback, err
+}
+
+// questionScorePayload é o contrato pedido à IA na correção por pergunta.
+type questionScorePayload struct {
+	Score    float64 `json:"score"`
+	Feedback string  `json:"feedback"`
+}
+
+var scoreRegex = regexp.MustCompile(`(?i)nota\s*[:=]?\s*(\d+(?:[.,]\d+)?)`)
+
+// AnalyzeQuestionAnswerScored corrige uma resposta com nota real de 0 a 10.
+// Pede JSON à IA; se vier fora do contrato, tenta extrair "NOTA X" do texto;
+// sem nota parseável, retorna erro para o chamador decidir (retry/fallback).
+func AnalyzeQuestionAnswerScored(question, answer string) (float64, string, error) {
+	prompt := fmt.Sprintf(
+		"Analise a seguinte pergunta de entrevista e a resposta fornecida pelo candidato.\n\nPergunta: %s\nResposta: %s\n\nRetorne APENAS JSON válido, SEM texto adicional, no formato:\n{\"score\": <nota de 0 a 10>, \"feedback\": \"feedback construtivo com pontos fortes e áreas de melhoria, objetivo e profissional\"}",
+		question, answer,
+	)
+	raw, err := callLMStudio(prompt)
+	if err != nil {
+		return 0, "", err
+	}
+
+	text := strings.TrimSpace(raw)
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+
+	var payload questionScorePayload
+	if err := json.Unmarshal([]byte(text), &payload); err == nil {
+		payload.Feedback = strings.TrimSpace(payload.Feedback)
+		if payload.Feedback != "" && payload.Score >= 0 && payload.Score <= 10 {
+			return payload.Score, payload.Feedback, nil
+		}
+	}
+
+	if m := scoreRegex.FindStringSubmatch(text); m != nil {
+		if score, serr := parseScoreNumber(m[1]); serr == nil {
+			return score, strings.TrimSpace(raw), nil
+		}
+	}
+
+	return 0, "", fmt.Errorf("resposta da IA fora do contrato (sem nota 0-10 parseável)")
+}
+
+// parseScoreNumber converte "7", "7.5" ou "7,5" em float64 na faixa 0..10.
+func parseScoreNumber(s string) (float64, error) {
+	s = strings.ReplaceAll(strings.TrimSpace(s), ",", ".")
+	var score float64
+	if _, err := fmt.Sscanf(s, "%f", &score); err != nil {
+		return 0, err
+	}
+	if score < 0 || score > 10 {
+		return 0, fmt.Errorf("nota fora da faixa 0-10: %v", score)
+	}
+	return score, nil
 }
 
 func ProcessResumeContent(rawContent string) (string, error) {
@@ -339,7 +404,7 @@ ANÁLISE COMPLETA:
 texto livre aqui`, resumeContent)
 
 	messages := []Message{
-		{Role: "system", Content: "Você é um Analista de RH Sênior especializado em tecnologia. Use os cabeçalhos PONTOS FORTES, PONTOS DE ATENÇÃO, SUGESTÕES DE MELHORIA e ANÁLISE COMPLETA. Use bullets (-) para listar itens."},
+		{Role: "system", Content: "Você é um Analista de RH Sênior especializado em tecnologia. Responda SEMPRE em Português do Brasil (PT-BR), mesmo que o conteúdo analisado esteja em outro idioma. Use os cabeçalhos PONTOS FORTES, PONTOS DE ATENÇÃO, SUGESTÕES DE MELHORIA e ANÁLISE COMPLETA. Use bullets (-) para listar itens."},
 		{Role: "user", Content: prompt},
 	}
 
@@ -610,29 +675,4 @@ func extractBullets(text, sectionStart, sectionEnd string) []string {
 		}
 	}
 	return items
-}
-
-func GenerateInterviewPrep(jobDescription string, resumeContent string) (string, error) {
-	prompt := fmt.Sprintf(`You are an expert interview coach. Based on the following job description and candidate resume, generate a comprehensive interview preparation guide.
-
-Job Description:
-%s
-
-Candidate Resume:
-%s
-
-Please provide:
-1. Top 5 most likely technical questions and suggested high-impact answers.
-2. Top 3 behavioral questions based on the job's requirements and the candidate's experience.
-3. A "Red Flag" section: gaps between the resume and job requirements and how to address them.
-4. 3 strategic questions the candidate should ask the interviewer to show deep interest and competence.
-
-Format the output in clear Markdown.`, jobDescription, resumeContent)
-
-	result, err := callLMStudio(prompt)
-	if err != nil {
-		return "", err
-	}
-
-	return result, nil
 }

@@ -118,6 +118,13 @@ func main() {
 		api.GET("/resumes/:id/data", handlers.GetResumeData)
 		api.PUT("/resumes/:id/data", handlers.UpdateResumeData)
 		api.POST("/resumes/:id/generate-pdf", handlers.GenerateResumePDFHandler)
+
+		api.GET("/interview-prep", handlers.ListInterviewPreps)
+		api.POST("/interview-prep", handlers.CreateInterviewPrep)
+		api.GET("/interview-prep/:id", handlers.GetInterviewPrep)
+		api.PATCH("/interview-prep/:id/questions/:questionId", handlers.UpdateQuestionStatus)
+		api.POST("/interview-prep/:id/questions/:questionId/answers", handlers.SaveQuestionAnswer)
+		api.POST("/interview-prep/:id/verify", handlers.VerifyInterviewPrep)
 	}
 
 	srv := &http.Server{
@@ -149,6 +156,12 @@ func autoMigrate(db *gorm.DB) {
 		&models.Match{},
 		&models.ResumeAnalysis{},
 		&models.AgentLog{},
+		&models.InterviewPreparation{},
+		&models.InterviewQuestion{},
+		&models.PracticeEntry{},
+		&models.PreparationVerification{},
+		&models.AIAnalysisResult{},
+		&models.PreparationVerificationHistory{},
 	)
 
 	seedPlans(db)

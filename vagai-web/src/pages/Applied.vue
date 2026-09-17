@@ -39,6 +39,25 @@
                 </div>
                 <div class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Similaridade</div>
               </div>
+              <div class="flex flex-col items-end gap-2">
+                <div v-if="prepsByMatch[match.id]" class="text-right">
+                  <router-link :to="`/interview-prep/${prepsByMatch[match.id].id}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-sm font-semibold hover:bg-indigo-500/25 transition-all">
+                    <GraduationCap class="w-4 h-4" />
+                    Preparação pronta
+                  </router-link>
+                  <div class="mt-1 text-[10px] text-slate-500 font-mono">
+                    {{ prepsByMatch[match.id].progress.practiced + prepsByMatch[match.id].progress.mastered }}/{{ prepsByMatch[match.id].progress.total }} avaliadas
+                  </div>
+                </div>
+                <button v-else-if="generatingMatchId === match.id" disabled class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 text-sm font-semibold cursor-wait">
+                  <span class="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin"></span>
+                  Gerando...
+                </button>
+                <button v-else @click="prepareInterview(match.id)" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
+                  <GraduationCap class="w-4 h-4" />
+                  Preparar entrevista
+                </button>
+              </div>
               <button @click="removeMatch(match.id)" class="w-12 h-12 rounded-2xl bg-red-500/20 hover:bg-red-500 flex items-center justify-center text-red-400 hover:text-white shadow-lg transition-all active:scale-95">
                 <Trash2 class="w-6 h-6" />
               </button>
@@ -96,7 +115,7 @@
 <script setup>
 import { reactive, ref, computed } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { useMatches, deleteMatch } from '../services/api'
+import { useMatches, deleteMatch, generateInterviewPrep, listInterviewPreps } from '../services/api'
 import { 
   Building2, 
   Calendar, 
@@ -106,7 +125,8 @@ import {
   Sparkles,
   BrainCircuit,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from 'lucide-vue-next'
 
 const filters = reactive({
@@ -121,6 +141,37 @@ const { data: matchesResponse, isLoading } = useMatches(filters)
 const appliedJobs = computed(() => matchesResponse.value?.data || [])
 const total = computed(() => matchesResponse.value?.total || 0)
 const totalPages = computed(() => matchesResponse.value?.totalPages || 0)
+
+const generatingMatchId = ref(null)
+const prepsByMatch = reactive({})
+
+const loadPreps = async () => {
+  try {
+    const res = await listInterviewPreps({ limit: 100 })
+    for (const prep of res.data || []) {
+      prepsByMatch[prep.match_id] = prep
+    }
+  } catch (e) {
+    // lista de preparações indisponível; botão reaparece
+  }
+}
+loadPreps()
+
+const prepareInterview = async (matchId) => {
+  generatingMatchId.value = matchId
+  try {
+    const res = await generateInterviewPrep(matchId)
+    const prep = res.preparation
+    if (prep) {
+      prepsByMatch[matchId] = prep
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
+    }
+  } catch (e) {
+    console.error('Falha ao gerar preparação', e)
+  } finally {
+    generatingMatchId.value = null
+  }
+}
 
 const showingInfo = computed(() => {
   if (total.value === 0) return 'Nenhuma candidatura encontrada'

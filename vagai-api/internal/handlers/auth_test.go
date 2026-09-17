@@ -87,11 +87,11 @@ func TestRandomString(t *testing.T) {
 
 func TestGetMe_WithoutAuth(t *testing.T) {
 	t.Skip("Skipping test that requires database connection")
-	
+
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	
+
 	// Set context values that middleware would set
 	c.Set("user_id", uint(1))
 	c.Set("org_id", uint(1))
@@ -113,7 +113,7 @@ func TestUpdateProfile_InvalidBody(t *testing.T) {
 
 	c.Request = httptest.NewRequest("PUT", "/profile", strings.NewReader("invalid json"))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	UpdateProfile(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -130,7 +130,7 @@ func TestUpdateProfile_EmptyUpdates(t *testing.T) {
 	body := `{"name": "", "timezone": ""}`
 	c.Request = httptest.NewRequest("PUT", "/profile", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	UpdateProfile(c)
 
 	if w.Code != http.StatusOK {
@@ -146,7 +146,7 @@ func TestChangePassword_InvalidBody(t *testing.T) {
 
 	c.Request = httptest.NewRequest("PUT", "/password", strings.NewReader("invalid"))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	ChangePassword(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -163,7 +163,7 @@ func TestChangePassword_ShortPassword(t *testing.T) {
 	body := `{"current_password": "test1234", "new_password": "short"}`
 	c.Request = httptest.NewRequest("PUT", "/password", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	ChangePassword(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -178,7 +178,7 @@ func TestLogin_InvalidBody(t *testing.T) {
 
 	c.Request = httptest.NewRequest("POST", "/login", strings.NewReader("invalid"))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	Login(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -194,7 +194,7 @@ func TestLogin_MissingEmail(t *testing.T) {
 	body := `{"password": "test1234"}`
 	c.Request = httptest.NewRequest("POST", "/login", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	Login(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -209,7 +209,7 @@ func TestRegister_InvalidBody(t *testing.T) {
 
 	c.Request = httptest.NewRequest("POST", "/register", strings.NewReader("invalid"))
 	c.Request.Header.Set("Content-Type", "application/json")
-	
+
 	Register(c)
 
 	if w.Code != http.StatusBadRequest {
@@ -219,7 +219,7 @@ func TestRegister_InvalidBody(t *testing.T) {
 
 func TestRegister_MissingFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	tests := []struct {
 		name string
 		body string
@@ -235,10 +235,10 @@ func TestRegister_MissingFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			
+
 			c.Request = httptest.NewRequest("POST", "/register", strings.NewReader(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
-			
+
 			Register(c)
 
 			if w.Code != http.StatusBadRequest {

@@ -15,8 +15,8 @@ type rateLimiter struct {
 }
 
 type clientLimit struct {
-	count    int
-	resetAt  time.Time
+	count   int
+	resetAt time.Time
 }
 
 var limiter = &rateLimiter{

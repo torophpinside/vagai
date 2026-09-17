@@ -16,7 +16,6 @@ WORKDIR /app
 
 COPY --from=builder /build/vagai .
 COPY configs/ configs/
-COPY curriculos/ curriculos/
 
 RUN chmod +x vagai
 

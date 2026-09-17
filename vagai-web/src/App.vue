@@ -30,6 +30,10 @@
             <Send class="w-5 h-5" />
             <span>Candidatadas</span>
           </router-link>
+          <router-link to="/interview-prep" class="nav-link" active-class="active">
+            <GraduationCap class="w-5 h-5" />
+            <span>Preparação</span>
+          </router-link>
           <router-link to="/analysis" class="nav-link" active-class="active">
             <FileText class="w-5 h-5" />
             <span>Análise</span>
@@ -116,6 +120,7 @@ import {
   Send,
   FileText,
   FileEdit,
+  GraduationCap,
   Settings as SettingsIcon,
   User,
   ChevronDown,
