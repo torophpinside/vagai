@@ -1,0 +1,1 @@
+Minhas habilidades incluem Go, MySQL, Vue. Tenho experiência em arquitetura de microsserviços e princípios SOLID.
