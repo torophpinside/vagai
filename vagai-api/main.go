@@ -166,6 +166,28 @@ func autoMigrate(db *gorm.DB) {
 	)
 
 	seedPlans(db)
+	ensureNullablePrepColumns(db)
+}
+
+// ensureNullablePrepColumns relaxa match_id/job_id de interview_preparations
+// para NULL em bancos já existentes. O AutoMigrate cria as colunas corretamente
+// em bancos novos, mas NÃO remove o NOT NULL de colunas antigas — sem isso,
+// preparações avulsas (sem match/job) falhariam com ERRCONN 1048 na primeira
+// inserção.
+func ensureNullablePrepColumns(db *gorm.DB) {
+	check := `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'interview_preparations' AND COLUMN_NAME = ?`
+	for _, col := range []string{"match_id", "job_id"} {
+		var nullable string
+		if err := db.Raw(check, col).Scan(&nullable).Error; err != nil || nullable == "YES" {
+			continue
+		}
+		if err := db.Exec("ALTER TABLE interview_preparations MODIFY "+col+" bigint unsigned NULL").Error; err != nil {
+			log.Printf("migrate: falha ao relaxar %s: %v", col, err)
+		} else {
+			log.Printf("migrate: %s relaxado para NULL", col)
+		}
+	}
 }
 
 func dropResumeAnalysisFK(db *gorm.DB) {
