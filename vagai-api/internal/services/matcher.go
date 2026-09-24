@@ -74,6 +74,33 @@ func collectConcepts(data ResumeData) []string {
 	return concepts
 }
 
+// ResumeDataToText gera um texto plano a partir dos dados estruturados do
+// curriculo, para alimentar o matching quando nao ha texto bruto extraido
+// (curriculos criados/editados pelo editor web).
+func ResumeDataToText(data ResumeData) string {
+	var parts []string
+	write := func(s string) {
+		if s != "" {
+			parts = append(parts, s)
+		}
+	}
+	write(data.PersonalInfo.Name)
+	write(data.PersonalInfo.Location)
+	write(data.Summary)
+	parts = append(parts, collectConcepts(data)...)
+	for _, exp := range data.Experience {
+		write(exp.Role)
+		write(exp.Company)
+		write(exp.Description)
+	}
+	for _, edu := range data.Education {
+		write(edu.Degree)
+		write(edu.Field)
+		write(edu.Institution)
+	}
+	return strings.Join(parts, ". ")
+}
+
 func phraseInText(title, description, phrase string) bool {
 	normalized := normalizeText(phrase)
 	if normalized == "" {
@@ -130,6 +157,7 @@ func MatchResumeToJob(data ResumeData, rawContent, jobTitle, jobDescription stri
 	if rawContent != "" {
 		resumeParts = append(resumeParts, rawContent)
 	}
+	resumeParts = append(resumeParts, collectConcepts(data)...)
 	resumeTokens := tokenSet(strings.Join(resumeParts, " "))
 	titleTokens := tokenSet(titleN)
 	jobTerms := tokenSet(titleN + " " + descN)

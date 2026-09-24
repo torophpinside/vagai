@@ -177,6 +177,7 @@ func CreateResume(c *gin.Context) {
 		OrganizationID: orgID,
 		Name:           name,
 		Data:           string(dataJSON),
+		Content:        services.ResumeDataToText(resumeData),
 		Version:        1,
 		UploadedAt:     time.Now(),
 		UpdatedAt:      time.Now(),
@@ -306,6 +307,9 @@ func UpdateResumeData(c *gin.Context) {
 	}
 
 	resume.Data = string(dataJSON)
+	if resume.Content == "" {
+		resume.Content = services.ResumeDataToText(resumeData)
+	}
 	resume.Version++
 	resume.UpdatedAt = time.Now()
 

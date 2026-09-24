@@ -6,6 +6,7 @@ import (
 	"github.com/anomalyco/vagai-cli/cmd/crawl"
 	"github.com/anomalyco/vagai-cli/cmd/delete"
 	"github.com/anomalyco/vagai-cli/cmd/match"
+	"github.com/anomalyco/vagai-cli/cmd/reset"
 	"github.com/anomalyco/vagai-cli/cmd/schedule"
 	"github.com/anomalyco/vagai-cli/cmd/sites"
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ func Execute() {
 		sites.Cmd,
 		schedule.Cmd,
 		delete.Cmd,
+		reset.Cmd,
 	)
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)

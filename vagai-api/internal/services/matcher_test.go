@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -190,6 +191,72 @@ func TestNegativeKeywordPenalty_Unit(t *testing.T) {
 				t.Errorf("negativeKeywordPenalty(%q, %v) = %.2f, want %.2f", tc.text, tc.kw, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestMatchResumeToJob_ConceptsInTokenOverlap(t *testing.T) {
+	data := ResumeData{
+		Summary: "Atuacao em projetos diversos.",
+		Skills:  []string{"PostgreSQL", "Redis"},
+	}
+	res := MatchResumeToJob(data, "", "Backend Developer", "Requisitos: PostgreSQL, Redis.", nil)
+
+	if res.Score <= 0 {
+		t.Fatalf("expected positive score from skills in token overlap, got %.2f", res.Score)
+	}
+	for _, want := range []string{"postgresql", "redis"} {
+		if !containsString(res.KeywordsMatched, want) {
+			t.Errorf("expected keyword %q in %v", want, res.KeywordsMatched)
+		}
+	}
+}
+
+func TestResumeDataToText_IncludesConcepts(t *testing.T) {
+	data := ResumeData{
+		PersonalInfo:   PersonalInfo{Name: "Maria Silva", Location: "São Paulo, SP"},
+		Summary:        "Analista de dados.",
+		Skills:         []string{"Python", "SQL"},
+		Certifications: []string{"AWS Certified"},
+		Languages:      []string{"Inglês"},
+	}
+	text := ResumeDataToText(data)
+
+	for _, want := range []string{"Maria Silva", "São Paulo, SP", "Analista de dados.", "Python", "SQL", "AWS Certified", "Inglês"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("ResumeDataToText deveria conter %q, got: %q", want, text)
+		}
+	}
+}
+
+func TestParseResumeFieldsFallback_ExtractsSections(t *testing.T) {
+	raw := `Curriculo Teste
+Resumo: engenheiro de dados.
+
+EXPERIENCIA
+Empresa X - Desenvolvedor
+
+HABILIDADES
+Go, Python, Docker
+AWS; Kubernetes
+
+IDIOMAS
+Inglês - Avançado
+Espanhol
+
+CERTIFICAÇÕES
+AWS Certified Solutions Architect
+CNCF CKA
+`
+	data := ParseResumeFieldsFallback(raw)
+
+	if !containsString(data.Skills, "Go") || !containsString(data.Skills, "AWS") || !containsString(data.Skills, "Kubernetes") {
+		t.Errorf("skills extras incorretas: %v", data.Skills)
+	}
+	if !containsString(data.Languages, "Inglês - Avançado") || !containsString(data.Languages, "Espanhol") {
+		t.Errorf("idiomas nao extraidos: %v", data.Languages)
+	}
+	if !containsString(data.Certifications, "AWS Certified Solutions Architect") || !containsString(data.Certifications, "CNCF CKA") {
+		t.Errorf("certificacoes nao extraidas: %v", data.Certifications)
 	}
 }
 

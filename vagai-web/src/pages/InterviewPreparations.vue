@@ -83,7 +83,7 @@
         <div class="mt-8 flex items-center gap-3 flex-wrap">
           <router-link :to="`/interview-prep/${prep.id}`" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
             <Play class="w-4 h-4" />
-            Retomar sabatina
+            Retomar Preparação
           </router-link>
           <button v-if="canVerify(prep)" @click="verifyPrep(prep)" :disabled="isVerifying(prep)" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 border border-white/10 text-slate-200 text-sm font-semibold hover:bg-slate-700 transition-all disabled:opacity-40 disabled:cursor-wait">
             <span v-if="isVerifying(prep)" class="w-4 h-4 border-2 border-slate-400/30 border-t-slate-200 rounded-full animate-spin"></span>

@@ -20,7 +20,8 @@ func ParseResumeFields(rawText string) (ResumeData, error) {
 		Timeout: 120 * time.Second,
 	}
 
-	prompt := fmt.Sprintf(`Extraia os campos estruturados do curriculo abaixo e retorne APENAS JSON valido.
+	prompt := fmt.Sprintf(`Analise o currículo fornecido e extraia as informações estruturadas com precisão.
+Retorne APENAS um objeto JSON válido no formato especificado abaixo, sem texto adicional.
 
 CURRICULO:
 %s
@@ -60,11 +61,29 @@ Retorne EXATAMENTE neste formato JSON:
   "certifications": ["certificacao1"]
 }
 
-Regras:
-- Se um campo nao for encontrado, deixe como string vazia ou array vazio
-- Para experience.description, inclua detalhes sobre as atividades realizadas no cargo
-- Mantenha o idioma original do curriculo
-- Nao inclua texto fora do JSON`, rawText)
+REGRAS DE EXTRAÇÃO:
+1. PRECISÃO: Extraia apenas informações explicitamente presentes no currículo
+2. NÃO INVENTAR: Se não tiver certeza, deixe o campo vazio
+3. SKILLS:
+   - Inclua habilidades técnicas (ex: Java, Python, SQL) e comportamentais (ex: Liderança, Comunicação)
+   - Normalize para MINÚSCULAS e SEM ACENTOS (ex: "java", "lideranca")
+   - Separe por competência distinta (evite combinar múltiplas skills em uma string)
+4. EXPERIENCE/EDUCATION:
+   - Para cada entrada, preencha todos os subcampos disponíveis
+   - Use formato MM/YYYY para datas
+   - Em description, inclua atividades reais realizadas
+5. LANGUAGES: Use formato "Idioma - Nível" (ex: "Inglês - Avançado")
+6. CAMPOS VAZIOS: Array vazio [] para listas, objeto com strings vazias para personal_info
+7. IDIOMA: Mantenha o idioma original do currículo nos campos de texto
+8. AMBIGUIDADE: Quando houver dúvida, escolha a interpretação mais conservadora
+
+EXEMPLOS DE SKILLS NORMALIZADAS:
+- "JavaScript" → "javascript"
+- "Liderança de Equipes" → "lideranca de equipes"
+- "AWS / Azure" → ["aws", "azure"]
+- "Inglês Avançado" (em skills) → "ingles avanzado" (mas prefira colocar em languages)
+
+IMPORTANTE: A qualidade do matching depende da precisão desta extração. Seja meticuloso.`, rawText)
 
 	messages := []Message{
 		{Role: "system", Content: "Voce e um assistente especializado em extrair dados estruturados de curriculos. Retorne apenas JSON valido, sem texto adicional."},
@@ -175,6 +194,9 @@ func ParseResumeFieldsFallback(rawText string) ResumeData {
 		"languages":      -1,
 		"certificacoes":  -1,
 		"certifications": -1,
+		"certificacao":   -1,
+		"certificação":   -1,
+		"certificações":  -1,
 		"resumo":         -1,
 		"summary":        -1,
 		"objetivo":       -1,
@@ -212,8 +234,19 @@ func ParseResumeFieldsFallback(rawText string) ResumeData {
 		}
 	}
 
-	// Extract skills
-	for _, key := range []string{"habilidades", "skills"} {
+	data.Skills = extractSectionList(cleanedLines, sectionMap, []string{"habilidades", "skills"})
+	data.Languages = extractSectionList(cleanedLines, sectionMap, []string{"idiomas", "languages"})
+	data.Certifications = extractSectionList(cleanedLines, sectionMap, []string{"certificacoes", "certifications", "certificacao", "certificação", "certificações"})
+
+	return data
+}
+
+// extractSectionList coleta os itens de uma secao do curriculo (ex.: skills,
+// idiomas, certificacoes) ate o inicio da proxima secao conhecida. Itens sao
+// separados por virgula, ponto e virgula, barra ou bullet.
+func extractSectionList(cleanedLines []string, sectionMap map[string]int, keys []string) []string {
+	var items []string
+	for _, key := range keys {
 		if idx := sectionMap[key]; idx >= 0 {
 			for j := idx + 1; j < len(cleanedLines); j++ {
 				isSection := false
@@ -230,13 +263,12 @@ func ParseResumeFieldsFallback(rawText string) ResumeData {
 				for _, p := range parts {
 					p = strings.TrimSpace(p)
 					if p != "" {
-						data.Skills = append(data.Skills, p)
+						items = append(items, p)
 					}
 				}
 			}
 			break
 		}
 	}
-
-	return data
+	return items
 }

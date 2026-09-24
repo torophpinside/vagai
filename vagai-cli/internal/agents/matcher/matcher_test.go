@@ -48,6 +48,57 @@ func TestResumeText_EmptyData(t *testing.T) {
 	}
 }
 
+func TestResumeConcepts_FromData(t *testing.T) {
+	resume := models.Resume{Data: sampleResumeDataJSON}
+	concepts := resumeConcepts(resume)
+
+	for _, want := range []string{"Go", "PostgreSQL", "Inglês", "AWS"} {
+		found := false
+		for _, c := range concepts {
+			if c == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("resumeConcepts() deveria conter %q, got %v", want, concepts)
+		}
+	}
+}
+
+func TestCalculateMatchFallback_ConceptsDriveSkillScore(t *testing.T) {
+	oldIDF := idf
+	idf = map[string]float64{"go": 1, "docker": 1, "kafka": 1, "react": 1}
+	defer func() { idf = oldIDF }()
+
+	resume := "Desenvolvedor Go."
+	jobDesc := "Vaga para desenvolvedor Go."
+	loc := JobLocation{Type: "remote"}
+
+	scoreMatch, keywords, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "", loc, []string{"Go", "Docker"})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	scoreNoMatch, _, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "", loc, []string{"Kafka", "React"})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	if scoreMatch <= scoreNoMatch {
+		t.Errorf("conceito presente deveria pontuar mais: com match=%.2f sem match=%.2f", scoreMatch, scoreNoMatch)
+	}
+	found := false
+	for _, kw := range keywords {
+		if strings.EqualFold(kw, "Go") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("keywords deveria conter o conceito casado, got %v", keywords)
+	}
+}
+
 func TestAnalyzeJobLocation_TypeDetection(t *testing.T) {
 	tests := []struct {
 		name string
@@ -154,11 +205,11 @@ func TestCalculateMatchFallback_UsesJobLocation(t *testing.T) {
 	sameCityLoc := JobLocation{Type: "presencial", City: "sao paulo"}
 	farCityLoc := JobLocation{Type: "presencial", City: "curitiba"}
 
-	scoreSame, _, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "São Paulo", sameCityLoc)
+	scoreSame, _, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "São Paulo", sameCityLoc, nil)
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
-	scoreFar, _, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "São Paulo", farCityLoc)
+	scoreFar, _, _, err := calculateMatchFallback(jobDesc, jobDesc, resume, "São Paulo", farCityLoc, nil)
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}

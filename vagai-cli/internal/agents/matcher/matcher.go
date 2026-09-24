@@ -115,6 +115,24 @@ func resumeText(resume models.Resume) string {
 	return strings.TrimSpace(b.String())
 }
 
+// resumeConcepts extrai as competencias estruturadas do JSON do curriculo
+// (skills, certificacoes e idiomas) para alimentar o calculo de skill score
+// independente da lista fixa de keywords.
+func resumeConcepts(resume models.Resume) []string {
+	if resume.Data == "" {
+		return nil
+	}
+	var data ResumeData
+	if err := json.Unmarshal([]byte(resume.Data), &data); err != nil {
+		return nil
+	}
+	concepts := make([]string, 0, len(data.Skills)+len(data.Languages)+len(data.Certifications))
+	concepts = append(concepts, data.Skills...)
+	concepts = append(concepts, data.Certifications...)
+	concepts = append(concepts, data.Languages...)
+	return concepts
+}
+
 type matchResult struct {
 	jobID    uint
 	resumeID uint
@@ -321,7 +339,8 @@ func processTask(job models.Job, resume models.Resume, userCity string, negative
 		return result
 	}
 
-	score, keywords, reason, err := calculateMatchAI(job.Title, job.Description, resume.Content, userCity, jobLoc)
+	concepts := resumeConcepts(resume)
+	score, keywords, reason, err := calculateMatchAI(job.Title, job.Description, resume.Content, userCity, jobLoc, concepts)
 	if err != nil {
 		result.err = err
 		return result
@@ -408,7 +427,7 @@ type AIResponse struct {
 	Reason string  `json:"reason"`
 }
 
-func calculateMatchAI(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation) (float64, []string, string, error) {
+func calculateMatchAI(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation, resumeConcepts []string) (float64, []string, string, error) {
 	if resumeContent == "" {
 		return 0, nil, "", fmt.Errorf("currículo vazio")
 	}
@@ -417,20 +436,21 @@ func calculateMatchAI(jobTitle, jobDesc, resumeContent, userCity string, jobLoc 
 		jobDesc = jobTitle
 	}
 
-	const maxLen = 2000
-	const resumePreviewLen = 500
-	if len(resumeContent) > maxLen {
-		resumeContent = resumeContent[:maxLen]
+	const resumeMaxLen = 4000
+	const jobMaxLen = 2000
+	const resumePreviewLen = 1200
+	if len(resumeContent) > resumeMaxLen {
+		resumeContent = resumeContent[:resumeMaxLen]
 	}
-	if len(jobDesc) > maxLen {
-		jobDesc = jobDesc[:maxLen]
+	if len(jobDesc) > jobMaxLen {
+		jobDesc = jobDesc[:jobMaxLen]
 	}
 
 	log.Printf("Calculando match AI: job_title=%s, resume_len=%d", jobTitle, len(resumeContent))
 
 	resumeForPrompt := resumeContent
-	if len(resumeForPrompt) > 500 {
-		resumeForPrompt = resumeForPrompt[:500]
+	if len(resumeForPrompt) > resumePreviewLen {
+		resumeForPrompt = resumeForPrompt[:resumePreviewLen]
 	}
 
 	// Construir prompt com contexto de localização
@@ -452,7 +472,7 @@ Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua expli
 	response, err := lmstudio.Chat(prompt, "Você é um especialista em recruitment tech. Responda sempre em JSON.")
 	if err != nil {
 		log.Printf("⚠️ Erro ao chamar LM Studio: %v. Usando fallback algorítmico.", err)
-		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc)
+		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc, resumeConcepts)
 	}
 
 	log.Printf("Resposta da AI recebida. Processando...")
@@ -460,7 +480,7 @@ Responda APENAS um objeto JSON no formato: {"score": 0-100, "reason": "sua expli
 	aiScore, aiReason := extractAIResult(response)
 	if aiScore <= 0 || aiScore > 100 {
 		log.Printf("⚠️ Falha ao decodificar score da AI. Resposta bruta: %.400s. Usando fallback.", response)
-		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc)
+		return calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity, jobLoc, resumeConcepts)
 	}
 
 	log.Printf("✅ Análise AI concluída com sucesso. Score: %.2f", aiScore)
@@ -499,7 +519,7 @@ func extractAIResult(response string) (float64, string) {
 	return score, reason
 }
 
-func calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation) (float64, []string, string, error) {
+func calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity string, jobLoc JobLocation, resumeConcepts []string) (float64, []string, string, error) {
 	jobWords := extractWords(jobDesc)
 	resumeWords := extractWords(resumeContent)
 
@@ -513,9 +533,35 @@ func calculateMatchFallback(jobTitle, jobDesc, resumeContent, userCity string, j
 	textual := cosineSimilarityTFIDF(jobDesc, resumeContent)
 
 	skills := extractKeywordsLMStudio(jobDesc, resumeContent)
-	skillScore := float64(len(skills)) * (100.0 / 15.0)
-	if skillScore > 100 {
-		skillScore = 100
+	var skillScore float64
+	if len(resumeConcepts) > 0 {
+		// Skill score derivado das competencias reais do currículo, ignorando a
+		// lista fixa de keywords. Proporcao de conceitos presentes na vaga.
+		jobText := normalizePhrase(jobTitle + " " + jobDesc)
+		var matched []string
+		hits := 0
+		for _, c := range resumeConcepts {
+			nc := normalizePhrase(c)
+			if strings.TrimSpace(nc) == "" {
+				continue
+			}
+			re := regexp.MustCompile(`\b` + regexp.QuoteMeta(nc) + `\b`)
+			if re.MatchString(jobText) {
+				hits++
+				matched = append(matched, c)
+			}
+		}
+		if len(resumeConcepts) > 0 {
+			skillScore = float64(hits) / float64(len(resumeConcepts)) * 100
+		}
+		if len(matched) > 0 {
+			skills = matched
+		}
+	} else {
+		skillScore = float64(len(skills)) * (100.0 / 15.0)
+		if skillScore > 100 {
+			skillScore = 100
+		}
 	}
 
 	loc := locationScore(jobLoc, userCity) / 100
@@ -708,24 +754,24 @@ var stateOfCity = map[string]string{
 	"cascavel": "parana", "ponta grossa": "parana", "foz do iguacu": "parana",
 	"florianopolis": "santa catarina", "joinville": "santa catarina", "blumenau": "santa catarina",
 	"porto alegre": "rio grande do sul",
-	"sao paulo": "sao paulo", "campinas": "sao paulo", "sorocaba": "sao paulo", "santos": "sao paulo",
+	"sao paulo":    "sao paulo", "campinas": "sao paulo", "sorocaba": "sao paulo", "santos": "sao paulo",
 	"rio de janeiro": "rio de janeiro", "niteroi": "rio de janeiro",
 	"belo horizonte": "minas gerais", "uberlandia": "minas gerais",
-	"vitoria": "espirito santo",
-	"salvador": "bahia",
-	"fortaleza": "ceara",
-	"recife": "pernambuco",
-	"brasilia": "distrito federal",
-	"manaus": "amazonas",
-	"belem": "para",
-	"cuiaba": "mato grosso",
+	"vitoria":      "espirito santo",
+	"salvador":     "bahia",
+	"fortaleza":    "ceara",
+	"recife":       "pernambuco",
+	"brasilia":     "distrito federal",
+	"manaus":       "amazonas",
+	"belem":        "para",
+	"cuiaba":       "mato grosso",
 	"campo grande": "mato grosso do sul",
-	"goiania": "goias",
-	"natal": "rio grande do norte",
-	"joao pessoa": "paraiba",
-	"maceio": "alagoas",
-	"teresina": "piaui",
-	"sao luis": "maranhao",
+	"goiania":      "goias",
+	"natal":        "rio grande do norte",
+	"joao pessoa":  "paraiba",
+	"maceio":       "alagoas",
+	"teresina":     "piaui",
+	"sao luis":     "maranhao",
 }
 
 // isStateName indica se o valor canônico representa uma UF (e não uma cidade).
@@ -955,6 +1001,24 @@ func extractWords(text string) []string {
 	reg := regexp.MustCompile(`\b[a-zA-Z+#.]{2,}\b`)
 	words := reg.FindAllString(strings.ToLower(text), -1)
 	return unique(words)
+}
+
+// normalizePhrase normaliza um conceito/frase para comparacao com fronteira de
+// palavra: minusculas, sem acentos e sem separadores. Usado para verificar se
+// uma competencia do currículo aparece na vaga.
+func normalizePhrase(s string) string {
+	replacer := strings.NewReplacer(
+		"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"í", "i", "ì", "i", "î", "i", "ï", "i",
+		"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ö", "o",
+		"ú", "u", "ù", "u", "û", "u", "ü", "u",
+		"ç", "c", "ñ", "n",
+	)
+	s = strings.ToLower(s)
+	s = replacer.Replace(s)
+	s = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
 }
 
 func unique(words []string) []string {
