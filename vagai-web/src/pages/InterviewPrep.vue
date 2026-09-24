@@ -12,7 +12,9 @@
           <span v-if="prep?.company" class="text-slate-500"> · {{ prep.company }}</span>
         </p>
       </div>
-      <button @click="regenerate" :disabled="regenerating" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-slate-300 text-sm font-semibold hover:bg-slate-700 transition-all disabled:opacity-40">
+      <button
+        v-if="prep?.match_id"
+        @click="regenerate" :disabled="regenerating" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-slate-300 text-sm font-semibold hover:bg-slate-700 transition-all disabled:opacity-40">
         <span v-if="regenerating" class="w-4 h-4 border-2 border-slate-400/30 border-t-slate-300 rounded-full animate-spin"></span>
         <RefreshCw v-else class="w-4 h-4" />
         Regenerar

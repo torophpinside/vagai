@@ -74,7 +74,10 @@ func currentLMStudioURL() string {
 // generateInterviewQuestionsAI pede à IA perguntas estruturadas e valida o
 // contrato (3 categorias, campos preenchidos, limites). Qualquer falha é
 // enviada ao chamador, que cai no fallback determinístico (template).
-func generateInterviewQuestionsAI(jobTitle, company, description string, techs []string) ([]AIQuestion, error) {
+// O contexto permite orçamentos por chamada (ex.: 180s na preparação avulsa);
+// o timeout de 240s do client permanece como limite superior do caminho
+// persistido, que passa context.Background().
+func generateInterviewQuestionsAI(ctx context.Context, jobTitle, company, description string, techs []string) ([]AIQuestion, error) {
 	prompt := fmt.Sprintf(`Gere uma preparação para entrevista técnica da vaga abaixo.
 
 CARGO: %s
@@ -119,7 +122,7 @@ Regras:
 	}
 
 	client := &http.Client{Timeout: 240 * time.Second}
-	req, err := http.NewRequest("POST", currentLMStudioURL()+"/v1/chat/completions", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", currentLMStudioURL()+"/v1/chat/completions", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +245,7 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 	source := models.SourceTemplate
 	questions := templateQuestionsToModels(BuildTemplateQuestions(techs))
 
-	if aiQs, aiErr := generateInterviewQuestionsAI(job.Title, job.Company, job.Description, techs); aiErr == nil {
+	if aiQs, aiErr := generateInterviewQuestionsAI(context.Background(), job.Title, job.Company, job.Description, techs); aiErr == nil {
 		source = models.SourceAI
 		questions = aiQuestionsToModels(aiQs)
 	}
@@ -267,8 +270,8 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 			}
 			p = models.InterviewPreparation{
 				OrganizationID: orgID,
-				MatchID:        matchID,
-				JobID:          job.ID,
+				MatchID:        &matchID,
+				JobID:          &job.ID,
 			}
 		}
 
@@ -305,8 +308,8 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 			}
 		}
 
-		p.MatchID = matchID
-		p.JobID = job.ID
+		p.MatchID = &matchID
+		p.JobID = &job.ID
 		p.Title = job.Title
 		p.Company = job.Company
 		p.Description = job.Description

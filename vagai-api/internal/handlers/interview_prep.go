@@ -93,14 +93,18 @@ func newInterviewPrepDTO(detail *services.PreparationDetail) interviewPrepDTO {
 	dto := interviewPrepDTO{
 		ID:             prep.ID,
 		OrganizationID: prep.OrganizationID,
-		MatchID:        prep.MatchID,
-		JobID:          prep.JobID,
 		Title:          prep.Title,
 		Company:        prep.Company,
 		Description:    prep.Description,
 		Source:         string(prep.Source),
 		GeneratedAt:    prep.GeneratedAt,
 		TechStack:      []string{},
+	}
+	if prep.MatchID != nil {
+		dto.MatchID = *prep.MatchID
+	}
+	if prep.JobID != nil {
+		dto.JobID = *prep.JobID
 	}
 	_ = json.Unmarshal([]byte(prep.TechStack), &dto.TechStack)
 	if dto.TechStack == nil {
@@ -229,6 +233,57 @@ func CreateInterviewPrep(c *gin.Context) {
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar preparação"})
 		}
+		return
+	}
+
+	detail, derr := services.GetPreparationDetail(db, orgID, prep.ID)
+	if derr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao carregar preparação"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"preparation": newInterviewPrepDTO(detail)})
+}
+
+// CreateSpontaneousPreparation gera e PERSISTE uma preparação avulsa
+// (InterviewPreparation + 15 perguntas) a partir do conteúdo bruto de uma vaga,
+// no escopo da organização autenticada. Requer JWT e org_id válidos; a
+// preparação criada é retornada com id real e nenhuma estrutura paralela é
+// montada (reusa newInterviewPrepDTO).
+func CreateSpontaneousPreparation(c *gin.Context) {
+	db := getDB(c)
+	orgID := c.GetUint("org_id")
+	if orgID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Organização inválida"})
+		return
+	}
+
+	var req struct {
+		Title       string `json:"title"`
+		Company     string `json:"company"`
+		Description string `json:"description"`
+		Random      string `json:"random"`
+		AtRandom    string `json:"@random"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+
+	// Seed: random tem precedência; @random é alias quando random está ausente.
+	seed := req.Random
+	if seed == "" {
+		seed = req.AtRandom
+	}
+
+	prep, err := services.CreatePersistedSpontaneousPreparation(db, orgID, req.Title, req.Company, req.Description, seed)
+	if err != nil {
+		if errors.Is(err, services.ErrSpontaneousDescriptionRequired) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Conteúdo da vaga é obrigatório"})
+			return
+		}
+		log.Printf("CreateSpontaneousPreparation (org=%d) error: %v", orgID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar preparação"})
 		return
 	}
 
