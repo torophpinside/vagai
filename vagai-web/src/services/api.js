@@ -111,6 +111,7 @@ export const updateResumeData = (id, data) => api.put(`/resumes/${id}/data`, dat
 export const generateResumePDF = (id) => api.post(`/resumes/${id}/generate-pdf`, {}, { responseType: 'blob' })
 
 export const generateInterviewPrep = (matchId) => api.post('/interview-prep', { match_id: matchId }, { timeout: 240000 }).then(res => res.data)
+export const generateSpontaneousPrep = (data) => api.post('/interview-prep/spontaneous', data, { timeout: 180000 }).then(res => res.data)
 export const listInterviewPreps = (filter = {}) => api.get('/interview-prep', { params: filter }).then(res => res.data)
 export const getInterviewPrep = (id) => api.get(`/interview-prep/${id}`).then(res => res.data)
 export const updateQuestionStatus = (prepId, questionId, status) => api.patch(`/interview-prep/${prepId}/questions/${questionId}`, { status }).then(res => res.data)

@@ -5,6 +5,14 @@
       <p class="text-slate-400">Suas preparações de entrevista por vaga candidatada, com acompanhamento de progresso.</p>
     </div>
 
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div></div>
+      <router-link to="/interview-prep/avulsa" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
+        <Wand2 class="w-4 h-4" />
+        Preparação Avulsa
+      </router-link>
+    </div>
+
     <div v-if="isLoading" class="flex items-center justify-center h-64">
       <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
     </div>
@@ -105,7 +113,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useInterviewPreps, verifyInterviewPrep } from '../services/api'
-import { Building2, GraduationCap, Play, Briefcase, Sparkles, RefreshCw } from 'lucide-vue-next'
+import { Building2, GraduationCap, Play, Briefcase, Sparkles, RefreshCw, Wand2 } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
 const { data: prepsResponse, isLoading } = useInterviewPreps()

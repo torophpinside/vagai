@@ -121,6 +121,7 @@ func main() {
 
 		api.GET("/interview-prep", handlers.ListInterviewPreps)
 		api.POST("/interview-prep", handlers.CreateInterviewPrep)
+		api.POST("/interview-prep/spontaneous", handlers.CreateSpontaneousPreparation)
 		api.GET("/interview-prep/:id", handlers.GetInterviewPrep)
 		api.PATCH("/interview-prep/:id/questions/:questionId", handlers.UpdateQuestionStatus)
 		api.POST("/interview-prep/:id/questions/:questionId/answers", handlers.SaveQuestionAnswer)

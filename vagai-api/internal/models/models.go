@@ -237,12 +237,15 @@ const (
 )
 
 // InterviewPreparation é o conjunto de perguntas de uma vaga candidatada.
-// Relação 1:1 com o Match aplicado (uniqueIndex em MatchID).
+// Relação 1:1 com o Match aplicado (uniqueIndex em MatchID). MatchID/JobID são
+// opcionais (NULL): preparações avulsas não possuem vínculo, e o MySQL trata
+// cada NULL como não-conflitante no índice único — preservando o 1:1 para
+// matches e permitindo várias preparações avulsas independentes por org.
 type InterviewPreparation struct {
 	ID             uint                       `gorm:"primaryKey" json:"id"`
 	OrganizationID uint                       `gorm:"index;not null" json:"organization_id"`
-	MatchID        uint                       `gorm:"uniqueIndex;not null" json:"match_id"`
-	JobID          uint                       `gorm:"index;not null" json:"job_id"`
+	MatchID        *uint                      `gorm:"uniqueIndex" json:"match_id"`
+	JobID          *uint                      `gorm:"index" json:"job_id"`
 	Title          string                     `gorm:"size:255" json:"title"`
 	Company        string                     `gorm:"size:255" json:"company"`
 	Description    string                     `gorm:"type:text" json:"description"`
