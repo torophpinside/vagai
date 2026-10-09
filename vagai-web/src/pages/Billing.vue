@@ -88,8 +88,8 @@ import { useMe, usePlans, changePlan as changePlanApi } from '../services/api'
 const { data: meData, isLoading: meLoading, isError: meError } = useMe()
 const { data: plansData, isLoading: plansLoading, isError: plansError } = usePlans()
 
-const planName = computed(() => meData.value?.plan?.name || meData.value?.organization?.plan || '-')
-const planSlug = computed(() => meData.value?.plan?.slug || meData.value?.organization?.plan || 'free')
+const planName = computed(() => meData.value?.plan?.name || '-')
+const planSlug = computed(() => meData.value?.plan?.slug || meData.value?.user?.plan || 'free')
 const planPrice = computed(() => meData.value?.plan?.price_monthly ?? 0)
 
 const maxJobsRaw = computed(() => meData.value?.plan?.max_jobs ?? -1)

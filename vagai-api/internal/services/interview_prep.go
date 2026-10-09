@@ -197,32 +197,32 @@ func validAIQuestionSet(qs []AIQuestion) bool {
 }
 
 // progressOf calcula o resumo de progresso de uma preparação.
-func progressOf(db *gorm.DB, orgID, prepID uint) (total, practiced, mastered int64, err error) {
+func progressOf(db *gorm.DB, userID, prepID uint) (total, practiced, mastered int64, err error) {
 	if err = db.Model(&models.InterviewQuestion{}).
-		Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+		Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		Count(&total).Error; err != nil {
 		return
 	}
 	if err = db.Model(&models.InterviewQuestion{}).
-		Where("organization_id = ? AND preparation_id = ? AND status = ?", orgID, prepID, models.QuestionStatusPracticed).
+		Where("user_id = ? AND preparation_id = ? AND status = ?", userID, prepID, models.QuestionStatusPracticed).
 		Count(&practiced).Error; err != nil {
 		return
 	}
 	err = db.Model(&models.InterviewQuestion{}).
-		Where("organization_id = ? AND preparation_id = ? AND status = ?", orgID, prepID, models.QuestionStatusMastered).
+		Where("user_id = ? AND preparation_id = ? AND status = ?", userID, prepID, models.QuestionStatusMastered).
 		Count(&mastered).Error
 	return
 }
 
 // CreateOrRegeneratePreparation (upsert) gera e persiste o conjunto de
 // perguntas de uma vaga candidatada, numa única transação. O Match é carregado
-// por id + organization_id (G3). Fallback determinístico quando a IA falha.
+// por id + user_id (G3). Fallback determinístico quando a IA falha.
 // O conjunto final tem sempre exatamente TargetQuestionCount perguntas
 // (006-fixed-count). A seed opcional (variádica, primeiro valor) embaralha o
 // resultado de forma reproduzível (FR-005).
-func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...string) (*models.InterviewPreparation, []models.InterviewQuestion, error) {
+func CreateOrRegeneratePreparation(db *gorm.DB, userID, matchID uint, seeds ...string) (*models.InterviewPreparation, []models.InterviewQuestion, error) {
 	var match models.Match
-	if err := db.Where("id = ? AND organization_id = ?", matchID, orgID).First(&match).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", matchID, userID).First(&match).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, ErrMatchNotFound
 		}
@@ -233,7 +233,7 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 	}
 
 	var job models.Job
-	if err := db.Where("id = ? AND organization_id = ?", match.JobID, orgID).First(&job).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", match.JobID, userID).First(&job).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, ErrMatchNotFound
 		}
@@ -264,12 +264,12 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 	var prep *models.InterviewPreparation
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var p models.InterviewPreparation
-		if err := tx.Where("match_id = ? AND organization_id = ?", matchID, orgID).First(&p).Error; err != nil {
+		if err := tx.Where("match_id = ? AND user_id = ?", matchID, userID).First(&p).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
 			p = models.InterviewPreparation{
-				OrganizationID: orgID,
+				UserID: userID,
 				MatchID:        &matchID,
 				JobID:          &job.ID,
 			}
@@ -280,29 +280,29 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 		if p.ID != 0 {
 			var qids []uint
 			if err := tx.Model(&models.InterviewQuestion{}).
-				Where("organization_id = ? AND preparation_id = ?", orgID, p.ID).
+				Where("user_id = ? AND preparation_id = ?", userID, p.ID).
 				Pluck("id", &qids).Error; err != nil {
 				return err
 			}
 			if len(qids) > 0 {
-				if err := tx.Where("organization_id = ? AND question_id IN ?", orgID, qids).
+				if err := tx.Where("user_id = ? AND question_id IN ?", userID, qids).
 					Delete(&models.PracticeEntry{}).Error; err != nil {
 					return err
 				}
 			}
-			if err := tx.Where("organization_id = ? AND preparation_id = ?", orgID, p.ID).
+			if err := tx.Where("user_id = ? AND preparation_id = ?", userID, p.ID).
 				Delete(&models.InterviewQuestion{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("organization_id = ? AND preparation_id = ?", orgID, p.ID).
+			if err := tx.Where("user_id = ? AND preparation_id = ?", userID, p.ID).
 				Delete(&models.PreparationVerification{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("organization_id = ? AND preparation_id = ?", orgID, p.ID).
+			if err := tx.Where("user_id = ? AND preparation_id = ?", userID, p.ID).
 				Delete(&models.AIAnalysisResult{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("organization_id = ? AND preparation_id = ?", orgID, p.ID).
+			if err := tx.Where("user_id = ? AND preparation_id = ?", userID, p.ID).
 				Delete(&models.PreparationVerificationHistory{}).Error; err != nil {
 				return err
 			}
@@ -322,7 +322,7 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 		}
 
 		for i, q := range questions {
-			q.OrganizationID = orgID
+			q.UserID = userID
 			q.PreparationID = p.ID
 			q.Position = i + 1
 			if err := tx.Create(&q).Error; err != nil {
@@ -338,12 +338,12 @@ func CreateOrRegeneratePreparation(db *gorm.DB, orgID, matchID uint, seeds ...st
 	}
 
 	// Recarrega as perguntas com posições determinísticas + progresso.
-	return GetPreparation(db, orgID, prep.ID)
+	return GetPreparation(db, userID, prep.ID)
 }
 
 // ListPreparations lista as preparações do tenant, com filtro opcional por match.
-func ListPreparations(db *gorm.DB, orgID uint, matchID *uint) ([]models.InterviewPreparation, error) {
-	query := db.Where("organization_id = ?", orgID)
+func ListPreparations(db *gorm.DB, userID uint, matchID *uint) ([]models.InterviewPreparation, error) {
+	query := db.Where("user_id = ?", userID)
 	if matchID != nil && *matchID > 0 {
 		query = query.Where("match_id = ?", *matchID)
 	}
@@ -357,9 +357,9 @@ func ListPreparations(db *gorm.DB, orgID uint, matchID *uint) ([]models.Intervie
 
 // GetPreparation carrega uma preparação do tenant com todas as perguntas
 // ordenadas pela sequência da sabatina.
-func GetPreparation(db *gorm.DB, orgID, prepID uint) (*models.InterviewPreparation, []models.InterviewQuestion, error) {
+func GetPreparation(db *gorm.DB, userID, prepID uint) (*models.InterviewPreparation, []models.InterviewQuestion, error) {
 	var prep models.InterviewPreparation
-	if err := db.Where("id = ? AND organization_id = ?", prepID, orgID).First(&prep).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", prepID, userID).First(&prep).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, ErrPrepNotFound
 		}
@@ -367,7 +367,7 @@ func GetPreparation(db *gorm.DB, orgID, prepID uint) (*models.InterviewPreparati
 	}
 
 	var questions []models.InterviewQuestion
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prep.ID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prep.ID).
 		Order("position ASC").
 		Find(&questions).Error; err != nil {
 		return nil, nil, err
@@ -377,7 +377,7 @@ func GetPreparation(db *gorm.DB, orgID, prepID uint) (*models.InterviewPreparati
 
 // UpdateQuestionStatus atualiza o status de autoavaliação de uma pergunta,
 // validando o enum e o escopo de tenant (preparação → pergunta).
-func UpdateQuestionStatus(db *gorm.DB, orgID, prepID, questionID uint, status models.InterviewQuestionStatus) (*models.InterviewQuestion, error) {
+func UpdateQuestionStatus(db *gorm.DB, userID, prepID, questionID uint, status models.InterviewQuestionStatus) (*models.InterviewQuestion, error) {
 	switch status {
 	case models.QuestionStatusPending, models.QuestionStatusPracticed, models.QuestionStatusMastered:
 	default:
@@ -385,7 +385,7 @@ func UpdateQuestionStatus(db *gorm.DB, orgID, prepID, questionID uint, status mo
 	}
 
 	var prep models.InterviewPreparation
-	if err := db.Where("id = ? AND organization_id = ?", prepID, orgID).First(&prep).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", prepID, userID).First(&prep).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPrepNotFound
 		}
@@ -393,7 +393,7 @@ func UpdateQuestionStatus(db *gorm.DB, orgID, prepID, questionID uint, status mo
 	}
 
 	var q models.InterviewQuestion
-	if err := db.Where("id = ? AND organization_id = ? AND preparation_id = ?", questionID, orgID, prepID).
+	if err := db.Where("id = ? AND user_id = ? AND preparation_id = ?", questionID, userID, prepID).
 		First(&q).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrQuestionNotFound
@@ -428,13 +428,13 @@ func validateSelfAssessment(sa string) error {
 // Quando selfAssessment é vazio, a autoavaliação já existente é preservada
 // (FR-003: mantém a mais recente informada pelo candidato).
 // timeSpentSecs opcional acumula o tempo de resposta (modo simulado).
-func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer string, selfAssessment string, timeSpentSecs ...int) (*models.PracticeEntry, error) {
+func SaveQuestionAnswer(db *gorm.DB, userID, prepID, questionID uint, answer string, selfAssessment string, timeSpentSecs ...int) (*models.PracticeEntry, error) {
 	if err := validateSelfAssessment(selfAssessment); err != nil {
 		return nil, err
 	}
 
 	var prep models.InterviewPreparation
-	if err := db.Where("id = ? AND organization_id = ?", prepID, orgID).First(&prep).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", prepID, userID).First(&prep).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPrepNotFound
 		}
@@ -442,7 +442,7 @@ func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer stri
 	}
 
 	var q models.InterviewQuestion
-	if err := db.Where("id = ? AND organization_id = ? AND preparation_id = ?", questionID, orgID, prepID).
+	if err := db.Where("id = ? AND user_id = ? AND preparation_id = ?", questionID, userID, prepID).
 		First(&q).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrQuestionNotFound
@@ -451,7 +451,7 @@ func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer stri
 	}
 
 	var entry models.PracticeEntry
-	err := db.Where("question_id = ? AND organization_id = ?", questionID, orgID).
+	err := db.Where("question_id = ? AND user_id = ?", questionID, userID).
 		First(&entry).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -461,12 +461,12 @@ func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer stri
 	// relevante se o texto da resposta mudou ou se este save completa a prep.
 	oldAnswer := entry.Answer
 	answerChanged := strings.TrimSpace(answer) != strings.TrimSpace(oldAnswer)
-	_, _, remainingBefore, cerr := PreparationCompletion(db, orgID, prepID)
+	_, _, remainingBefore, cerr := PreparationCompletion(db, userID, prepID)
 	if cerr != nil {
 		return nil, cerr
 	}
 
-	entry.OrganizationID = orgID
+	entry.UserID = userID
 	entry.QuestionID = questionID
 	entry.Answer = answer
 	// FR-003: auto-save preserva a autoavaliação já existente quando não
@@ -488,13 +488,13 @@ func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer stri
 	// (autosave ao navegar) preserva o 'verified' — retomar a sabatina não
 	// re-corrige o já corrigido.
 	if answerChanged {
-		ver, verr := GetPreparationVerification(db, orgID, prepID)
+		ver, verr := GetPreparationVerification(db, userID, prepID)
 		if verr != nil {
 			return nil, verr
 		}
 		if ver != nil && ver.Status == models.VerificationVerified {
 			if err := db.Model(&models.PreparationVerification{}).
-				Where("id = ? AND organization_id = ? AND status = ?", ver.ID, orgID, models.VerificationVerified).
+				Where("id = ? AND user_id = ? AND status = ?", ver.ID, userID, models.VerificationVerified).
 				Updates(map[string]interface{}{"status": models.VerificationOutdated}).Error; err != nil {
 				return nil, err
 			}
@@ -504,12 +504,12 @@ func SaveQuestionAnswer(db *gorm.DB, orgID, prepID, questionID uint, answer stri
 	// US1/FR-001: dispara a verificação assíncrona automaticamente SOMENTE na
 	// transição para completa (última questão respondida). Saves sem mudança
 	// de completude — ex.: navegar com autosave — nunca re-agendam correção.
-	_, _, remainingAfter, cerr := PreparationCompletion(db, orgID, prepID)
+	_, _, remainingAfter, cerr := PreparationCompletion(db, userID, prepID)
 	if cerr != nil {
 		return nil, cerr
 	}
 	if remainingBefore > 0 && remainingAfter == 0 {
-		_, _ = VerifyPreparation(db, orgID, prepID)
+		_, _ = VerifyPreparation(db, userID, prepID)
 	}
 
 	return &entry, nil
@@ -633,10 +633,10 @@ func isStaleRunning(v *models.PreparationVerification, maxAge time.Duration, now
 // PreparationCompletion conta as questões da preparação e quantas possuem
 // resposta escrita não-vazia (FR-008). answered = questões com resposta;
 // remaining = total - answered.
-func PreparationCompletion(db *gorm.DB, orgID, prepID uint) (total, answered, remaining int, err error) {
+func PreparationCompletion(db *gorm.DB, userID, prepID uint) (total, answered, remaining int, err error) {
 	var totalCount int64
 	if err = db.Model(&models.InterviewQuestion{}).
-		Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+		Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		Count(&totalCount).Error; err != nil {
 		return
 	}
@@ -644,8 +644,8 @@ func PreparationCompletion(db *gorm.DB, orgID, prepID uint) (total, answered, re
 
 	var answeredCount int64
 	if err = db.Model(&models.InterviewQuestion{}).
-		Joins("JOIN practice_entries pe ON pe.question_id = interview_questions.id AND pe.organization_id = ?", orgID).
-		Where("interview_questions.organization_id = ? AND interview_questions.preparation_id = ? AND TRIM(pe.answer) <> ''", orgID, prepID).
+		Joins("JOIN practice_entries pe ON pe.question_id = interview_questions.id AND pe.user_id = ?", userID).
+		Where("interview_questions.user_id = ? AND interview_questions.preparation_id = ? AND TRIM(pe.answer) <> ''", userID, prepID).
 		Count(&answeredCount).Error; err != nil {
 		return
 	}
@@ -659,9 +659,9 @@ func PreparationCompletion(db *gorm.DB, orgID, prepID uint) (total, answered, re
 
 // GetPreparationVerification carrega o resultado atual (1:1) da verificação,
 // dentro do escopo do tenant. Retorna (nil, nil) se nunca houve verificação.
-func GetPreparationVerification(db *gorm.DB, orgID, prepID uint) (*models.PreparationVerification, error) {
+func GetPreparationVerification(db *gorm.DB, userID, prepID uint) (*models.PreparationVerification, error) {
 	var v models.PreparationVerification
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		First(&v).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -687,8 +687,8 @@ type PreparationDetail struct {
 
 // GetPreparationDetail carrega o detalhe completo de uma preparação. Executa o
 // self-heal na leitura (T022): verificação 'running' órfã retoma sem bloquear.
-func GetPreparationDetail(db *gorm.DB, orgID, prepID uint) (*PreparationDetail, error) {
-	prep, questions, err := GetPreparation(db, orgID, prepID)
+func GetPreparationDetail(db *gorm.DB, userID, prepID uint) (*PreparationDetail, error) {
+	prep, questions, err := GetPreparation(db, userID, prepID)
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +706,7 @@ func GetPreparationDetail(db *gorm.DB, orgID, prepID uint) (*PreparationDetail, 
 			ids = append(ids, q.ID)
 		}
 		var entries []models.PracticeEntry
-		if err := db.Where("organization_id = ? AND question_id IN ?", orgID, ids).
+		if err := db.Where("user_id = ? AND question_id IN ?", userID, ids).
 			Find(&entries).Error; err != nil {
 			return nil, err
 		}
@@ -717,7 +717,7 @@ func GetPreparationDetail(db *gorm.DB, orgID, prepID uint) (*PreparationDetail, 
 
 	// Feedback individual da correção por IA, por pergunta respondida.
 	var analyses []models.AIAnalysisResult
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		Find(&analyses).Error; err != nil {
 		return nil, err
 	}
@@ -726,20 +726,20 @@ func GetPreparationDetail(db *gorm.DB, orgID, prepID uint) (*PreparationDetail, 
 	}
 
 	var history []models.PreparationVerificationHistory
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		Order("verified_at DESC").Limit(10).
 		Find(&history).Error; err != nil {
 		return nil, err
 	}
 	detail.History = history
 
-	ver, err := GetPreparationVerification(db, orgID, prepID)
+	ver, err := GetPreparationVerification(db, userID, prepID)
 	if err != nil {
 		return nil, err
 	}
 	if isStaleRunning(ver, selfHealRunningThreshold, time.Now()) {
-		if _, err := VerifyPreparation(db, orgID, prepID); err == nil {
-			ver, err = GetPreparationVerification(db, orgID, prepID)
+		if _, err := VerifyPreparation(db, userID, prepID); err == nil {
+			ver, err = GetPreparationVerification(db, userID, prepID)
 			if err != nil {
 				return nil, err
 			}
@@ -756,16 +756,16 @@ func GetPreparationDetail(db *gorm.DB, orgID, prepID uint) (*PreparationDetail, 
 // Retorna 0, nil quando agendada (ou já em andamento) e um
 // *PrepIncompleteError quando nada há para corrigir. O processamento real roda
 // em goroutine (IA → retry → fallback; orçamento total ≤120s).
-func VerifyPreparation(db *gorm.DB, orgID, prepID uint) (int, error) {
+func VerifyPreparation(db *gorm.DB, userID, prepID uint) (int, error) {
 	var prep models.InterviewPreparation
-	if err := db.Where("id = ? AND organization_id = ?", prepID, orgID).First(&prep).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", prepID, userID).First(&prep).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, ErrPrepNotFound
 		}
 		return 0, err
 	}
 
-	_, answered, remaining, err := PreparationCompletion(db, orgID, prepID)
+	_, answered, remaining, err := PreparationCompletion(db, userID, prepID)
 	if err != nil {
 		return 0, err
 	}
@@ -779,14 +779,14 @@ func VerifyPreparation(db *gorm.DB, orgID, prepID uint) (int, error) {
 	// solicitações concorrentes (auto-trigger + POST /verify) tentarem criar,
 	// o conflito no uniqueIndex é ignorado e recarregamos a linha existente.
 	ver := &models.PreparationVerification{
-		OrganizationID: orgID,
+		UserID: userID,
 		PreparationID:  prepID,
 		Status:         models.VerificationPending,
 	}
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(ver).Error; err != nil {
 		return 0, err
 	}
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		First(ver).Error; err != nil {
 		return 0, err
 	}
@@ -794,7 +794,7 @@ func VerifyPreparation(db *gorm.DB, orgID, prepID uint) (int, error) {
 	// Self-heal antes do claim: 'running' órfão antigo volta a 'pending'.
 	if isStaleRunning(ver, selfHealRunningThreshold, now) {
 		if err := db.Model(&models.PreparationVerification{}).
-			Where("id = ? AND organization_id = ? AND status = ?", ver.ID, orgID, models.VerificationRunning).
+			Where("id = ? AND user_id = ? AND status = ?", ver.ID, userID, models.VerificationRunning).
 			Updates(map[string]interface{}{"status": models.VerificationPending, "started_at": nil}).Error; err != nil {
 			return 0, err
 		}
@@ -803,7 +803,7 @@ func VerifyPreparation(db *gorm.DB, orgID, prepID uint) (int, error) {
 
 	// Claim otimista: pending|outdated|verified → running.
 	res := db.Model(&models.PreparationVerification{}).
-		Where("id = ? AND organization_id = ? AND status IN ?", ver.ID, orgID, []models.PreparationVerificationStatus{
+		Where("id = ? AND user_id = ? AND status IN ?", ver.ID, userID, []models.PreparationVerificationStatus{
 			models.VerificationPending, models.VerificationOutdated, models.VerificationVerified,
 		}).
 		Updates(map[string]interface{}{"status": models.VerificationRunning, "started_at": now})
@@ -815,15 +815,15 @@ func VerifyPreparation(db *gorm.DB, orgID, prepID uint) (int, error) {
 		return 0, nil
 	}
 
-	go runVerificationPipeline(db, orgID, prepID, ver.ID)
+	go runVerificationPipeline(db, userID, prepID, ver.ID)
 	return 0, nil
 }
 
 // runVerificationPipeline executa a verificação em background: carrega as
 // respostas, avalia (IA → retry → fallback) e persiste o resultado atomically.
 // Dispara em paralelo a correção por pergunta (feedback individual por questão).
-func runVerificationPipeline(db *gorm.DB, orgID, prepID, verID uint) {
-	qas, err := loadVerificationInput(db, orgID, prepID)
+func runVerificationPipeline(db *gorm.DB, userID, prepID, verID uint) {
+	qas, err := loadVerificationInput(db, userID, prepID)
 	if err != nil {
 		log.Printf("Verificação (prep=%d): %v", prepID, err)
 		return
@@ -845,7 +845,7 @@ func runVerificationPipeline(db *gorm.DB, orgID, prepID, verID uint) {
 
 	now := time.Now()
 	db.Model(&models.PreparationVerification{}).
-		Where("id = ? AND organization_id = ? AND status = ?", verID, orgID, models.VerificationRunning).
+		Where("id = ? AND user_id = ? AND status = ?", verID, userID, models.VerificationRunning).
 		Updates(map[string]interface{}{
 			"status":      models.VerificationVerified,
 			"score":       score,
@@ -857,7 +857,7 @@ func runVerificationPipeline(db *gorm.DB, orgID, prepID, verID uint) {
 
 	// Histórico de evolução: anexa a tentativa concluída (imutável).
 	if herr := db.Create(&models.PreparationVerificationHistory{
-		OrganizationID: orgID,
+		UserID: userID,
 		PreparationID:  prepID,
 		Score:          score,
 		Feedback:       feedback,
@@ -869,9 +869,9 @@ func runVerificationPipeline(db *gorm.DB, orgID, prepID, verID uint) {
 }
 
 // loadVerificationInput monta a lista pergunta+resposta+guia para avaliar.
-func loadVerificationInput(db *gorm.DB, orgID, prepID uint) ([]verificationQA, error) {
+func loadVerificationInput(db *gorm.DB, userID, prepID uint) ([]verificationQA, error) {
 	var questions []models.InterviewQuestion
-	if err := db.Where("organization_id = ? AND preparation_id = ?", orgID, prepID).
+	if err := db.Where("user_id = ? AND preparation_id = ?", userID, prepID).
 		Order("position ASC").Find(&questions).Error; err != nil {
 		return nil, err
 	}
@@ -884,7 +884,7 @@ func loadVerificationInput(db *gorm.DB, orgID, prepID uint) ([]verificationQA, e
 		ids = append(ids, q.ID)
 	}
 	var entries []models.PracticeEntry
-	if err := db.Where("organization_id = ? AND question_id IN ?", orgID, ids).
+	if err := db.Where("user_id = ? AND question_id IN ?", userID, ids).
 		Find(&entries).Error; err != nil {
 		return nil, err
 	}

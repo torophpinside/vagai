@@ -12,7 +12,7 @@ import (
 // análise exposta em GET /interview-prep/:id; nova correção substitui.
 func TestPerQuestionAnalysis_Wiring(t *testing.T) {
 	token, _ := registerUser(t, "Analysis User", "analysis@example.com", "password123", "Analysis Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/analysis", "Backend Developer", fixedCountTechDescription)
@@ -106,7 +106,7 @@ func TestPerQuestionAnalysis_Wiring(t *testing.T) {
 // Item 4 — correção parcial: 1 resposta basta para agendar a correção.
 func TestPerQuestionAnalysis_PartialVerify(t *testing.T) {
 	token, _ := registerUser(t, "Partial User", "partial-verify@example.com", "password123", "Partial Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/partial-verify", "Backend Developer", fixedCountTechDescription)
@@ -179,7 +179,7 @@ func getPrepDetail(t *testing.T, token string, prepID uint) prepDetailDTO {
 // verificada NÃO agenda nova correção — status segue verified e nada é recriado.
 func TestNoReverifyOnIdenticalSave(t *testing.T) {
 	token, _ := registerUser(t, "NoReverify User", "noreverify@example.com", "password123", "NoReverify Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/no-reverify", "Backend Developer", fixedCountTechDescription)
@@ -243,7 +243,7 @@ func TestNoReverifyOnIdenticalSave(t *testing.T) {
 // outdated SEM re-corrigir sozinha (correção manual posterior decide).
 func TestEditMarksOutdatedWithoutReverify(t *testing.T) {
 	token, _ := registerUser(t, "EditOutdated User", "edit-outdated@example.com", "password123", "EditOutdated Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/edit-outdated", "Backend Developer", fixedCountTechDescription)

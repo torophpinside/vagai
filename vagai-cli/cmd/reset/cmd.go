@@ -19,13 +19,13 @@ os matches (score) associados a elas, permitindo que o matching seja refeito.`,
 		Run:  run,
 	}
 	resetDate string
-	orgID     uint
+	userID     uint
 	force     bool
 )
 
 func init() {
 	Cmd.Flags().StringVar(&resetDate, "date", "", "Data das vagas a resetar (YYYY-MM-DD). Padrao: hoje")
-	Cmd.Flags().UintVar(&orgID, "org", 0, "Limitar a uma organizacao (padrao: todas)")
+	Cmd.Flags().UintVar(&userID, "user", 0, "Limitar a um usuario (padrao: todas)")
 	Cmd.Flags().BoolVarP(&force, "force", "f", false, "Aplicar de fato (sem isso, apenas mostra o que sera feito)")
 }
 
@@ -48,8 +48,8 @@ func run(cmd *cobra.Command, args []string) {
 	end := start.Add(24 * time.Hour)
 
 	q := db.DB.Model(&models.Job{}).Where("collected_at >= ? AND collected_at < ?", start, end)
-	if orgID != 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID != 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 
 	var jobIDs []uint

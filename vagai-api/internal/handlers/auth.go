@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/anomalyco/vagai-api/internal/middleware"
 	"github.com/anomalyco/vagai-api/internal/models"
@@ -15,10 +14,9 @@ import (
 
 func Register(c *gin.Context) {
 	var body struct {
-		Name         string `json:"name" binding:"required,min=2,max=200"`
-		Email        string `json:"email" binding:"required,email"`
-		Password     string `json:"password" binding:"required,min=8"`
-		Organization string `json:"organization" binding:"required,min=2,max=200"`
+		Name     string `json:"name" binding:"required,min=2,max=200"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=8"`
 	}
 
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -26,8 +24,9 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	email := strings.ToLower(body.Email)
 	var existingUser models.User
-	if err := DB.Where("email = ?", strings.ToLower(body.Email)).First(&existingUser).Error; err == nil {
+	if err := DB.Where("email = ?", email).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Email já cadastrado"})
 		return
 	}
@@ -38,66 +37,27 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	tx := DB.Begin()
-	defer tx.Rollback()
-
-	org := models.Organization{
-		Name: body.Organization,
-		Slug: generateSlug(body.Organization),
-		Plan: "free",
-	}
-	if err := tx.Create(&org).Error; err != nil {
-		if strings.Contains(err.Error(), "Duplicate") {
-			org.Slug = org.Slug + "-" + randomString(4)
-			if err := tx.Create(&org).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar organização"})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar organização"})
-			return
-		}
+	role := models.RoleUser
+	if middleware.IsAdminEmail(email) {
+		role = models.RoleAdmin
 	}
 
+	trialEnds := time.Now().Add(14 * 24 * time.Hour)
 	user := models.User{
-		Name:         body.Name,
-		Email:        strings.ToLower(body.Email),
-		PasswordHash: string(hashedPassword),
+		Name:               body.Name,
+		Email:              email,
+		PasswordHash:       string(hashedPassword),
+		Role:               role,
+		PlanSlug:           "free",
+		SubscriptionStatus: models.SubStatusTrial,
+		TrialEndsAt:        &trialEnds,
 	}
-	if err := tx.Create(&user).Error; err != nil {
+	if err := DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar usuário"})
 		return
 	}
 
-	membership := models.Membership{
-		OrganizationID: org.ID,
-		UserID:         user.ID,
-		Role:           models.RoleOwner,
-	}
-	if err := tx.Create(&membership).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar membership"})
-		return
-	}
-
-	var freePlan models.Plan
-	if err := tx.Where("slug = ?", "free").First(&freePlan).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao configurar plano"})
-		return
-	}
-
-	subscription := models.Subscription{
-		OrganizationID: org.ID,
-		PlanID:         freePlan.ID,
-		Status:         models.SubStatusActive,
-	}
-	if err := tx.Create(&subscription).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar assinatura"})
-		return
-	}
-
-	tx.Commit()
-
-	token, err := middleware.GenerateToken(user.ID, org.ID, user.Email, string(membership.Role))
+	token, err := middleware.GenerateToken(user.ID, user.Email, string(user.Role))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar token"})
 		return
@@ -105,19 +65,8 @@ func Register(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Conta criada com sucesso",
-		"user": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  membership.Role,
-		},
-		"organization": gin.H{
-			"id":   org.ID,
-			"name": org.Name,
-			"slug": org.Slug,
-			"plan": org.Plan,
-		},
-		"token": token,
+		"user":    userResponse(user),
+		"token":   token,
 	})
 }
 
@@ -143,13 +92,12 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	var membership models.Membership
-	if err := DB.Where("user_id = ?", user.ID).Preload("Organization").First(&membership).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuário sem organização"})
+	if user.Suspended {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Conta suspensa"})
 		return
 	}
 
-	token, err := middleware.GenerateToken(user.ID, membership.OrganizationID, user.Email, string(membership.Role))
+	token, err := middleware.GenerateToken(user.ID, user.Email, string(user.Role))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar token"})
 		return
@@ -157,25 +105,31 @@ func Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login realizado com sucesso",
-		"user": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  membership.Role,
-		},
-		"organization": gin.H{
-			"id":   membership.Organization.ID,
-			"name": membership.Organization.Name,
-			"slug": membership.Organization.Slug,
-			"plan": membership.Organization.Plan,
-		},
-		"token": token,
+		"user":    userResponse(user),
+		"token":   token,
 	})
 }
 
+// userResponse serializa os dados públicos do usuário para o frontend.
+func userResponse(user models.User) gin.H {
+	return gin.H{
+		"id":                  user.ID,
+		"name":                user.Name,
+		"email":               user.Email,
+		"avatar":              user.Avatar,
+		"timezone":            user.Timezone,
+		"city":                user.City,
+		"role":                user.Role,
+		"plan":                user.PlanSlug,
+		"plan_slug":           user.PlanSlug,
+		"subscription_status": user.SubscriptionStatus,
+		"subscription_ends_at": user.SubscriptionEndsAt,
+		"trial_ends_at":       user.TrialEndsAt,
+	}
+}
+
 func GetMe(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	orgID, _ := c.Get("org_id")
+	userID := c.GetUint("user_id")
 
 	var user models.User
 	if err := DB.First(&user, userID).Error; err != nil {
@@ -183,25 +137,13 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	var org models.Organization
-	if err := DB.First(&org, orgID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
-		return
-	}
-
-	var membership models.Membership
-	DB.Where("user_id = ? AND organization_id = ?", userID, orgID).First(&membership)
-
-	var sub models.Subscription
-	DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub)
-
 	var plan models.Plan
-	DB.Where("slug = ?", org.Plan).First(&plan)
+	DB.Where("slug = ?", user.PlanSlug).First(&plan)
 
 	var jobCount, resumeCount, siteCount int64
-	DB.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&jobCount)
-	DB.Model(&models.Resume{}).Where("organization_id = ?", orgID).Count(&resumeCount)
-	DB.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&siteCount)
+	DB.Model(&models.Job{}).Where("user_id = ?", userID).Count(&jobCount)
+	DB.Model(&models.Resume{}).Where("user_id = ?", userID).Count(&resumeCount)
+	DB.Model(&models.Site{}).Where("user_id = ?", userID).Count(&siteCount)
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
@@ -211,14 +153,8 @@ func GetMe(c *gin.Context) {
 			"avatar":   user.Avatar,
 			"timezone": user.Timezone,
 			"city":     user.City,
-			"role":     membership.Role,
-		},
-		"organization": gin.H{
-			"id":            org.ID,
-			"name":          org.Name,
-			"slug":          org.Slug,
-			"plan":          org.Plan,
-			"trial_ends_at": org.TrialEndsAt,
+			"role":     user.Role,
+			"plan":     user.PlanSlug,
 		},
 		"plan": gin.H{
 			"name":          plan.Name,
@@ -236,15 +172,15 @@ func GetMe(c *gin.Context) {
 			"sites":   siteCount,
 		},
 		"subscription": gin.H{
-			"status":               sub.Status,
-			"current_period_end":   sub.CurrentPeriodEnd,
-			"cancel_at_period_end": sub.CancelAtPeriodEnd,
+			"status":             user.SubscriptionStatus,
+			"current_period_end": user.SubscriptionEndsAt,
+			"cancel_at_period_end": false,
 		},
 	})
 }
 
 func UpdateProfile(c *gin.Context) {
-	userID, _ := c.Get("user_id")
+	userID := c.GetUint("user_id")
 
 	var body struct {
 		Name     string `json:"name" binding:"omitempty,min=2,max=200"`
@@ -288,7 +224,7 @@ func UpdateProfile(c *gin.Context) {
 }
 
 func ChangePassword(c *gin.Context) {
-	userID, _ := c.Get("user_id")
+	userID := c.GetUint("user_id")
 
 	var body struct {
 		CurrentPassword string `json:"current_password" binding:"required"`
@@ -318,7 +254,7 @@ func ChangePassword(c *gin.Context) {
 }
 
 func ChangePlan(c *gin.Context) {
-	orgID, _ := c.Get("org_id")
+	userID := c.GetUint("user_id")
 
 	var body struct {
 		PlanSlug string `json:"plan_slug" binding:"required"`
@@ -334,33 +270,25 @@ func ChangePlan(c *gin.Context) {
 		return
 	}
 
-	var org models.Organization
-	if err := DB.First(&org, orgID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+	var user models.User
+	if err := DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
 		return
 	}
 
 	// Paywall: upgrade para plano pago exige assinatura Stripe ativa. Sem isso,
 	// qualquer usuário poderia se auto-promover a Pro sem pagar.
-	if (plan.PriceMonthly > 0 || plan.PriceYearly > 0) && org.Plan != plan.Slug {
-		var sub models.Subscription
-		if err := DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub).Error; err != nil ||
-			sub.StripeSubscriptionID == nil || *sub.StripeSubscriptionID == "" || sub.Status != models.SubStatusActive {
+	if (plan.PriceMonthly > 0 || plan.PriceYearly > 0) && user.PlanSlug != plan.Slug {
+		if user.StripeCustomerID == "" || user.SubscriptionStatus != models.SubStatusActive {
 			c.JSON(http.StatusPaymentRequired, gin.H{"error": "Para ativar um plano pago, conclua a assinatura pelo checkout. Contate o suporte se você já pagou."})
 			return
 		}
 	}
 
-	org.Plan = plan.Slug
-	if err := DB.Save(&org).Error; err != nil {
+	user.PlanSlug = plan.Slug
+	if err := DB.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar plano"})
 		return
-	}
-
-	var sub models.Subscription
-	if err := DB.Where("organization_id = ?", orgID).Order("created_at DESC").First(&sub).Error; err == nil {
-		sub.PlanID = plan.ID
-		DB.Save(&sub)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -375,22 +303,6 @@ func ChangePlan(c *gin.Context) {
 			"features":      plan.Features,
 		},
 	})
-}
-
-func generateSlug(name string) string {
-	slug := strings.ToLower(name)
-	slug = strings.ReplaceAll(slug, " ", "-")
-	slug = strings.ReplaceAll(slug, ".", "-")
-	for strings.Contains(slug, "--") {
-		slug = strings.ReplaceAll(slug, "--", "-")
-	}
-	return slug
-}
-
-func randomString(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return hex.EncodeToString(b)[:n]
 }
 
 func getEnv(key, defaultValue string) string {

@@ -1,7 +1,7 @@
 // Package analytics implementa as queries de leitura de analytics do VagAI.
 //
 // Padrões do pacote:
-//   - Toda query é escopada por organization_id (Constitution III).
+//   - Toda query é escopada por user_id (Constitution III).
 //   - Resultados são cacheados em Redis por 5 minutos (quando disponível).
 //   - Queries rodam com timeout de 5s (SC-020).
 //   - Ausência de dados retorna nil + empty-state com mensagem de orientação.

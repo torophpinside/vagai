@@ -33,9 +33,8 @@ func TestUserRoleConstants(t *testing.T) {
 		role     UserRole
 		expected string
 	}{
-		{"Owner", RoleOwner, "owner"},
+		{"User", RoleUser, "user"},
 		{"Admin", RoleAdmin, "admin"},
-		{"Member", RoleMember, "member"},
 	}
 
 	for _, tt := range tests {
@@ -69,26 +68,31 @@ func TestSubscriptionStatusConstants(t *testing.T) {
 	}
 }
 
-func TestOrganizationModel(t *testing.T) {
+func TestUserSaaSFields(t *testing.T) {
 	trialEnds := time.Now().Add(14 * 24 * time.Hour)
-	org := Organization{
-		Name:        "Test Org",
-		Slug:        "test-org",
-		Plan:        "free",
-		TrialEndsAt: &trialEnds,
+	user := User{
+		Name:           "Test User",
+		Email:          "user@example.com",
+		PlanSlug:       "free",
+		StripeCustomerID: "cus_123",
+		TrialEndsAt:    &trialEnds,
 	}
 
-	if org.Name != "Test Org" {
-		t.Errorf("Organization.Name = %v, expected Test Org", org.Name)
+	if user.Name != "Test User" {
+		t.Errorf("User.Name = %v, expected Test User", user.Name)
 	}
-	if org.Slug != "test-org" {
-		t.Errorf("Organization.Slug = %v, expected test-org", org.Slug)
+	if user.PlanSlug != "free" {
+		t.Errorf("User.PlanSlug = %v, expected free", user.PlanSlug)
 	}
-	if org.Plan != "free" {
-		t.Errorf("Organization.Plan = %v, expected free", org.Plan)
+	if user.TrialEndsAt == nil {
+		t.Error("User.TrialEndsAt should not be nil")
 	}
-	if org.TrialEndsAt == nil {
-		t.Error("Organization.TrialEndsAt should not be nil")
+	if user.IsAdmin() {
+		t.Error("User.IsAdmin() = true, expected false for user role")
+	}
+	user.Role = RoleAdmin
+	if !user.IsAdmin() {
+		t.Error("User.IsAdmin() = false, expected true for admin role")
 	}
 }
 
@@ -111,24 +115,6 @@ func TestUserModel(t *testing.T) {
 	}
 	if user.Timezone != "America/Sao_Paulo" {
 		t.Errorf("User.Timezone = %v, expected America/Sao_Paulo", user.Timezone)
-	}
-}
-
-func TestMembershipModel(t *testing.T) {
-	membership := Membership{
-		OrganizationID: 1,
-		UserID:         1,
-		Role:           RoleOwner,
-	}
-
-	if membership.OrganizationID != 1 {
-		t.Errorf("Membership.OrganizationID = %v, expected 1", membership.OrganizationID)
-	}
-	if membership.UserID != 1 {
-		t.Errorf("Membership.UserID = %v, expected 1", membership.UserID)
-	}
-	if membership.Role != RoleOwner {
-		t.Errorf("Membership.Role = %v, expected owner", membership.Role)
 	}
 }
 
@@ -245,30 +231,12 @@ func TestPlanModel(t *testing.T) {
 	}
 }
 
-func TestSubscriptionModel(t *testing.T) {
-	now := time.Now()
-	sub := Subscription{
-		OrganizationID:     1,
-		Status:             SubStatusTrial,
-		CurrentPeriodStart: &now,
-		CurrentPeriodEnd:   func() *time.Time { t := now.Add(14 * 24 * time.Hour); return &t }(),
-		CancelAtPeriodEnd:  false,
-	}
-
-	if sub.Status != SubStatusTrial {
-		t.Errorf("Subscription.Status = %v, expected trial", sub.Status)
-	}
-	if sub.CancelAtPeriodEnd != false {
-		t.Errorf("Subscription.CancelAtPeriodEnd = %v, expected false", sub.CancelAtPeriodEnd)
-	}
-}
-
 func TestApiKeyModel(t *testing.T) {
 	apiKey := ApiKey{
-		OrganizationID: 1,
-		Name:           "Production API Key",
-		KeyHash:        "hashed_key_123",
-		LastFour:       "1234",
+		UserID:   1,
+		Name:     "Production API Key",
+		KeyHash:  "hashed_key_123",
+		LastFour: "1234",
 	}
 
 	if apiKey.Name != "Production API Key" {
@@ -281,13 +249,12 @@ func TestApiKeyModel(t *testing.T) {
 
 func TestAuditLogModel(t *testing.T) {
 	log := AuditLog{
-		OrganizationID: 1,
-		UserID:         1,
-		Action:         "job.created",
-		Resource:       "Job",
-		ResourceID:     42,
-		IP:             "192.168.1.1",
-		Details:        `{"title": "Dev"}`,
+		UserID:     1,
+		Action:     "job.created",
+		Resource:   "Job",
+		ResourceID: 42,
+		IP:         "192.168.1.1",
+		Details:    `{"title": "Dev"}`,
 	}
 
 	if log.Action != "job.created" {
@@ -303,10 +270,10 @@ func TestAuditLogModel(t *testing.T) {
 
 func TestAgentLogModel(t *testing.T) {
 	agentLog := AgentLog{
-		OrganizationID: 1,
-		AgentName:      "crawler",
-		Action:         "crawl.completed",
-		Details:        `{"jobs_found": 10}`,
+		UserID:    1,
+		AgentName: "crawler",
+		Action:    "crawl.completed",
+		Details:   `{"jobs_found": 10}`,
 	}
 
 	if agentLog.AgentName != "crawler" {

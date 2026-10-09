@@ -98,23 +98,23 @@ var geoCityToUF = map[string]string{
 //
 // Retorna nil quando a organização (ou a visão global) não possui usuários
 // com membership nem vagas (estado vazio, T069).
-func (s *Service) Geographic(ctx context.Context, orgID uint) (*models.GeographicInsights, error) {
+func (s *Service) Geographic(ctx context.Context, userID uint) (*models.GeographicInsights, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:geographic", orgID)
+	key := fmt.Sprintf("org:%d:geographic", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.GeographicInsights, error) {
-		return loadGeographic(db, orgID)
+		return loadGeographic(db, userID)
 	})
 }
 
-func loadGeographic(db *gorm.DB, orgID uint) (*models.GeographicInsights, error) {
+func loadGeographic(db *gorm.DB, userID uint) (*models.GeographicInsights, error) {
 	// T069 — estado vazio: zero usuários (com membership) E zero vagas.
-	users, err := geoCountUsers(db, orgID)
+	users, err := geoCountUsers(db, userID)
 	if err != nil {
 		return nil, err
 	}
-	jobs, err := geoCountJobs(db, orgID)
+	jobs, err := geoCountJobs(db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -123,11 +123,11 @@ func loadGeographic(db *gorm.DB, orgID uint) (*models.GeographicInsights, error)
 	}
 
 	// T065 — usuários por cidade (top 50) e por fuso horário (top 30).
-	cityRows, err := geoUserAggregate(db, orgID, "u.city", 50)
+	cityRows, err := geoUserAggregate(db, userID, "u.city", 50)
 	if err != nil {
 		return nil, err
 	}
-	tzRows, err := geoUserAggregate(db, orgID, "u.timezone", 30)
+	tzRows, err := geoUserAggregate(db, userID, "u.timezone", 30)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +141,13 @@ func loadGeographic(db *gorm.DB, orgID uint) (*models.GeographicInsights, error)
 	}
 
 	// T066 — vagas por cidade/UF inferidas do texto.
-	jobsByCity, jobsByState, err := geoJobsByLocation(db, orgID)
+	jobsByCity, jobsByState, err := geoJobsByLocation(db, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// T067 — razão de vagas amigáveis a trabalho remoto.
-	remoteRatio, remoteToOnSite, err := geoRemoteRatios(db, orgID)
+	remoteRatio, remoteToOnSite, err := geoRemoteRatios(db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,17 +168,15 @@ type geoNameCount struct {
 	Cnt  int64
 }
 
-// geoCountUsers conta usuários vivos com membership (escopados pela
-// organização quando orgID > 0). users não tem organization_id: o vínculo é
-// pela tabela memberships (T065).
-func geoCountUsers(db *gorm.DB, orgID uint) (int64, error) {
-	q := `SELECT COUNT(DISTINCT u.id) FROM users u JOIN memberships ms ON ms.user_id = u.id`
+// geoCountUsers conta usuários vivos (escopados pelo usuário quando
+// userID > 0; userID == 0 agrega todos os usuários da plataforma).
+func geoCountUsers(db *gorm.DB, userID uint) (int64, error) {
+	q := `SELECT COUNT(*) FROM users u WHERE u.deleted_at IS NULL`
 	args := []any{}
-	if orgID > 0 {
-		q += " AND ms.organization_id = ?"
-		args = append(args, orgID)
+	if userID > 0 {
+		q += " AND u.id = ?"
+		args = append(args, userID)
 	}
-	q += " WHERE u.deleted_at IS NULL"
 
 	var total int64
 	if err := db.Raw(q, args...).Scan(&total).Error; err != nil {
@@ -187,11 +185,11 @@ func geoCountUsers(db *gorm.DB, orgID uint) (int64, error) {
 	return total, nil
 }
 
-// geoCountJobs conta as vagas da organização (global quando orgID == 0).
-func geoCountJobs(db *gorm.DB, orgID uint) (int64, error) {
+// geoCountJobs conta as vagas da organização (global quando userID == 0).
+func geoCountJobs(db *gorm.DB, userID uint) (int64, error) {
 	q := db.Table("jobs")
-	if orgID > 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -201,18 +199,20 @@ func geoCountJobs(db *gorm.DB, orgID uint) (int64, error) {
 }
 
 // geoUserAggregate conta usuários distintos agrupados por column
-// ("u.city" ou "u.timezone"), ignorando valores vazios. Com orgID == 0 o
+// ("u.city" ou "u.timezone"), ignorando valores vazios. Com userID == 0 o
 // JOIN sem filtro de organização agrega no global sem duplicar usuários
 // (COUNT(DISTINCT u.id)).
-func geoUserAggregate(db *gorm.DB, orgID uint, column string, limit int) ([]geoNameCount, error) {
-	q := fmt.Sprintf(`SELECT %s AS name, COUNT(DISTINCT u.id) AS cnt
-		FROM users u JOIN memberships ms ON ms.user_id = u.id`, column)
+func geoUserAggregate(db *gorm.DB, userID uint, column string, limit int) ([]geoNameCount, error) {
+	q := fmt.Sprintf(`SELECT %s AS name, COUNT(*) AS cnt
+		FROM users u`, column)
 	args := []any{}
-	if orgID > 0 {
-		q += " AND ms.organization_id = ?"
-		args = append(args, orgID)
+	if userID > 0 {
+		q += " WHERE u.id = ? AND u.deleted_at IS NULL"
+		args = append(args, userID)
+	} else {
+		q += " WHERE u.deleted_at IS NULL"
 	}
-	q += fmt.Sprintf(` WHERE u.deleted_at IS NULL AND %s <> ''
+	q += fmt.Sprintf(` AND %s <> ''
 		GROUP BY %s ORDER BY cnt DESC LIMIT %d`, column, column, limit)
 
 	var rows []geoNameCount
@@ -248,14 +248,14 @@ func geoCityRefs() []geoCityRef {
 // (SIMD) sobre o texto normalizado uma vez por linha (T066) — e deriva o
 // total por UF a partir das cidades casadas. LIKE '%cidade%' no MySQL é
 // O(linha×cidade×bytes) e estoura o budget de 5s em descrições longas.
-func geoJobsByLocation(db *gorm.DB, orgID uint) ([]models.CityCount, []models.StateCount, error) {
+func geoJobsByLocation(db *gorm.DB, userID uint) ([]models.CityCount, []models.StateCount, error) {
 	type jobText struct {
 		Title       string
 		Description string
 	}
 	q := db.Model(&models.Job{}).Select("title, description")
-	if orgID > 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 	var jobs []jobText
 	if err := q.Find(&jobs).Error; err != nil {
@@ -314,15 +314,15 @@ type geoRemoteRow struct {
 // geoRemoteRatios calcula a razão de vagas remotas em uma única query
 // (T067): RemoteFriendlyRatio = remoto/total arredondado em 2 casas e
 // RemoteToOnSiteRatio = "r:o" irreduzível pela GCD.
-func geoRemoteRatios(db *gorm.DB, orgID uint) (float64, string, error) {
+func geoRemoteRatios(db *gorm.DB, userID uint) (float64, string, error) {
 	q := `SELECT COUNT(*) AS total,
 		COALESCE(SUM(LOWER(CONCAT(COALESCE(title,''),' ',COALESCE(description,'')))
 			REGEXP 'remote|remoto|home office|teletrabalho|hibrido remoto'),0) AS remote
 		FROM jobs`
 	args := []any{}
-	if orgID > 0 {
-		q += " WHERE organization_id = ?"
-		args = append(args, orgID)
+	if userID > 0 {
+		q += " WHERE user_id = ?"
+		args = append(args, userID)
 	}
 
 	var row geoRemoteRow

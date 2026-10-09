@@ -8,23 +8,23 @@ import (
 )
 
 var orgMetricsCmd = &cobra.Command{
-	Use:   "org-metrics",
-	Short: "Relatório de indicadores da organização",
+	Use:   "user-metrics",
+	Short: "Relatório de indicadores do usuário",
 	Long: `Volumes de vagas, currículos, matches e candidaturas, taxa de
 conversão, utilização de features, assinatura e tempos médios até
 match/análise.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Organization Metrics", org)
+		printHeader("User Metrics", user)
 
 		// Textos de estado vazio (espelham EmptyOrgMetricsMessage/Guidance do
 		// serviço — os dois módulos Go são independentes).
-		const emptyMessage = "Nenhum indicador da organização disponível"
-		const emptyGuidance = "Cadastre vagas, envie currículos e execute o matching para começar a acompanhar os indicadores da organização."
+		const emptyMessage = "Nenhum indicador do usuário disponível"
+		const emptyGuidance = "Cadastre vagas, envie currículos e execute o matching para começar a acompanhar os indicadores do usuário."
 		printEmpty := func() {
 			fmt.Println(emptyMessage)
 			fmt.Println(emptyGuidance)
@@ -35,9 +35,9 @@ match/análise.`,
 			Plan string
 		}
 		var orgInfo []orgInfoRow
-		if err := db.DB.Table("organizations").
+		if err := db.DB.Table("users").
 			Select("name, plan").
-			Where("id = ? AND deleted_at IS NULL", org).
+			Where("id = ? AND deleted_at IS NULL", user).
 			Scan(&orgInfo).Error; err != nil {
 			return err
 		}
@@ -57,13 +57,13 @@ match/análise.`,
 		var counts countsRow
 		if err := db.DB.Raw(`
 			SELECT
-				(SELECT COUNT(*) FROM jobs WHERE organization_id = ?) AS jobs_posted,
-				(SELECT COUNT(*) FROM resumes WHERE organization_id = ?) AS resumes_uploaded,
-				(SELECT COUNT(*) FROM matches WHERE organization_id = ?) AS matches_made,
-				(SELECT COUNT(*) FROM matches WHERE organization_id = ? AND applied = ?) AS applications_made,
-				(SELECT COUNT(*) FROM ai_analysis_results WHERE organization_id = ?) AS ai_analyses,
-				(SELECT COUNT(*) FROM interview_preparations WHERE organization_id = ?) AS interview_preps`,
-			org, org, org, org, true, org, org).
+				(SELECT COUNT(*) FROM jobs WHERE user_id = ?) AS jobs_posted,
+				(SELECT COUNT(*) FROM resumes WHERE user_id = ?) AS resumes_uploaded,
+				(SELECT COUNT(*) FROM matches WHERE user_id = ?) AS matches_made,
+				(SELECT COUNT(*) FROM matches WHERE user_id = ? AND applied = ?) AS applications_made,
+				(SELECT COUNT(*) FROM ai_analysis_results WHERE user_id = ?) AS ai_analyses,
+				(SELECT COUNT(*) FROM interview_preparations WHERE user_id = ?) AS interview_preps`,
+			user, user, user, user, true, user, user).
 			Scan(&counts).Error; err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ match/análise.`,
 		var subs []subRow
 		if err := db.DB.Table("subscriptions").
 			Select("status").
-			Where("organization_id = ? AND deleted_at IS NULL", org).
+			Where("user_id = ? AND deleted_at IS NULL", user).
 			Order("created_at DESC").
 			Limit(1).
 			Scan(&subs).Error; err != nil {
@@ -94,7 +94,7 @@ match/análise.`,
 			SELECT COALESCE(AVG(GREATEST(0, DATEDIFF(m.analyzed_at, j.collected_at))), 0)
 			FROM matches m
 			JOIN jobs j ON j.id = m.job_id
-			WHERE m.organization_id = ?`, org).Scan(&timeToMatch).Error; err != nil {
+			WHERE m.user_id = ?`, user).Scan(&timeToMatch).Error; err != nil {
 			return err
 		}
 		if err := db.DB.Raw(`
@@ -102,7 +102,7 @@ match/análise.`,
 			FROM matches m
 			JOIN interview_preparations ip ON ip.match_id = m.id
 			JOIN ai_analysis_results ai ON ai.preparation_id = ip.id
-			WHERE m.organization_id = ?`, org).Scan(&timeToAnalysis).Error; err != nil {
+			WHERE m.user_id = ?`, user).Scan(&timeToAnalysis).Error; err != nil {
 			return err
 		}
 
@@ -113,7 +113,7 @@ match/análise.`,
 			return "não"
 		}
 
-		fmt.Printf("\nOrganização: %s | Plano: %s\n", orgInfo[0].Name, orgInfo[0].Plan)
+		fmt.Printf("\nUsuário: %s | Plano: %s\n", orgInfo[0].Name, orgInfo[0].Plan)
 		if subStatus == "" {
 			fmt.Println("Assinatura: (nenhuma)")
 		} else {

@@ -9,29 +9,29 @@ import (
 	"gorm.io/gorm"
 )
 
-// analyticsOrgWhere monta o filtro de tenant "WHERE organization_id = ?"
-// (ou vazio, para super admin com orgID == 0 = todas as organizações).
-func analyticsOrgWhere(orgID uint) (string, []any) {
-	if orgID == 0 {
+// analyticsOrgWhere monta o filtro de tenant "WHERE user_id = ?"
+// (ou vazio, para super admin com userID == 0 = todas as organizações).
+func analyticsOrgWhere(userID uint) (string, []any) {
+	if userID == 0 {
 		return "", nil
 	}
-	return " WHERE organization_id = ?", []any{orgID}
+	return " WHERE user_id = ?", []any{userID}
 }
 
 // matchingJoinOrgWhere/Args montam o filtro de tenant no join matches→jobs
 // (alias m), respeitando o agregado global do super admin.
-func matchingJoinOrgWhere(orgID uint) string {
-	if orgID == 0 {
+func matchingJoinOrgWhere(userID uint) string {
+	if userID == 0 {
 		return ""
 	}
-	return " WHERE m.organization_id = ?"
+	return " WHERE m.user_id = ?"
 }
 
-func matchingJoinOrgArgs(orgID uint) []any {
-	if orgID == 0 {
+func matchingJoinOrgArgs(userID uint) []any {
+	if userID == 0 {
 		return nil
 	}
-	return []any{orgID}
+	return []any{userID}
 }
 
 // Mensagens de estado vazio do matching-distribution (T015 / spec
@@ -51,26 +51,26 @@ var scoreBucketOrder = []string{"0.0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8
 // Retorna nil quando a organização não possui nenhum match (estado vazio,
 // T015). A escala armazenada em matches.similarity_score é 0–100; aqui é
 // normalizada para 0–1 conforme contracts/api_contract.md.
-func (s *Service) MatchingDistribution(ctx context.Context, orgID uint, opts PageOptions) (*models.MatchingDistribution, error) {
+func (s *Service) MatchingDistribution(ctx context.Context, userID uint, opts PageOptions) (*models.MatchingDistribution, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:matching:page:%d:size:%d", orgID, opts.Page, opts.PageSize)
+	key := fmt.Sprintf("org:%d:matching:page:%d:size:%d", userID, opts.Page, opts.PageSize)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.MatchingDistribution, error) {
-		return loadMatchingDistribution(db, orgID, opts)
+		return loadMatchingDistribution(db, userID, opts)
 	})
 }
 
-func loadMatchingDistribution(db *gorm.DB, orgID uint, opts PageOptions) (*models.MatchingDistribution, error) {
-	// T011 — histograma de scores normalizado para 0–1. orgID == 0 (super
-	// admin) agrega todas as organizações; orgID > 0 escopa pelo tenant.
+func loadMatchingDistribution(db *gorm.DB, userID uint, opts PageOptions) (*models.MatchingDistribution, error) {
+	// T011 — histograma de scores normalizado para 0–1. userID == 0 (super
+	// admin) agrega todas as organizações; userID > 0 escopa pelo tenant.
 	type bucketRow struct {
 		Bucket   string
 		Cnt      int64
 		AvgScore float64
 	}
 
-	matchWhere, matchArgs := analyticsOrgWhere(orgID)
+	matchWhere, matchArgs := analyticsOrgWhere(userID)
 
 	var rows []bucketRow
 	err := db.Raw(`
@@ -92,8 +92,8 @@ func loadMatchingDistribution(db *gorm.DB, orgID uint, opts PageOptions) (*model
 
 	var total int64
 	qTotal := db.Model(&models.Match{})
-	if orgID > 0 {
-		qTotal = qTotal.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qTotal = qTotal.Where("user_id = ?", userID)
 	}
 	if err := qTotal.Count(&total).Error; err != nil {
 		return nil, err
@@ -143,8 +143,8 @@ func loadMatchingDistribution(db *gorm.DB, orgID uint, opts PageOptions) (*model
 
 	// T012 — taxa de conversão match → candidatura.
 	qApplied := db.Model(&models.Match{}).Where("applied = ?", true)
-	if orgID > 0 {
-		qApplied = qApplied.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qApplied = qApplied.Where("user_id = ?", userID)
 	}
 	var applied int64
 	if err := qApplied.Count(&applied).Error; err != nil {
@@ -161,10 +161,10 @@ func loadMatchingDistribution(db *gorm.DB, orgID uint, opts PageOptions) (*model
 	if err := db.Raw(`
 		SELECT j.title AS title, COUNT(*) AS total, COALESCE(SUM(m.applied), 0) AS applied
 		FROM matches m
-		JOIN jobs j ON j.id = m.job_id`+matchingJoinOrgWhere(orgID)+`
+		JOIN jobs j ON j.id = m.job_id`+matchingJoinOrgWhere(userID)+`
 		GROUP BY j.title
 		ORDER BY COALESCE(SUM(m.applied), 0) / COUNT(*) DESC, COUNT(*) DESC
-		LIMIT 5`, matchingJoinOrgArgs(orgID)...).Scan(&titles).Error; err != nil {
+		LIMIT 5`, matchingJoinOrgArgs(userID)...).Scan(&titles).Error; err != nil {
 		return nil, err
 	}
 	top := make([]models.JobTitleSuccess, 0, len(titles))

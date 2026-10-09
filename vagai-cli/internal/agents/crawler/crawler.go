@@ -63,12 +63,12 @@ func crawlSite(site models.Site) error {
 		return err
 	}
 
-	if site.OrganizationID > 0 {
-		allowed, current, maxLimit, err := db.CheckJobsLimit(site.OrganizationID)
+	if site.UserID > 0 {
+		allowed, current, maxLimit, err := db.CheckJobsLimit(site.UserID)
 		if err != nil {
-			log.Printf("Erro ao verificar limite do plano para org %d: %v", site.OrganizationID, err)
+			log.Printf("Erro ao verificar limite do plano para user %d: %v", site.UserID, err)
 		} else if !allowed {
-			log.Printf("Limite de vagas atingido para org %d: %d/%d. Pulando site %s", site.OrganizationID, current, maxLimit, site.Name)
+			log.Printf("Limite de vagas atingido para user %d: %d/%d. Pulando site %s", site.UserID, current, maxLimit, site.Name)
 			return nil
 		}
 	}
@@ -192,7 +192,7 @@ func crawlSite(site models.Site) error {
 
 			// Verifica se a vaga já existe
 			var existingJob models.Job
-			if err := db.DB.Where("url = ? AND organization_id = ?", link, site.OrganizationID).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND user_id = ?", link, site.UserID).First(&existingJob).Error; err == nil {
 				if existingJob.Description == "" {
 					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
 					fetchJobDetails(&existingJob, site, client)
@@ -202,7 +202,7 @@ func crawlSite(site models.Site) error {
 			}
 
 			job := models.Job{
-				OrganizationID: site.OrganizationID,
+				UserID: site.UserID,
 				SiteID:         &site.ID,
 				URL:            link,
 				Title:          title,
@@ -278,7 +278,7 @@ func crawlSite(site models.Site) error {
 			}
 
 			var existingJob models.Job
-			if err := db.DB.Where("url = ? AND organization_id = ?", link, site.OrganizationID).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND user_id = ?", link, site.UserID).First(&existingJob).Error; err == nil {
 				if existingJob.Description == "" {
 					log.Printf("Vaga já existe mas sem descrição, buscando detalhes...")
 					fetchJobDetails(&existingJob, site, client)
@@ -288,7 +288,7 @@ func crawlSite(site models.Site) error {
 			}
 
 			job := models.Job{
-				OrganizationID: site.OrganizationID,
+				UserID: site.UserID,
 				SiteID:         &site.ID,
 				URL:            link,
 				Title:          title,
@@ -322,7 +322,7 @@ func crawlSite(site models.Site) error {
 
 	log.Printf("Vagas encontradas: %d", jobsFound)
 	db.DB.Model(&site).Update("last_crawl", time.Now())
-	db.Log(site.OrganizationID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "url": "%s", "jobs": %d}`, site.Name, site.URL, jobsFound))
+	db.Log(site.UserID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "url": "%s", "jobs": %d}`, site.Name, site.URL, jobsFound))
 
 	return nil
 }
@@ -605,12 +605,12 @@ func crawlWorkana(site models.Site) error {
 			jobURL := NormalizeURL("https://www.workana.com/job/" + slug)
 
 			var existingJob models.Job
-			if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&existingJob).Error; err == nil {
+			if err := db.DB.Where("url = ? AND user_id = ?", jobURL, site.UserID).First(&existingJob).Error; err == nil {
 				continue
 			}
 
 			job := models.Job{
-				OrganizationID: site.OrganizationID,
+				UserID: site.UserID,
 				SiteID:         &site.ID,
 				URL:            jobURL,
 				Title:          title,
@@ -645,7 +645,7 @@ func crawlWorkana(site models.Site) error {
 
 	log.Printf("Total de vagas encontradas na Workana: %d", jobsFound)
 	db.DB.Model(&site).Update("last_crawl", time.Now())
-	db.Log(site.OrganizationID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
+	db.Log(site.UserID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
 
 	return nil
 }
@@ -702,7 +702,7 @@ func crawlRemoteOKAPI(site models.Site) error {
 		}
 
 		var job models.Job
-		if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&job).Error; err == nil {
+		if err := db.DB.Where("url = ? AND user_id = ?", jobURL, site.UserID).First(&job).Error; err == nil {
 			continue
 		}
 
@@ -712,7 +712,7 @@ func crawlRemoteOKAPI(site models.Site) error {
 		}
 
 		job = models.Job{
-			OrganizationID: site.OrganizationID,
+			UserID: site.UserID,
 			SiteID:        &site.ID,
 			URL:           jobURL,
 			Title:         title,
@@ -732,7 +732,7 @@ func crawlRemoteOKAPI(site models.Site) error {
 
 	log.Printf("Total de vagas salvas: %d", jobsFound)
 	db.DB.Model(&site).Update("last_crawl", now)
-	db.Log(site.OrganizationID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
+	db.Log(site.UserID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
 
 	return nil
 }
@@ -791,12 +791,12 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 		}
 
 		var job models.Job
-		if err := db.DB.Where("url = ? AND organization_id = ?", jobURL, site.OrganizationID).First(&job).Error; err == nil {
+		if err := db.DB.Where("url = ? AND user_id = ?", jobURL, site.UserID).First(&job).Error; err == nil {
 			continue
 		}
 
 		job = models.Job{
-			OrganizationID: site.OrganizationID,
+			UserID: site.UserID,
 			SiteID:        &site.ID,
 			URL:           jobURL,
 			Title:         title,
@@ -815,7 +815,7 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 
 	log.Printf("Total de vagas salvas: %d", jobsFound)
 	db.DB.Model(&site).Update("last_crawl", now)
-	db.Log(site.OrganizationID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
+	db.Log(site.UserID, "crawler", "crawl_completed", fmt.Sprintf(`{"site": "%s", "jobs": %d}`, site.Name, jobsFound))
 
 	return nil
 }

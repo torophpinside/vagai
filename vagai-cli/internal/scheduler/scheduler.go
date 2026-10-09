@@ -15,7 +15,7 @@ import (
 var c *cron.Cron
 var jobs = make(map[string]cron.EntryID)
 
-func AddSchedule(name, command, schedule string, orgID uint) error {
+func AddSchedule(name, command, schedule string, userID uint) error {
 	if err := db.Init(); err != nil {
 		return fmt.Errorf("falha ao inicializar banco: %w", err)
 	}
@@ -25,17 +25,17 @@ func AddSchedule(name, command, schedule string, orgID uint) error {
 		Command:        command,
 		Schedule:       schedule,
 		Active:         true,
-		OrganizationID: orgID,
+		UserID: userID,
 	}
 
 	if err := db.DB.Create(&sched).Error; err != nil {
 		return fmt.Errorf("falha ao adicionar schedule: %w", err)
 	}
 
-	log.Printf("Schedule adicionado: %s (org=%d) (%s) - %s", name, orgID, schedule, command)
+	log.Printf("Schedule adicionado: %s (user=%d) (%s) - %s", name, userID, schedule, command)
 
 	if c != nil {
-		if err := addToCron(name, command, schedule, orgID); err != nil {
+		if err := addToCron(name, command, schedule, userID); err != nil {
 			log.Printf("Erro ao adicionar ao cron: %v", err)
 		}
 	}
@@ -57,7 +57,7 @@ func ListSchedules() error {
 		if !s.Active {
 			status = "INATIVO"
 		}
-		fmt.Printf("[%s] %s (org=%d)\n", status, s.Name, s.OrganizationID)
+		fmt.Printf("[%s] %s (user=%d)\n", status, s.Name, s.UserID)
 		fmt.Printf("  Comando: %s\n", s.Command)
 		fmt.Printf("  Cron: %s\n", s.Schedule)
 		if s.NextRun != nil {
@@ -102,27 +102,27 @@ func RunScheduler() error {
 	var schedules []models.Schedule
 	db.DB.Where("active = ?", true).Find(&schedules)
 
-	// Group schedules by organization
+	// Group schedules by user
 	orgSchedules := make(map[uint][]models.Schedule)
 	for _, s := range schedules {
-		orgSchedules[s.OrganizationID] = append(orgSchedules[s.OrganizationID], s)
+		orgSchedules[s.UserID] = append(orgSchedules[s.UserID], s)
 	}
 
-	for orgID, orgScheds := range orgSchedules {
+	for userID, orgScheds := range orgSchedules {
 		for _, s := range orgScheds {
-			if err := addToCron(s.Name, s.Command, s.Schedule, orgID); err != nil {
+			if err := addToCron(s.Name, s.Command, s.Schedule, userID); err != nil {
 				log.Printf("Erro ao adicionar %s: %v", s.Name, err)
 			}
 		}
 	}
 
-	log.Printf("Scheduler iniciado com %d jobs em %d organizações", len(schedules), len(orgSchedules))
+	log.Printf("Scheduler iniciado com %d jobs em %d usuários", len(schedules), len(orgSchedules))
 	c.Start()
 
 	select {}
 }
 
-func addToCron(name, command, schedule string, orgID uint) error {
+func addToCron(name, command, schedule string, userID uint) error {
 	scheduleNormalized := normalizeSchedule(schedule)
 
 	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
@@ -132,14 +132,14 @@ func addToCron(name, command, schedule string, orgID uint) error {
 	}
 
 	id, err := c.AddFunc(scheduleNormalized, func() {
-		runCommand(name, command, orgID)
+		runCommand(name, command, userID)
 	})
 	if err != nil {
 		return fmt.Errorf("erro ao adicionar job: %w", err)
 	}
 
 	jobs[name] = id
-	log.Printf("Job adicionado ao cron: %s (org=%d)", name, orgID)
+	log.Printf("Job adicionado ao cron: %s (user=%d)", name, userID)
 
 	return nil
 }
@@ -191,8 +191,8 @@ func normalizeSchedule(schedule string) string {
 	return schedule
 }
 
-func runCommand(name, command string, orgID uint) {
-	log.Printf("[%s] Executando: %s (org=%d)", name, command, orgID)
+func runCommand(name, command string, userID uint) {
+	log.Printf("[%s] Executando: %s (user=%d)", name, command, userID)
 
 	startTime := time.Now()
 	startedAt := startTime

@@ -1,6 +1,6 @@
 <template>
-  <Card title="Métricas da Organização" subtitle="Plano, assinatura e conversão">
-    <template #icon><Building2 class="w-6 h-6 text-purple-400" /></template>
+  <Card title="Métricas do Usuário" subtitle="Plano, assinatura e conversão">
+    <template #icon><User class="w-6 h-6 text-purple-400" /></template>
     <EmptyState :data="data" :loading="loading" :error="error">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Kpi :label="'Vagas'" :value="metrics?.jobs_posted" />
@@ -20,15 +20,19 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Building2 } from 'lucide-vue-next'
-import { useAnalyticsOrgMetrics, useMe } from '../../services/api'
+import { User } from 'lucide-vue-next'
+import { useAnalyticsUserMetrics, useMe } from '../../services/api'
+import { useAuth } from '../../composables/auth'
 import Card from './Card.vue'
 import EmptyState from './EmptyState.vue'
 import Kpi from './Kpi.vue'
 
 const { data: me, isLoading: meLoading } = useMe()
-const orgId = computed(() => me.value?.organization?.id)
-const { data, isLoading: loading, isError: error } = useAnalyticsOrgMetrics(orgId)
+const { user } = useAuth()
+const isAdmin = computed(() => user.value?.role === 'admin')
+// Admin vê métricas globais (user/0); usuário comum vê as próprias.
+const userId = computed(() => (isAdmin.value ? 0 : me.value?.user?.id))
+const { data, isLoading: loading, isError: error } = useAnalyticsUserMetrics(userId)
 
 const metrics = computed(() => data.value?.metrics)
 

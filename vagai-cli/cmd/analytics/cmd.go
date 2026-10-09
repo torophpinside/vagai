@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var orgID uint
+var userID uint
 
 // Cmd é o comando raiz `vagai analytics <relatório>` com os subcomandos de
 // relatórios (research.md #3).
@@ -18,34 +18,34 @@ var Cmd = &cobra.Command{
 	Use:   "analytics",
 	Short: "Gera relatórios de analytics do banco do VagAI",
 	Long: `Gera relatórios de analytics direto do banco de dados:
-matching-distribution, resume-insights, job-trends, org-metrics,
+matching-distribution, resume-insights, job-trends, user-metrics,
 interview-prep, ai-quality, time-to-hire, skills-gap, funnel e geographic.`,
 	SilenceUsage: true,
 }
 
 // setup conecta ao banco, silencia o logger do GORM (saída limpa do relatório)
-// e resolve a organização (--org; auto-detecção quando há exatamente uma).
+// e resolve o usuário (--user; auto-detecção quando há exatamente uma).
 func setup(cmd *cobra.Command) (uint, error) {
 	if err := db.Init(); err != nil {
 		return 0, err
 	}
 	db.DB.Logger = logger.Default.LogMode(logger.Silent)
 
-	if orgID > 0 {
-		return orgID, nil
+	if userID > 0 {
+		return userID, nil
 	}
 
-	var orgs []models.Organization
-	if err := db.DB.Order("id").Find(&orgs).Error; err != nil {
+	var users []models.User
+	if err := db.DB.Order("id").Find(&users).Error; err != nil {
 		return 0, err
 	}
-	switch len(orgs) {
+	switch len(users) {
 	case 0:
-		return 0, errors.New("nenhuma organização encontrada no banco")
+		return 0, errors.New("nenhum usuário encontrado no banco")
 	case 1:
-		return orgs[0].ID, nil
+		return users[0].ID, nil
 	default:
-		return 0, fmt.Errorf("%d organizações encontradas: use --org <id> para escolher", len(orgs))
+		return 0, fmt.Errorf("%d usuários encontrados: use --user <id> para escolher", len(users))
 	}
 }
 
@@ -59,12 +59,12 @@ func mustSetup(cmd *cobra.Command) (uint, error) {
 }
 
 func init() {
-	// PersistentFlags para o --org estar disponível em TODOS os subcomandos
-	// (ex.: `vagai analytics matching-distribution --org 17`).
-	Cmd.PersistentFlags().UintVar(&orgID, "org", 0, "ID da organização (auto-detectada se houver apenas uma)")
+	// PersistentFlags para o --user estar disponível em TODOS os subcomandos
+	// (ex.: `vagai analytics matching-distribution --user 17`).
+	Cmd.PersistentFlags().UintVar(&userID, "user", 0, "ID do usuário (auto-detectada se houver apenas uma)")
 }
 
 // printHeader imprime o cabeçalho padrão dos relatórios.
-func printHeader(title string, org uint) {
-	fmt.Printf("=== %s (organização %d) ===\n", title, org)
+func printHeader(title string, user uint) {
+	fmt.Printf("=== %s (usuário %d) ===\n", title, user)
 }

@@ -26,17 +26,17 @@ const prepMaxTrendRows = 500
 //
 // Retorna nil quando a organização não possui preparações, perguntas nem
 // histórico de verificação (estado vazio, T039).
-func (s *Service) InterviewPrepAnalysis(ctx context.Context, orgID uint) (*models.InterviewPrepAnalysis, error) {
+func (s *Service) InterviewPrepAnalysis(ctx context.Context, userID uint) (*models.InterviewPrepAnalysis, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:interview-prep", orgID)
+	key := fmt.Sprintf("org:%d:interview-prep", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.InterviewPrepAnalysis, error) {
-		return loadInterviewPrepAnalysis(db, orgID)
+		return loadInterviewPrepAnalysis(db, userID)
 	})
 }
 
-func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAnalysis, error) {
+func loadInterviewPrepAnalysis(db *gorm.DB, userID uint) (*models.InterviewPrepAnalysis, error) {
 	// T035 — contagem de interview_questions por categoria (escopo da org).
 	type prepCategoryRow struct {
 		Category models.InterviewCategory
@@ -46,8 +46,8 @@ func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAn
 	if err := db.Raw(`
 		SELECT category, COUNT(*) AS cnt
 		FROM interview_questions
-		WHERE organization_id = ?
-		GROUP BY category`, orgID).Scan(&catRows).Error; err != nil {
+		WHERE user_id = ?
+		GROUP BY category`, userID).Scan(&catRows).Error; err != nil {
 		return nil, err
 	}
 	categories := make(map[models.InterviewCategory]int64, len(catRows))
@@ -64,8 +64,8 @@ func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAn
 	if err := db.Raw(`
 		SELECT source, COUNT(*) AS cnt
 		FROM interview_preparations
-		WHERE organization_id = ?
-		GROUP BY source`, orgID).Scan(&srcRows).Error; err != nil {
+		WHERE user_id = ?
+		GROUP BY source`, userID).Scan(&srcRows).Error; err != nil {
 		return nil, err
 	}
 	sources := make(map[models.InterviewPreparationSource]int64, len(srcRows))
@@ -76,7 +76,7 @@ func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAn
 	// TotalPreparations — COUNT(*) de interview_preparations da org.
 	var total int64
 	if err := db.Table("interview_preparations").
-		Where("organization_id = ?", orgID).
+		Where("user_id = ?", userID).
 		Count(&total).Error; err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAn
 	if err := db.Raw(`
 		SELECT AVG(score) AS avg_score
 		FROM preparation_verification_histories
-		WHERE organization_id = ?`, orgID).Scan(&avgScore).Error; err != nil {
+		WHERE user_id = ?`, userID).Scan(&avgScore).Error; err != nil {
 		return nil, err
 	}
 
@@ -98,9 +98,9 @@ func loadInterviewPrepAnalysis(db *gorm.DB, orgID uint) (*models.InterviewPrepAn
 	if err := db.Raw(`
 		SELECT score
 		FROM preparation_verification_histories
-		WHERE organization_id = ?
+		WHERE user_id = ?
 		ORDER BY verified_at ASC
-		LIMIT ?`, orgID, prepMaxTrendRows).Scan(&scoreRows).Error; err != nil {
+		LIMIT ?`, userID, prepMaxTrendRows).Scan(&scoreRows).Error; err != nil {
 		return nil, err
 	}
 

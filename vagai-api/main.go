@@ -79,10 +79,10 @@ func main() {
 
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuth())
-	api.Use(middleware.ScopedDB(db))
 	{
-		// Analytics (specs/010-data-analytics): /api/v1/analytics/* — acesso
-		// restrito a org admins e super admins (FR-020).
+		// Analytics (specs/010-data-analytics): /api/v1/analytics/* —
+		// autenticado; admin vê dados globais, usuário comum os próprios
+		// (middleware.ResolveAnalyticsUserID).
 		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
 
 		api.GET("/stats", handlers.GetStats)
@@ -148,11 +148,8 @@ func main() {
 func autoMigrate(db *gorm.DB) {
 	log.Println("Running migrations...")
 	db.AutoMigrate(
-		&models.Organization{},
 		&models.User{},
-		&models.Membership{},
 		&models.Plan{},
-		&models.Subscription{},
 		&models.ApiKey{},
 		&models.AuditLog{},
 		&models.Site{},

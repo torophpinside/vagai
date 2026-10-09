@@ -15,11 +15,11 @@ var matchingCmd = &cobra.Command{
 taxa de conversão match→candidatura e top títulos por taxa de sucesso.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Matching Effectiveness", org)
+		printHeader("Matching Effectiveness", user)
 
 		type bucketRow struct {
 			Bucket   string
@@ -39,14 +39,14 @@ taxa de conversão match→candidatura e top títulos por taxa de sucesso.`,
 				COUNT(*) AS cnt,
 				AVG(similarity_score) AS avg_score
 			FROM matches
-			WHERE organization_id = ?
-			GROUP BY bucket`, org).Scan(&rows).Error; err != nil {
+			WHERE user_id = ?
+			GROUP BY bucket`, user).Scan(&rows).Error; err != nil {
 			return err
 		}
 
 		var total, applied int64
-		db.DB.Table("matches").Where("organization_id = ?", org).Count(&total)
-		db.DB.Table("matches").Where("organization_id = ? AND applied = ?", org, true).Count(&applied)
+		db.DB.Table("matches").Where("user_id = ?", user).Count(&total)
+		db.DB.Table("matches").Where("user_id = ? AND applied = ?", user, true).Count(&applied)
 
 		if total == 0 {
 			fmt.Println("Nenhum match registrado ainda.")
@@ -76,9 +76,9 @@ taxa de conversão match→candidatura e top títulos por taxa de sucesso.`,
 				SELECT similarity_score,
 					ROW_NUMBER() OVER (ORDER BY similarity_score) AS rn,
 					COUNT(*) OVER () AS total
-				FROM matches WHERE organization_id = ?
+				FROM matches WHERE user_id = ?
 			) ranked
-			WHERE rn IN (FLOOR((total + 1) / 2), CEIL((total + 1) / 2))`, org).Scan(&med)
+			WHERE rn IN (FLOOR((total + 1) / 2), CEIL((total + 1) / 2))`, user).Scan(&med)
 
 		fmt.Printf("\nMédia: %.2f | Mediana: %.2f | Total: %d\n",
 			(weighted/float64(total))/100, med.Float64, total)
@@ -95,10 +95,10 @@ taxa de conversão match→candidatura e top títulos por taxa de sucesso.`,
 			SELECT j.title AS title, COUNT(*) AS total, COALESCE(SUM(m.applied), 0) AS applied
 			FROM matches m
 			JOIN jobs j ON j.id = m.job_id
-			WHERE m.organization_id = ?
+			WHERE m.user_id = ?
 			GROUP BY j.title
 			ORDER BY COALESCE(SUM(m.applied), 0) / COUNT(*) DESC, COUNT(*) DESC
-			LIMIT 5`, org).Scan(&titles).Error; err != nil {
+			LIMIT 5`, user).Scan(&titles).Error; err != nil {
 			return err
 		}
 		if len(titles) > 0 {

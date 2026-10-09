@@ -20,10 +20,9 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	registerUser(t, "User One", "dupe@example.com", "password123", "Org One")
 
 	resp := doRequest(t, "POST", "/api/auth/register", map[string]string{
-		"name":         "User Two",
-		"email":        "dupe@example.com",
-		"password":     "password123",
-		"organization": "Org Two",
+		"name":     "User Two",
+		"email":    "dupe@example.com",
+		"password": "password123",
 	}, "")
 	if resp.StatusCode != http.StatusConflict {
 		t.Errorf("expected 409 Conflict, got %d", resp.StatusCode)
@@ -36,10 +35,9 @@ func TestRegister_ValidationErrors(t *testing.T) {
 		body       map[string]string
 		expectCode int
 	}{
-		{"empty name", map[string]string{"name": "", "email": "a@b.com", "password": "12345678", "organization": "Org"}, http.StatusBadRequest},
-		{"invalid email", map[string]string{"name": "User", "email": "notanemail", "password": "12345678", "organization": "Org"}, http.StatusBadRequest},
-		{"short password", map[string]string{"name": "User", "email": "a@b.com", "password": "123", "organization": "Org"}, http.StatusBadRequest},
-		{"short org", map[string]string{"name": "User", "email": "a@b.com", "password": "12345678", "organization": "A"}, http.StatusBadRequest},
+		{"empty name", map[string]string{"name": "", "email": "a@b.com", "password": "12345678"}, http.StatusBadRequest},
+		{"invalid email", map[string]string{"name": "User", "email": "notanemail", "password": "12345678"}, http.StatusBadRequest},
+		{"short password", map[string]string{"name": "User", "email": "a@b.com", "password": "123"}, http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
@@ -109,20 +107,16 @@ func TestGetMe_WithValidToken(t *testing.T) {
 			ID    uint   `json:"id"`
 			Name  string `json:"name"`
 			Email string `json:"email"`
+			Plan  string `json:"plan"`
 		} `json:"user"`
-		Organization struct {
-			ID   uint   `json:"id"`
-			Name string `json:"name"`
-			Plan string `json:"plan"`
-		} `json:"organization"`
 	}
 	parseBody(t, resp, &result)
 
 	if result.User.Name != "Me User" {
 		t.Errorf("expected name 'Me User', got '%s'", result.User.Name)
 	}
-	if result.Organization.Plan != "free" {
-		t.Errorf("expected plan 'free', got '%s'", result.Organization.Plan)
+	if result.User.Plan != "free" {
+		t.Errorf("expected plan 'free', got '%s'", result.User.Plan)
 	}
 }
 

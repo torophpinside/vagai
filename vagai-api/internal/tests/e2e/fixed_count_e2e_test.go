@@ -13,7 +13,7 @@ import (
 // O ambiente de E2E não tem LM Studio; todos os testes forçam o fallback
 // determinístico via LMSTUDIO_URL apontando para uma porta morta.
 
-func getOrgID(t *testing.T, token string) uint {
+func getUserID(t *testing.T, token string) uint {
 	t.Helper()
 
 	resp := doRequest(t, "GET", "/api/me", nil, token)
@@ -21,22 +21,22 @@ func getOrgID(t *testing.T, token string) uint {
 		t.Fatalf("GET /api/me failed: status=%d", resp.StatusCode)
 	}
 	var body struct {
-		Organization struct {
+		User struct {
 			ID uint `json:"id"`
-		} `json:"organization"`
+		} `json:"user"`
 	}
 	parseBody(t, resp, &body)
-	if body.Organization.ID == 0 {
-		t.Fatal("GET /api/me returned empty organization id")
+	if body.User.ID == 0 {
+		t.Fatal("GET /api/me returned empty user id")
 	}
-	return body.Organization.ID
+	return body.User.ID
 }
 
 func insertResume(t *testing.T, orgID uint, name, content string) uint {
 	t.Helper()
 
 	resume := models.Resume{
-		OrganizationID: orgID,
+		UserID: orgID,
 		Name:           name,
 		Content:        content,
 		// MySQL rejeita string vazia em coluna JSON; "{}" desfaz para
@@ -185,7 +185,7 @@ const fixedCountTechDescription = "Vaga backend com Go, MySQL, Redis e Docker em
 // T005 [US1] Geração padrão retorna exatamente 15 perguntas.
 func TestFixedCount_DefaultGeneration(t *testing.T) {
 	token, _ := registerUser(t, "Fixed Default", "fixed-default@example.com", "password123", "Fixed Default Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/fixed-default", "Backend Developer", fixedCountTechDescription)
@@ -204,7 +204,7 @@ func TestFixedCount_DefaultGeneration(t *testing.T) {
 // T006 [US1] Truncagem: banco com 19 perguntas resulta em exatamente 15.
 func TestFixedCount_TruncatesWhenMoreThan15(t *testing.T) {
 	token, _ := registerUser(t, "Fixed Truncate", "fixed-truncate@example.com", "password123", "Fixed Truncate Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	desc := "Stack: Go, MySQL, Redis, Docker, Kubernetes, Vue, React e Python em produção."
 	matchID := setupAppliedMatch(t, token, orgID,
@@ -221,7 +221,7 @@ func TestFixedCount_TruncatesWhenMoreThan15(t *testing.T) {
 // T007 [US1] Suplementação: banco com 7 perguntas resulta em exatamente 15.
 func TestFixedCount_SupplementsWhenFewerThan15(t *testing.T) {
 	token, _ := registerUser(t, "Fixed Supplement", "fixed-supplement@example.com", "password123", "Fixed Supplement Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	// Descrição sem tecnologias detectadas (pool de 7), mas com termos em
 	// comum com o currículo para gerar match (score > 0).
@@ -240,7 +240,7 @@ func TestFixedCount_SupplementsWhenFewerThan15(t *testing.T) {
 // T008 [US1] Fallback de template (sem IA) retorna exatamente 15 perguntas.
 func TestFixedCount_TemplateFallback(t *testing.T) {
 	token, _ := registerUser(t, "Fixed Fallback", "fixed-fallback@example.com", "password123", "Fixed Fallback Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/fixed-fallback", "Backend Developer", fixedCountTechDescription)
@@ -258,7 +258,7 @@ func TestFixedCount_TemplateFallback(t *testing.T) {
 // T009 [US1] Mesma seed @random produz a mesma ordem de perguntas.
 func TestFixedCount_ReproducibleOrderingWithSeed(t *testing.T) {
 	token, _ := registerUser(t, "Fixed Seed", "fixed-seed@example.com", "password123", "Fixed Seed Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchA := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/fixed-seed-a", "Backend Developer", fixedCountTechDescription)

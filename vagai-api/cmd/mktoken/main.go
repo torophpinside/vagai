@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	token, err := middleware.GenerateToken(1, 1, "torophpinside@vagai.ia", "owner")
+	token, err := middleware.GenerateToken(1, "torophpinside@vagai.ia", "admin")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

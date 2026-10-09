@@ -30,34 +30,34 @@ var fnFunnelStages = []string{
 // Funnel calcula o funil de conversão em 4 estágios (T059), o tempo mediano
 // entre estágios (T061) e os pontos de maior abandono (T060) — US9.
 //
-// Retorna nil quando não há nenhum usuário (estado vazio, T063). Com orgID
-// == 0 agrega todas as organizações; orgID > 0 escopa cada tabela pelo tenant
+// Retorna nil quando não há nenhum usuário (estado vazio, T063). Com userID
+// == 0 agrega todas as organizações; userID > 0 escopa cada tabela pelo tenant
 // (Constitution III).
-func (s *Service) Funnel(ctx context.Context, orgID uint) (*models.FunnelMetrics, error) {
+func (s *Service) Funnel(ctx context.Context, userID uint) (*models.FunnelMetrics, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:funnel", orgID)
+	key := fmt.Sprintf("org:%d:funnel", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.FunnelMetrics, error) {
-		return fnFunnelLoad(db, orgID)
+		return fnFunnelLoad(db, userID)
 	})
 }
 
-func fnFunnelLoad(db *gorm.DB, orgID uint) (*models.FunnelMetrics, error) {
+func fnFunnelLoad(db *gorm.DB, userID uint) (*models.FunnelMetrics, error) {
 	// T059 — contagens agregadas em SQL, na ordem fixa dos estágios.
-	signups, err := fnFunnelCountSignups(db, orgID)
+	signups, err := fnFunnelCountSignups(db, userID)
 	if err != nil {
 		return nil, err
 	}
-	resumes, err := fnFunnelCount(db, "resumes", orgID, "", nil)
+	resumes, err := fnFunnelCount(db, "resumes", userID, "", nil)
 	if err != nil {
 		return nil, err
 	}
-	matches, err := fnFunnelCount(db, "matches", orgID, "", nil)
+	matches, err := fnFunnelCount(db, "matches", userID, "", nil)
 	if err != nil {
 		return nil, err
 	}
-	applied, err := fnFunnelCount(db, "matches", orgID, "applied = TRUE", nil)
+	applied, err := fnFunnelCount(db, "matches", userID, "applied = TRUE", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func fnFunnelLoad(db *gorm.DB, orgID uint) (*models.FunnelMetrics, error) {
 	}
 
 	// T061 — tempo mediano por estágio.
-	timings, err := fnFunnelStageTimings(db, orgID, counts)
+	timings, err := fnFunnelStageTimings(db, userID, counts)
 	if err != nil {
 		return nil, err
 	}
@@ -93,16 +93,15 @@ func fnFunnelLoad(db *gorm.DB, orgID uint) (*models.FunnelMetrics, error) {
 	}, nil
 }
 
-// fnFunnelCountSignups conta usuários distintos que pertencem a pelo menos
-// uma membership (T059, estágio 1): COUNT(DISTINCT users.id) com JOIN em
-// memberships, excluindo usuários soft-deletados. Org 0 agrega tudo.
-func fnFunnelCountSignups(db *gorm.DB, orgID uint) (int64, error) {
+// fnFunnelCountSignups conta usuários distintos (estágio 1 do funil):
+// COUNT(DISTINCT users.id) excluindo usuários soft-deletados. userID 0
+// agrega todos os usuários da plataforma.
+func fnFunnelCountSignups(db *gorm.DB, userID uint) (int64, error) {
 	q := db.Table("users").
 		Select("COUNT(DISTINCT users.id)").
-		Joins("JOIN memberships ms ON ms.user_id = users.id").
 		Where("users.deleted_at IS NULL")
-	if orgID > 0 {
-		q = q.Where("ms.organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("users.id = ?", userID)
 	}
 	var n int64
 	if err := q.Scan(&n).Error; err != nil {
@@ -111,12 +110,12 @@ func fnFunnelCountSignups(db *gorm.DB, orgID uint) (int64, error) {
 	return n, nil
 }
 
-// fnFunnelCount conta linhas de <table>, escopadas por organization_id quando
-// orgID > 0, com <extra> opcional no WHERE (ex.: "applied = TRUE").
-func fnFunnelCount(db *gorm.DB, table string, orgID uint, extra string, extraArgs []any) (int64, error) {
+// fnFunnelCount conta linhas de <table>, escopadas por user_id quando
+// userID > 0, com <extra> opcional no WHERE (ex.: "applied = TRUE").
+func fnFunnelCount(db *gorm.DB, table string, userID uint, extra string, extraArgs []any) (int64, error) {
 	q := db.Table(table)
-	if orgID > 0 {
-		q = q.Where(table+".organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where(table+".user_id = ?", userID)
 	}
 	if extra != "" {
 		q = q.Where(extra, extraArgs...)
@@ -136,20 +135,20 @@ func fnFunnelCount(db *gorm.DB, table string, orgID uint, extra string, extraArg
 //	AVG(v) WHERE rn IN (FLOOR((total+1)/2), CEIL((total+1)/2))
 //
 // Samples é a contagem de linhas do estágio de destino da transição.
-func fnFunnelStageTimings(db *gorm.DB, orgID uint, counts []int64) ([]models.StageTiming, error) {
-	// Mesmo recorte do estágio 1 (usuários ativos da organização).
-	membershipsFrom := "memberships ms JOIN users u ON u.id = ms.user_id"
-	membershipsWhere := "u.deleted_at IS NULL"
-	var membershipsArgs []any
-	if orgID > 0 {
-		membershipsWhere += " AND ms.organization_id = ?"
-		membershipsArgs = append(membershipsArgs, orgID)
+func fnFunnelStageTimings(db *gorm.DB, userID uint, counts []int64) ([]models.StageTiming, error) {
+	// Mesmo recorte do estágio 1 (usuários ativos da plataforma).
+	signupFrom := "users u"
+	signupWhere := "u.deleted_at IS NULL"
+	var signupArgs []any
+	if userID > 0 {
+		signupWhere += " AND u.id = ?"
+		signupArgs = append(signupArgs, userID)
 	}
 
-	resumesWhere, resumesArgs := fnFunnelWhere("resumes", orgID, "")
-	matchesWhere, matchesArgs := fnFunnelWhere("matches", orgID, "")
+	resumesWhere, resumesArgs := fnFunnelWhere("resumes", userID, "")
+	matchesWhere, matchesArgs := fnFunnelWhere("matches", userID, "")
 
-	mSignup, err := fnFunnelMedian(db, "ms.created_at", membershipsFrom, membershipsWhere, membershipsArgs...)
+	mSignup, err := fnFunnelMedian(db, "u.created_at", signupFrom, signupWhere, signupArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -180,14 +179,14 @@ func fnFunnelStageTimings(db *gorm.DB, orgID uint, counts []int64) ([]models.Sta
 }
 
 // fnFunnelWhere devolve o WHERE (e os args) de <table> com o escopo opcional
-// de organização: orgID == 0 agrega todas as organizações; orgID > 0 filtra
-// por organization_id. <extra> é acrescentado ao WHERE com AND.
-func fnFunnelWhere(table string, orgID uint, extra string) (string, []any) {
+// de organização: userID == 0 agrega todas as organizações; userID > 0 filtra
+// por user_id. <extra> é acrescentado ao WHERE com AND.
+func fnFunnelWhere(table string, userID uint, extra string) (string, []any) {
 	where := "1 = 1"
 	var args []any
-	if orgID > 0 {
-		where = table + ".organization_id = ?"
-		args = append(args, orgID)
+	if userID > 0 {
+		where = table + ".user_id = ?"
+		args = append(args, userID)
 	}
 	if extra != "" {
 		where += " AND " + extra

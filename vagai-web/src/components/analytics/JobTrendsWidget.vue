@@ -1,5 +1,5 @@
 <template>
-  <Card title="Tendências de Vagas" subtitle="Status, principais organizações e volume de postagens">
+  <Card title="Tendências de Vagas" subtitle="Status, principais usuários e volume de postagens">
     <template #icon><Briefcase class="w-6 h-6 text-amber-400" /></template>
     <EmptyState :data="data" :loading="loading" :error="error">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -8,8 +8,8 @@
           <Bar :data="statusChart" :options="barOptions" />
         </div>
         <div>
-          <h3 class="text-xs text-slate-400 uppercase tracking-widest mb-4">Principais Organizações</h3>
-          <FacetList :items="data?.top_organizations" color="bg-amber-500" />
+          <h3 class="text-xs text-slate-400 uppercase tracking-widest mb-4">Principais Usuários</h3>
+          <FacetList :items="topUsers" color="bg-amber-500" />
         </div>
       </div>
     </EmptyState>
@@ -26,6 +26,8 @@ import FacetList from './FacetList.vue'
 import { Bar, barOptions, PALETTE } from './charts'
 
 const { data, isLoading: loading, isError: error } = useAnalyticsJobTrends()
+
+const topUsers = computed(() => (data.value?.top_users || []).map(u => ({ name: u.name, count: u.job_count })))
 
 const statusChart = computed(() => ({
   labels: Object.keys(data.value?.jobs_by_status || {}),

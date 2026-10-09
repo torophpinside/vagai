@@ -12,15 +12,15 @@ var jobTrendsPeriod string
 var jobTrendsCmd = &cobra.Command{
 	Use:   "job-trends",
 	Short: "Relatório de tendências de vagas",
-	Long: `Distribuição de vagas por status, top organizações por volume,
+	Long: `Distribuição de vagas por status, top usuários por volume,
 volume de postagens por período e empresas ativas.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Job Market Trends", org)
+		printHeader("Job Market Trends", user)
 
 		type statusRow struct {
 			Status string
@@ -28,8 +28,8 @@ volume de postagens por período e empresas ativas.`,
 		}
 		var statuses []statusRow
 		q := db.DB.Table("jobs").Select("status, COUNT(*) AS cnt").Group("status")
-		if org > 0 {
-			q = q.Where("organization_id = ?", org)
+		if user > 0 {
+			q = q.Where("user_id = ?", user)
 		}
 		if err := q.Scan(&statuses).Error; err != nil {
 			return err
@@ -53,19 +53,19 @@ volume de postagens por período e empresas ativas.`,
 			Name     string
 			JobCount int64
 		}
-		var orgs []orgRow
+		var users []orgRow
 		orgQ := db.DB.Table("jobs").
-			Select("organizations.name, COUNT(*) AS job_count").
-			Joins("JOIN organizations ON organizations.id = jobs.organization_id").
-			Group("organizations.name").Order("job_count DESC").Limit(5)
-		if org > 0 {
-			orgQ = orgQ.Where("jobs.organization_id = ?", org)
+			Select("users.name, COUNT(*) AS job_count").
+			Joins("JOIN users ON users.id = jobs.user_id").
+			Group("users.name").Order("job_count DESC").Limit(5)
+		if user > 0 {
+			orgQ = orgQ.Where("jobs.user_id = ?", user)
 		}
-		if err := orgQ.Scan(&orgs).Error; err != nil {
+		if err := orgQ.Scan(&users).Error; err != nil {
 			return err
 		}
-		fmt.Println("\nTop organizações:")
-		for _, o := range orgs {
+		fmt.Println("\nTop usuários:")
+		for _, o := range users {
 			fmt.Printf("  %-40s %6d vagas\n", o.Name, o.JobCount)
 		}
 
@@ -90,8 +90,8 @@ volume de postagens por período e empresas ativas.`,
 		volQ := db.DB.Table("jobs").
 			Select(fmt.Sprintf("%s AS period, COUNT(*) AS cnt", expr)).
 			Where("COALESCE(posted_date, collected_at) IS NOT NULL")
-		if org > 0 {
-			volQ = volQ.Where("organization_id = ?", org)
+		if user > 0 {
+			volQ = volQ.Where("user_id = ?", user)
 		}
 		if err := volQ.Group("period").Order("period DESC").Limit(12).Scan(&vol).Error; err != nil {
 			return err
@@ -103,8 +103,8 @@ volume de postagens por período e empresas ativas.`,
 
 		var active int64
 		activeQ := db.DB.Table("jobs").Select("COUNT(DISTINCT NULLIF(TRIM(company), ''))")
-		if org > 0 {
-			activeQ = activeQ.Where("organization_id = ?", org)
+		if user > 0 {
+			activeQ = activeQ.Where("user_id = ?", user)
 		}
 		activeQ.Scan(&active)
 

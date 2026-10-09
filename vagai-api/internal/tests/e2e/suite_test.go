@@ -139,11 +139,8 @@ func startMySQL(ctx context.Context) (tc.Container, *gorm.DB, error) {
 
 func runMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&models.Organization{},
 		&models.User{},
-		&models.Membership{},
 		&models.Plan{},
-		&models.Subscription{},
 		&models.ApiKey{},
 		&models.AuditLog{},
 		&models.Site{},
@@ -200,6 +197,11 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuth())
 	{
+		// Analytics: /api/v1/analytics/* — autenticado; escopo por papel
+		// resolvido em middleware.ResolveAnalyticsUserID (admin globais,
+		// usuário comum os próprios dados).
+		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
+
 		api.GET("/me", handlers.GetMe)
 		api.PATCH("/me", handlers.UpdateProfile)
 		api.POST("/me/change-password", handlers.ChangePassword)
@@ -246,14 +248,13 @@ func testURL(path string) string {
 	return testServer.URL + path
 }
 
-func registerUser(t *testing.T, name, email, password, org string) (string, uint) {
+func registerUser(t *testing.T, name, email, password, _ string) (string, uint) {
 	t.Helper()
 
 	body := map[string]string{
-		"name":         name,
-		"email":        email,
-		"password":     password,
-		"organization": org,
+		"name":     name,
+		"email":    email,
+		"password": password,
 	}
 
 	resp := doRequest(t, "POST", "/api/auth/register", body, "")

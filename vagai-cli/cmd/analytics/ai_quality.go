@@ -14,11 +14,11 @@ var aiQualityCmd = &cobra.Command{
 taxa de sucesso por fonte e tempo médio de processamento.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("AI Analysis Quality", org)
+		printHeader("AI Analysis Quality", user)
 
 		type bucketRow struct {
 			Bucket string
@@ -35,8 +35,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 			END AS bucket,
 			COUNT(*) AS cnt
 		`)
-		if org > 0 {
-			qb = qb.Where("organization_id = ?", org)
+		if user > 0 {
+			qb = qb.Where("user_id = ?", user)
 		}
 		qb = qb.Group("bucket")
 		if err := qb.Scan(&buckets).Error; err != nil {
@@ -45,8 +45,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 
 		var total int64
 		qt := db.DB.Table("ai_analysis_results")
-		if org > 0 {
-			qt = qt.Where("organization_id = ?", org)
+		if user > 0 {
+			qt = qt.Where("user_id = ?", user)
 		}
 		if err := qt.Count(&total).Error; err != nil {
 			return err
@@ -74,8 +74,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 		// Média
 		var avg float64
 		qa := db.DB.Table("ai_analysis_results").Select("AVG(analysis_score) AS avg")
-		if org > 0 {
-			qa = qa.Where("organization_id = ?", org)
+		if user > 0 {
+			qa = qa.Where("user_id = ?", user)
 		}
 		if err := qa.Scan(&avg).Error; err != nil {
 			return err
@@ -95,8 +95,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 		}
 		var sts []st
 		qs := db.DB.Table("ai_analysis_results").Select("status, COUNT(*) AS cnt")
-		if org > 0 {
-			qs = qs.Where("organization_id = ?", org)
+		if user > 0 {
+			qs = qs.Where("user_id = ?", user)
 		}
 		qs = qs.Group("status")
 		if err := qs.Scan(&sts).Error; err != nil {
@@ -121,8 +121,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 			SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) AS error,
 			SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending
 		`)
-		if org > 0 {
-			qsrc = qsrc.Where("organization_id = ?", org)
+		if user > 0 {
+			qsrc = qsrc.Where("user_id = ?", user)
 		}
 		qsrc = qsrc.Group("source")
 		if err := qsrc.Scan(&srcs).Error; err != nil {
@@ -143,8 +143,8 @@ taxa de sucesso por fonte e tempo médio de processamento.`,
 		// Processamento
 		var proc float64
 		qp := db.DB.Table("ai_analysis_results").Select("AVG(UNIX_TIMESTAMP(updated_at) - UNIX_TIMESTAMP(created_at)) AS proc")
-		if org > 0 {
-			qp = qp.Where("organization_id = ?", org)
+		if user > 0 {
+			qp = qp.Where("user_id = ?", user)
 		}
 		qp = qp.Where("status IN ('completed','error')")
 		if err := qp.Scan(&proc).Error; err != nil {

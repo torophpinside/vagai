@@ -6,7 +6,6 @@ import Matches from './pages/Matches.vue'
 import Applied from './pages/Applied.vue'
 import Analysis from './pages/Analysis.vue'
 import Settings from './pages/Settings.vue'
-import Team from './pages/Team.vue'
 import Billing from './pages/Billing.vue'
 import Login from './pages/auth/Login.vue'
 import Register from './pages/auth/Register.vue'
@@ -25,9 +24,8 @@ const routes = [
   { path: '/matches', name: 'Matches', component: Matches, meta: { requiresAuth: true } },
   { path: '/applied', name: 'Applied', component: Applied, meta: { requiresAuth: true } },
   { path: '/analysis', name: 'Analysis', component: Analysis, meta: { requiresAuth: true } },
-  { path: '/analytics', name: 'Analytics', component: Analytics, meta: { requiresAuth: true, orgAdmin: true } },
+  { path: '/analytics', name: 'Analytics', component: Analytics, meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
-  { path: '/settings/team', name: 'Team', component: Team, meta: { requiresAuth: true } },
   { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } },
   { path: '/resume-editor/:id', name: 'ResumeEditor', component: ResumeEditor, meta: { requiresAuth: true } },
   { path: '/interview-prep', name: 'InterviewPreparations', component: InterviewPreparations, meta: { requiresAuth: true } },
@@ -48,10 +46,10 @@ router.beforeEach((to, from, next) => {
     next({ name: 'Login' })
   } else if (to.meta.guest && isAuth) {
     next({ name: 'Dashboard' })
-  } else if (to.meta.orgAdmin) {
+  } else if (to.meta.admin) {
     const rawUser = localStorage.getItem('vagai_user')
-    const isOrgAdmin = rawUser ? ['owner', 'admin'].includes(JSON.parse(rawUser).role) : false
-    next(isOrgAdmin ? undefined : { name: 'Dashboard' })
+    const isAdmin = rawUser ? JSON.parse(rawUser).role === 'admin' : false
+    next(isAdmin ? undefined : { name: 'Dashboard' })
   } else {
     next()
   }

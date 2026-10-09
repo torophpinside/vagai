@@ -47,11 +47,11 @@ export const useAnalyticsJobTrends = (params = {}) => {
   })
 }
 
-export const useAnalyticsOrgMetrics = (orgId) => {
+export const useAnalyticsUserMetrics = (userId) => {
   return useQuery({
-    queryKey: ['analytics', 'org-metrics', orgId],
-    queryFn: () => api.get(`/v1/analytics/org/${orgId}`).then(res => res.data),
-    enabled: !!orgId
+    queryKey: ['analytics', 'user-metrics', userId],
+    queryFn: () => api.get(`/v1/analytics/user/${userId}`).then(res => res.data),
+    enabled: userId != null
   })
 }
 
@@ -126,8 +126,8 @@ export const useMatches = (filters = {}) => {
   })
 }
 
-export const useSites = () => {
-  return useQuery({ queryKey: ['sites'], queryFn: () => api.get('/sites').then(res => res.data) })
+export const useSites = (options = {}) => {
+  return useQuery({ queryKey: ['sites'], queryFn: () => api.get('/sites').then(res => res.data), ...options })
 }
 
 export const useResumes = () => {
@@ -151,8 +151,8 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
-export const useNegativeKeywords = () => {
-  return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data) })
+export const useNegativeKeywords = (options = {}) => {
+  return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data), ...options })
 }
 
 export const listSites = () => api.get('/sites').then(res => res.data)

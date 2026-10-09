@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,10 +12,9 @@ import (
 )
 
 type Claims struct {
-	UserID         uint   `json:"user_id"`
-	OrganizationID uint   `json:"organization_id"`
-	Email          string `json:"email"`
-	Role           string `json:"role"`
+	UserID uint   `json:"user_id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -52,19 +52,17 @@ func JWTAuth() gin.HandlerFunc {
 		}
 
 		c.Set("user_id", claims.UserID)
-		c.Set("org_id", claims.OrganizationID)
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", claims.Role)
 		c.Next()
 	}
 }
 
-func GenerateToken(userID, orgID uint, email, role string) (string, error) {
+func GenerateToken(userID uint, email, role string) (string, error) {
 	claims := Claims{
-		UserID:         userID,
-		OrganizationID: orgID,
-		Email:          email,
-		Role:           role,
+		UserID: userID,
+		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -74,9 +72,9 @@ func GenerateToken(userID, orgID uint, email, role string) (string, error) {
 	return token.SignedString([]byte(getJWTSecret()))
 }
 
-func GenerateRefreshToken(userID, orgID uint) (string, error) {
+func GenerateRefreshToken(userID uint) (string, error) {
 	claims := jwt.RegisteredClaims{
-		Subject:   jwt.NewNumericDate(time.Now()).Time.String(),
+		Subject:   strconv.FormatUint(uint64(userID), 10),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}

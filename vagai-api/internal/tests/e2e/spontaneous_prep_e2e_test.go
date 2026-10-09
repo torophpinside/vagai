@@ -22,7 +22,7 @@ type spontaneousQuestionDTO struct {
 type spontaneousPrepDTO struct {
 	Preparation struct {
 		ID             uint                       `json:"id"`
-		OrganizationID uint                       `json:"organization_id"`
+		UserID uint                       `json:"user_id"`
 		MatchID        uint                       `json:"match_id"`
 		JobID          uint                       `json:"job_id"`
 		Title          string                     `json:"title"`
@@ -46,7 +46,7 @@ type spontaneousPrepDTO struct {
 
 type spontaneousListedDTO struct {
 	ID          uint                       `json:"id"`
-	OrganizationID uint                    `json:"organization_id"`
+	UserID uint                    `json:"user_id"`
 	MatchID     uint                       `json:"match_id"`
 	JobID       uint                       `json:"job_id"`
 	Title       string                     `json:"title"`
@@ -101,7 +101,7 @@ func postSpontaneous(t *testing.T, token, description, seed string) *http.Respon
 func countRows(t *testing.T, model interface{}, orgID uint) int64 {
 	t.Helper()
 	var count int64
-	if err := testDB.Model(model).Where("organization_id = ?", orgID).Count(&count).Error; err != nil {
+	if err := testDB.Model(model).Where("user_id = ?", orgID).Count(&count).Error; err != nil {
 		t.Fatalf("counting rows: %v", err)
 	}
 	return count
@@ -111,7 +111,7 @@ func countRows(t *testing.T, model interface{}, orgID uint) int64 {
 // perguntas com ids reais) e a expõe na listagem.
 func TestSpontaneousPrep_PersistsPreparation(t *testing.T) {
 	token, _ := registerUser(t, "Spont Persist", "spont-persist@example.com", "password123", "Spont Persist Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	resp := postSpontaneous(t, token, spontaneousE2EDescription, "")
 	if resp.StatusCode != http.StatusCreated {
@@ -124,8 +124,8 @@ func TestSpontaneousPrep_PersistsPreparation(t *testing.T) {
 	if prep.ID == 0 {
 		t.Errorf("expected real id > 0, got %d", prep.ID)
 	}
-	if prep.OrganizationID != orgID {
-		t.Errorf("expected organization_id=%d, got %d", orgID, prep.OrganizationID)
+	if prep.UserID != orgID {
+		t.Errorf("expected user_id=%d, got %d", orgID, prep.UserID)
 	}
 	if prep.MatchID != 0 || prep.JobID != 0 {
 		t.Errorf("expected match_id=0 job_id=0 for avulsa, got match=%d job=%d", prep.MatchID, prep.JobID)
@@ -218,7 +218,7 @@ func TestSpontaneousPrep_AppearsInList(t *testing.T) {
 // T007 [US2] IA indisponível => fallback de template que ainda persiste.
 func TestSpontaneousPrep_TemplateFallbackStillPersists(t *testing.T) {
 	token, _ := registerUser(t, "Spont Fallback", "spont-fallback@example.com", "password123", "Spont Fallback Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	resp := postSpontaneous(t, token, spontaneousE2EDescription, "")
 	if resp.StatusCode != http.StatusCreated {
@@ -242,7 +242,7 @@ func TestSpontaneousPrep_TemplateFallbackStillPersists(t *testing.T) {
 // T007 [US2] Entrada inválida (sem descrição) => 400 e ZERO registros.
 func TestSpontaneousPrep_MissingDescriptionPersistsNothing(t *testing.T) {
 	token, _ := registerUser(t, "Spont Invalid", "spont-invalid@example.com", "password123", "Spont Invalid Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 	t.Setenv("LMSTUDIO_URL", "http://127.0.0.1:59999")
 
 	resp := doRequest(t, "POST", "/api/interview-prep/spontaneous", map[string]interface{}{"title": "Backend"}, token)
@@ -274,7 +274,7 @@ func TestSpontaneousPrep_MissingAuth(t *testing.T) {
 // mesma seed reproduz a ordem; descrição alterada reflete a stack.
 func TestSpontaneousPrep_RepetitionCreatesIndependentPreps(t *testing.T) {
 	token, _ := registerUser(t, "Spont Seed", "spont-seed@example.com", "password123", "Spont Seed Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	a := postSpontaneous(t, token, spontaneousE2EDescription, "seed123")
 	if a.StatusCode != http.StatusCreated {

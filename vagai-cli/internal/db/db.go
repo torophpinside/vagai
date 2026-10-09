@@ -47,7 +47,7 @@ func Init() error {
 func autoMigrate() error {
 	log.Println("Executando auto migrate...")
 	return DB.AutoMigrate(
-		&models.Organization{},
+		&models.User{},
 		&models.Plan{},
 		&models.Site{},
 		&models.Job{},
@@ -66,24 +66,24 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func Log(orgID uint, agentName, action, details string) {
+func Log(userID uint, agentName, action, details string) {
 	logEntry := models.AgentLog{
-		OrganizationID: orgID,
-		AgentName:      agentName,
-		Action:         action,
-		Details:        details,
+		UserID:    userID,
+		AgentName: agentName,
+		Action:    action,
+		Details:   details,
 	}
 	DB.Create(&logEntry)
 }
 
-func CheckJobsLimit(orgID uint) (bool, int, int, error) {
-	var org models.Organization
-	if err := DB.First(&org, orgID).Error; err != nil {
+func CheckJobsLimit(userID uint) (bool, int, int, error) {
+	var user models.User
+	if err := DB.First(&user, userID).Error; err != nil {
 		return false, 0, 0, err
 	}
 
 	var plan models.Plan
-	if err := DB.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+	if err := DB.Where("slug = ?", user.PlanSlug).First(&plan).Error; err != nil {
 		return false, 0, 0, err
 	}
 
@@ -92,23 +92,23 @@ func CheckJobsLimit(orgID uint) (bool, int, int, error) {
 	}
 
 	var count int64
-	DB.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&count)
+	DB.Model(&models.Job{}).Where("user_id = ?", userID).Count(&count)
 
 	return int(count) < plan.MaxJobs, int(count), plan.MaxJobs, nil
 }
 
-func CheckSitesLimit(orgID uint) (bool, int, int, error) {
-	if orgID == 0 {
+func CheckSitesLimit(userID uint) (bool, int, int, error) {
+	if userID == 0 {
 		return true, 0, 0, nil
 	}
 
-	var org models.Organization
-	if err := DB.First(&org, orgID).Error; err != nil {
+	var user models.User
+	if err := DB.First(&user, userID).Error; err != nil {
 		return false, 0, 0, err
 	}
 
 	var plan models.Plan
-	if err := DB.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+	if err := DB.Where("slug = ?", user.PlanSlug).First(&plan).Error; err != nil {
 		return false, 0, 0, err
 	}
 
@@ -117,7 +117,7 @@ func CheckSitesLimit(orgID uint) (bool, int, int, error) {
 	}
 
 	var count int64
-	DB.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&count)
+	DB.Model(&models.Site{}).Where("user_id = ?", userID).Count(&count)
 
 	return int(count) < plan.MaxSites, int(count), plan.MaxSites, nil
 }

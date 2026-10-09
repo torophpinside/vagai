@@ -18,31 +18,31 @@
             <LayoutDashboard class="w-5 h-5" />
             <span>Dashboard</span>
           </router-link>
-          <router-link to="/jobs" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/jobs" class="nav-link" active-class="active">
             <Briefcase class="w-5 h-5" />
             <span>Vagas</span>
           </router-link>
-          <router-link to="/matches" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/matches" class="nav-link" active-class="active">
             <CheckCircle2 class="w-5 h-5" />
             <span>Matches</span>
           </router-link>
-          <router-link to="/applied" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/applied" class="nav-link" active-class="active">
             <Send class="w-5 h-5" />
             <span>Candidatadas</span>
           </router-link>
-          <router-link to="/interview-prep" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/interview-prep" class="nav-link" active-class="active">
             <GraduationCap class="w-5 h-5" />
             <span>Preparação</span>
           </router-link>
-          <router-link to="/analysis" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/analysis" class="nav-link" active-class="active">
             <FileText class="w-5 h-5" />
             <span>Análise</span>
           </router-link>
-          <router-link v-if="isOrgAdmin" to="/analytics" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/analytics" class="nav-link" active-class="active">
             <BarChart3 class="w-5 h-5" />
             <span>Analytics</span>
           </router-link>
-          <router-link to="/resume-editor/new" class="nav-link" active-class="active">
+          <router-link v-if="!isAdmin" to="/resume-editor/new" class="nav-link" active-class="active">
             <FileEdit class="w-5 h-5" />
             <span>Currículo</span>
           </router-link>
@@ -62,7 +62,7 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-bold text-white truncate">{{ userName }}</div>
-                <div class="text-xs text-slate-500 truncate">{{ orgName }}</div>
+                <div class="text-xs text-slate-500 truncate">{{ userPlan }}</div>
               </div>
               <button class="text-slate-400 hover:text-white">
                 <ChevronUp v-if="open" class="w-4 h-4" />
@@ -75,7 +75,7 @@
               <SettingsIcon class="w-4 h-4 inline mr-2" />
               Configurações
             </router-link>
-            <router-link @click="close" to="/settings/billing" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
+            <router-link v-if="!isAdmin" @click="close" to="/settings/billing" class="block px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg">
               <CreditCard class="w-4 h-4 inline mr-2" />
               Billing
             </router-link>
@@ -147,8 +147,11 @@ onMounted(() => {
 
 const userName = computed(() => user.value?.name || 'Usuário')
 const firstName = computed(() => user.value?.name?.split(' ')[0] || 'Usuário')
-const orgName = computed(() => user.value?.organization?.name || 'VagAI')
-const isOrgAdmin = computed(() => ['owner', 'admin'].includes(user.value?.role))
+const userPlan = computed(() => {
+  const plan = user.value?.plan || user.value?.plan_slug || 'free'
+  return plan === 'free' ? 'Plano Free' : `Plano ${plan.charAt(0).toUpperCase()}${plan.slice(1)}`
+})
+const isAdmin = computed(() => user.value?.role === 'admin')
 
 function handleLogout() {
   logout()

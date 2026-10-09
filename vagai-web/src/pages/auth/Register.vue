@@ -48,18 +48,6 @@
             />
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">Nome da Empresa</label>
-            <input
-              v-model="organization"
-              type="text"
-              required
-              minlength="2"
-              class="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="Sua empresa ou nome pessoal"
-            />
-          </div>
-
           <div v-if="error" class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
             {{ error }}
           </div>
@@ -99,7 +87,6 @@ const { register } = useAuth()
 const name = ref('')
 const email = ref('')
 const password = ref('')
-const organization = ref('')
 const error = ref('')
 const loading = ref(false)
 
@@ -108,7 +95,7 @@ async function handleRegister() {
   error.value = ''
 
   try {
-    await register(name.value, email.value, password.value, organization.value)
+    await register(name.value, email.value, password.value)
     router.push('/')
   } catch (err) {
     error.value = err.code === 'QUOTA_EXCEEDED'

@@ -13,12 +13,11 @@ import (
 )
 
 // RegisterAnalyticsRoutes registra o grupo /api/v1/analytics/* (contracts/
-// api_contract.md) com autenticação JWT + controle de acesso FR-020
-// (org admins e super admins). As rotas individuais são registradas por
-// user story (US1–US10).
+// api_contract.md) com autenticação JWT. O escopo por papel é resolvido em
+// middleware.ResolveAnalyticsUserID: admin consulta dados globais (0) ou de
+// qualquer usuário; usuário comum consulta apenas os próprios. As rotas
+// individuais são registradas por user story (US1–US10).
 func RegisterAnalyticsRoutes(rg *gin.RouterGroup) {
-	rg.Use(middleware.RequireAnalyticsAccess())
-
 	// US1 — matching effectiveness
 	rg.GET("/matching-distribution", GetMatchingDistribution)
 
@@ -29,7 +28,7 @@ func RegisterAnalyticsRoutes(rg *gin.RouterGroup) {
 	rg.GET("/job-trends", GetJobTrends)
 
 	// US4 — organization metrics
-	rg.GET("/org/:organization_id", GetOrgMetrics)
+	rg.GET("/user/:user_id", GetUserMetrics)
 
 	// US5 — interview preparation analysis
 	rg.GET("/interview-prep", GetInterviewPrepAnalytics)
@@ -68,19 +67,19 @@ func parsePage(c *gin.Context) (analytics.PageOptions, bool) {
 	return opts, true
 }
 
-// queryOrgID lê o parâmetro opcional organization_id da query string.
+// queryUserID lê o parâmetro opcional user_id da query string.
 // Retorna 0 quando ausente (o middleware resolve para a organização do
 // próprio usuário; super admin com 0 consulta todas). OK=false indica
 // parâmetro inválido — resposta 422 já emitida.
-func queryOrgID(c *gin.Context) (uint, bool) {
-	raw := c.Query("organization_id")
+func queryUserID(c *gin.Context) (uint, bool) {
+	raw := c.Query("user_id")
 	if raw == "" {
 		return 0, true
 	}
 	id, err := strconv.ParseUint(raw, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error": "organization_id inválido",
+			"error": "user_id inválido",
 		})
 		return 0, false
 	}
@@ -112,17 +111,17 @@ func GetMatchingDistribution(c *gin.Context) {
 		return
 	}
 
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.MatchingDistribution(c.Request.Context(), orgID, opts)
+	result, err := svc.MatchingDistribution(c.Request.Context(), userID, opts)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -157,17 +156,17 @@ func GetMatchingDistribution(c *gin.Context) {
 
 // US2 — GET /api/v1/analytics/resume-insights (FR-011).
 func GetResumeInsights(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.ResumeInsights(c.Request.Context(), orgID)
+	result, err := svc.ResumeInsights(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -207,17 +206,17 @@ func GetJobTrends(c *gin.Context) {
 		return
 	}
 
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.JobTrends(c.Request.Context(), orgID, period, opts)
+	result, err := svc.JobTrends(c.Request.Context(), userID, period, opts)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -226,7 +225,7 @@ func GetJobTrends(c *gin.Context) {
 	if result == nil {
 		c.JSON(http.StatusOK, analytics.EmptyEnvelope(map[string]any{
 			"jobs_by_status":    map[string]int64{},
-			"top_organizations": []gin.H{},
+			"top_users": []gin.H{},
 			"posting_volume":    map[string]int64{},
 			"active_companies":  0,
 			"total_jobs":        0,
@@ -237,53 +236,57 @@ func GetJobTrends(c *gin.Context) {
 	page := analytics.NewPagination(opts, result.PostingVolumeTotal)
 	c.JSON(http.StatusOK, analytics.OKEnvelope(map[string]any{
 		"jobs_by_status":    result.JobsByStatus,
-		"top_organizations": result.TopOrganizations,
+		"top_users": result.TopUsers,
 		"posting_volume":    result.PostingVolume,
 		"active_companies":  result.ActiveCompanies,
 		"total_jobs":        result.TotalJobs,
 	}, &page))
 }
 
-// US4 — GET /api/v1/analytics/org/:organization_id (FR-013).
-// Contrato: 404 organização inexistente, 403 acesso negado, 500 serviço.
-func GetOrgMetrics(c *gin.Context) {
-	requested, err := strconv.ParseUint(c.Param("organization_id"), 10, 32)
+// US4 — GET /api/v1/analytics/user/:user_id (FR-013).
+// user_id=0 agrega os dados de todos os usuários (visão global do admin);
+// para usuário comum o ResolveAnalyticsUserID força os próprios dados.
+// Contrato: 404 usuário inexistente, 500 serviço.
+func GetUserMetrics(c *gin.Context) {
+	requested, err := strconv.ParseUint(c.Param("user_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, uint(requested))
+	userID, ok := middleware.ResolveAnalyticsUserID(c, uint(requested))
 	if !ok {
 		return
 	}
-	if orgID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
-		return
-	}
 
-	var org models.Organization
-	if err := getDB(c).First(&org, orgID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+	var user models.User
+	if userID != 0 {
+		if err := getDB(c).First(&user, userID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
+				return
+			}
+			abortAnalyticsError(c, err)
 			return
 		}
-		abortAnalyticsError(c, err)
-		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.OrgMetrics(c.Request.Context(), orgID)
+	result, err := svc.UserMetrics(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
 	}
 
 	if result == nil {
+		userName := user.Name
+		if userID == 0 {
+			userName = "Todos os usuários"
+		}
 		c.JSON(http.StatusOK, analytics.EmptyEnvelope(map[string]any{
-			"organization": gin.H{
-				"id":                  orgID,
-				"name":                org.Name,
-				"plan":                org.Plan,
+			"user": gin.H{
+				"id":                  userID,
+				"name":                userName,
+				"plan":                user.PlanSlug,
 				"subscription_status": "",
 				"trial_to_paid":       false,
 			},
@@ -299,14 +302,14 @@ func GetOrgMetrics(c *gin.Context) {
 				"average_time_to_match_days":    0,
 				"average_time_to_analysis_days": 0,
 			},
-		}, analytics.EmptyOrgMetricsMessage, analytics.EmptyOrgMetricsGuidance))
+		}, analytics.EmptyUserMetricsMessage, analytics.EmptyUserMetricsGuidance))
 		return
 	}
 
 	c.JSON(http.StatusOK, analytics.OKEnvelope(map[string]any{
-		"organization": gin.H{
-			"id":                  result.OrganizationID,
-			"name":                result.OrganizationName,
+		"user": gin.H{
+			"id":                  result.UserID,
+			"name":                result.UserName,
 			"plan":                result.PlanType,
 			"subscription_status": result.SubscriptionStatus,
 			"trial_to_paid":       result.TrialToPaid,
@@ -328,17 +331,17 @@ func GetOrgMetrics(c *gin.Context) {
 
 // US5 — GET /api/v1/analytics/interview-prep (FR-014).
 func GetInterviewPrepAnalytics(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.InterviewPrepAnalysis(c.Request.Context(), orgID)
+	result, err := svc.InterviewPrepAnalysis(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -366,17 +369,17 @@ func GetInterviewPrepAnalytics(c *gin.Context) {
 
 // US6 — GET /api/v1/analytics/ai-quality (FR-015).
 func GetAIQuality(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.AIQuality(c.Request.Context(), orgID)
+	result, err := svc.AIQuality(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -406,17 +409,17 @@ func GetAIQuality(c *gin.Context) {
 
 // US7 — GET /api/v1/analytics/time-to-hire (FR-016).
 func GetTimeToHire(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.TimeToHire(c.Request.Context(), orgID)
+	result, err := svc.TimeToHire(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -448,11 +451,11 @@ func GetTimeToHire(c *gin.Context) {
 
 // US8 — GET /api/v1/analytics/skills-gap (FR-017).
 func GetSkillsGap(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
@@ -470,7 +473,7 @@ func GetSkillsGap(c *gin.Context) {
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.SkillGap(c.Request.Context(), orgID, minFreq)
+	result, err := svc.SkillGap(c.Request.Context(), userID, minFreq)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -498,17 +501,17 @@ func GetSkillsGap(c *gin.Context) {
 
 // US9 — GET /api/v1/analytics/funnel (FR-018).
 func GetFunnel(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.Funnel(c.Request.Context(), orgID)
+	result, err := svc.Funnel(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return
@@ -534,17 +537,17 @@ func GetFunnel(c *gin.Context) {
 
 // US10 — GET /api/v1/analytics/geographic (FR-019).
 func GetGeographic(c *gin.Context) {
-	requested, ok := queryOrgID(c)
+	requested, ok := queryUserID(c)
 	if !ok {
 		return
 	}
-	orgID, ok := middleware.ResolveAnalyticsOrgID(c, requested)
+	userID, ok := middleware.ResolveAnalyticsUserID(c, requested)
 	if !ok {
 		return
 	}
 
 	svc := analyticsService(c)
-	result, err := svc.Geographic(c.Request.Context(), orgID)
+	result, err := svc.Geographic(c.Request.Context(), userID)
 	if err != nil {
 		abortAnalyticsError(c, err)
 		return

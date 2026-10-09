@@ -17,24 +17,27 @@ matches e candidaturas) com contagem, conversão acumulada, tempo mediano
 entre estágios e pontos de maior abandono.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Funnel Analysis", org)
+		printHeader("Funnel Analysis", user)
 
-		// Estágio 1 — usuários distintos com membership na organização.
+		// Estágio 1 — usuários cadastrados (user == 0 agrega todos os usuários).
+		signupQuery := db.DB.Table("users").Where("users.deleted_at IS NULL")
+		if user > 0 {
+			signupQuery = signupQuery.Where("users.id = ?", user)
+		}
 		var signups int64
-		if err := db.DB.Table("users").
-			Select("COUNT(DISTINCT users.id)").
-			Joins("JOIN memberships ms ON ms.user_id = users.id").
-			Where("users.deleted_at IS NULL AND ms.organization_id = ?", org).
-			Scan(&signups).Error; err != nil {
+		if err := signupQuery.Count(&signups).Error; err != nil {
 			return err
 		}
 
 		count := func(table, extra string) (int64, error) {
-			q := db.DB.Table(table).Where("organization_id = ?", org)
+			q := db.DB.Table(table)
+			if user > 0 {
+				q = q.Where("user_id = ?", user)
+			}
 			if extra != "" {
 				q = q.Where(extra)
 			}
@@ -59,7 +62,7 @@ entre estágios e pontos de maior abandono.`,
 		// Estado vazio: literais duplicados da API (o CLI não importa o pacote).
 		if signups == 0 {
 			fmt.Println("Nenhum usuário no funil ainda")
-			fmt.Println("Cadastre usuários na organização, envie currículos e execute o matching para começar a acompanhar o funil de conversão.")
+			fmt.Println("Cadastre usuários, envie currículos e execute o matching para começar a acompanhar o funil de conversão.")
 			return nil
 		}
 
@@ -72,27 +75,40 @@ entre estágios e pontos de maior abandono.`,
 		}
 
 		// Medianas de timestamps via window functions (MySQL 8).
-		mSignup, err := fnFunnelMedian("ms.created_at",
-			"memberships ms JOIN users u ON u.id = ms.user_id",
-			"u.deleted_at IS NULL AND ms.organization_id = ?", org)
+		signupWhere := "deleted_at IS NULL"
+		var signupArgs []any
+		if user > 0 {
+			signupWhere += " AND id = ?"
+			signupArgs = append(signupArgs, user)
+		}
+		userWhere := func(base string) (string, []any) {
+			if user > 0 {
+				return base + " AND user_id = ?", []any{user}
+			}
+			return base, []any{}
+		}
+
+		mSignup, err := fnFunnelMedian("created_at", "users", signupWhere, signupArgs...)
 		if err != nil {
 			return err
 		}
-		mResume, err := fnFunnelMedian("uploaded_at", "resumes", "organization_id = ?", org)
+		where, wArgs := userWhere("1=1")
+		mResume, err := fnFunnelMedian("uploaded_at", "resumes", where, wArgs...)
 		if err != nil {
 			return err
 		}
-		mMatch, err := fnFunnelMedian("analyzed_at", "matches", "organization_id = ?", org)
+		where, wArgs = userWhere("1=1")
+		mMatch, err := fnFunnelMedian("analyzed_at", "matches", where, wArgs...)
 		if err != nil {
 			return err
 		}
-		mMatchApplied, err := fnFunnelMedian("analyzed_at", "matches",
-			"organization_id = ? AND applied = TRUE", org)
+		where, wArgs = userWhere("applied = TRUE")
+		mMatchApplied, err := fnFunnelMedian("analyzed_at", "matches", where, wArgs...)
 		if err != nil {
 			return err
 		}
-		mAppliedAt, err := fnFunnelMedian("applied_at", "matches",
-			"organization_id = ? AND applied = TRUE AND applied_at IS NOT NULL", org)
+		where, wArgs = userWhere("applied = TRUE AND applied_at IS NOT NULL")
+		mAppliedAt, err := fnFunnelMedian("applied_at", "matches", where, wArgs...)
 		if err != nil {
 			return err
 		}
