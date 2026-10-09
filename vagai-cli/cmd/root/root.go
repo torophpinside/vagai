@@ -3,6 +3,7 @@ package root
 import (
 	"os"
 
+	"github.com/anomalyco/vagai-cli/cmd/analytics"
 	"github.com/anomalyco/vagai-cli/cmd/crawl"
 	"github.com/anomalyco/vagai-cli/cmd/delete"
 	"github.com/anomalyco/vagai-cli/cmd/match"
@@ -26,6 +27,7 @@ func Execute() {
 		schedule.Cmd,
 		delete.Cmd,
 		reset.Cmd,
+		analytics.Cmd,
 	)
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)

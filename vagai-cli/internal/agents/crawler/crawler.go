@@ -91,6 +91,23 @@ func crawlSite(site models.Site) error {
 		Timeout: 30 * time.Second,
 	}
 
+	if site.RespectRobots {
+		robotsURL := buildRobotsURL(site.URL)
+		parser := NewRobotsParser(userAgents)
+		if err := parser.FetchAndParse(robotsURL, client); err != nil {
+			log.Printf("Aviso: não foi possível obter robots.txt de %s: %v", robotsURL, err)
+		} else {
+			if !parser.IsAllowed(site.URL) {
+				log.Printf("Acesso negado por robots.txt para: %s", site.URL)
+				return fmt.Errorf("crawl negado por robots.txt")
+			}
+			if delay := parser.GetCrawlDelay(); delay != nil && *delay > 0 {
+				log.Printf("Respeitando crawl-delay de %v do robots.txt", *delay)
+				time.Sleep(*delay)
+			}
+		}
+	}
+
 	req, err := http.NewRequest("GET", site.URL, nil)
 	if err != nil {
 		return err
@@ -832,4 +849,12 @@ func shouldIgnoreJob(job *models.Job) bool {
 	}
 
 	return false
+}
+
+func buildRobotsURL(siteURL string) string {
+	parsed, err := url.Parse(siteURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host + "/robots.txt"
 }

@@ -430,6 +430,18 @@ services:
 - Self-heal: verificação `running` órfã (>5 min) volta a `pending` e é retomada na leitura
 - Registro único vigente por preparação (substituição sem duplicação); isolamento por tenant (404 para outra organização)
 
+### Feature 010 — Data Analytics: Concluído ✅
+- API REST `/api/v1/analytics/*` (gin) expondo 10 relatórios: matching-distribution, resume-insights, job-trends, org-metrics, interview-prep, ai-quality, time-to-hire, skills-gap, funnel e geographic
+- Implementação em `vagai-api/internal/services/analytics/` (predominantemente SQL/Mysql + window functions; skills-gap/geographic normalizam em Go via `strings.Contains`)
+- Isolamento multi-tenant (FR-020) via `middleware/analytics_tenant.go`: admin de organização → próprio org (403 para outros); super admin (`SUPER_ADMIN_EMAILS`) → `organization_id=0` agrega cross-org (404 para org inexistente)
+- Paginação (`page`/`page_size`, 1–100, 422 fora do range) e envelope de resposta com `pagination`/`empty_state` em todos os endpoints
+- Respostas vazias: HTTP 200 com `empty_state {empty, message, guidance}` em português (nunca 404/500)
+- Redis caching (TTL 5min, prefixo `analytics:v1:`, key por endpoint+org+page) ativo quando `REDIS_URL` definido, com fallback sem cache
+- Otimização de performance: índices idempotentes em `models/analytics_migrate.go` (organization_id em jobs/resumes/matches/ai_analysis_results/interview_preparations/verification_histories); queries com `only_full_group_by` compatíveis; tempo de resposta <5s verificado em todos os endpoints
+- Documentação da API em `docs/analytics-api.md` (padrão do SPECS.md)
+- CLI: 11 subcomandos `vagai analytics <relatório> [--org <id>]` produzindo relatórios direto do banco (flag `--org` persistent)
+- Dashboard Vue 3 em `vagai-web/src/components/analytics/` consumindo os endpoints, com entrada no menu para admins de organização e super admins
+
 ---
 
 ## Comandos CLI

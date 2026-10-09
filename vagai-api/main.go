@@ -81,6 +81,10 @@ func main() {
 	api.Use(middleware.JWTAuth())
 	api.Use(middleware.ScopedDB(db))
 	{
+		// Analytics (specs/010-data-analytics): /api/v1/analytics/* — acesso
+		// restrito a org admins e super admins (FR-020).
+		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
+
 		api.GET("/stats", handlers.GetStats)
 		api.GET("/plans", handlers.ListPlans)
 		api.GET("/negative-keywords", handlers.GetNegativeKeywords)
@@ -167,6 +171,8 @@ func autoMigrate(db *gorm.DB) {
 
 	seedPlans(db)
 	ensureNullablePrepColumns(db)
+	models.MigrateAnalytics(db)
+	models.CreateAnalyticsViews(db)
 }
 
 // ensureNullablePrepColumns relaxa match_id/job_id de interview_preparations
@@ -182,7 +188,7 @@ func ensureNullablePrepColumns(db *gorm.DB) {
 		if err := db.Raw(check, col).Scan(&nullable).Error; err != nil || nullable == "YES" {
 			continue
 		}
-		if err := db.Exec("ALTER TABLE interview_preparations MODIFY "+col+" bigint unsigned NULL").Error; err != nil {
+		if err := db.Exec("ALTER TABLE interview_preparations MODIFY " + col + " bigint unsigned NULL").Error; err != nil {
 			log.Printf("migrate: falha ao relaxar %s: %v", col, err)
 		} else {
 			log.Printf("migrate: %s relaxado para NULL", col)

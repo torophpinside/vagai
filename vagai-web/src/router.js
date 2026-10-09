@@ -14,6 +14,7 @@ import ResumeEditor from './pages/ResumeEditor.vue'
 import InterviewPrep from './pages/InterviewPrep.vue'
 import InterviewPreparations from './pages/InterviewPreparations.vue'
 import SpontaneousPrep from './pages/SpontaneousPrep.vue'
+import Analytics from './pages/Analytics.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
@@ -24,6 +25,7 @@ const routes = [
   { path: '/matches', name: 'Matches', component: Matches, meta: { requiresAuth: true } },
   { path: '/applied', name: 'Applied', component: Applied, meta: { requiresAuth: true } },
   { path: '/analysis', name: 'Analysis', component: Analysis, meta: { requiresAuth: true } },
+  { path: '/analytics', name: 'Analytics', component: Analytics, meta: { requiresAuth: true, orgAdmin: true } },
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/settings/team', name: 'Team', component: Team, meta: { requiresAuth: true } },
   { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } },
@@ -46,6 +48,10 @@ router.beforeEach((to, from, next) => {
     next({ name: 'Login' })
   } else if (to.meta.guest && isAuth) {
     next({ name: 'Dashboard' })
+  } else if (to.meta.orgAdmin) {
+    const rawUser = localStorage.getItem('vagai_user')
+    const isOrgAdmin = rawUser ? ['owner', 'admin'].includes(JSON.parse(rawUser).role) : false
+    next(isOrgAdmin ? undefined : { name: 'Dashboard' })
   } else {
     next()
   }

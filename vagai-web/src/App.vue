@@ -38,6 +38,10 @@
             <FileText class="w-5 h-5" />
             <span>Análise</span>
           </router-link>
+          <router-link v-if="isOrgAdmin" to="/analytics" class="nav-link" active-class="active">
+            <BarChart3 class="w-5 h-5" />
+            <span>Analytics</span>
+          </router-link>
           <router-link to="/resume-editor/new" class="nav-link" active-class="active">
             <FileEdit class="w-5 h-5" />
             <span>Currículo</span>
@@ -126,6 +130,7 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  BarChart3,
   LogOut
 } from 'lucide-vue-next'
 import { useAuth } from './composables/auth'
@@ -143,6 +148,7 @@ onMounted(() => {
 const userName = computed(() => user.value?.name || 'Usuário')
 const firstName = computed(() => user.value?.name?.split(' ')[0] || 'Usuário')
 const orgName = computed(() => user.value?.organization?.name || 'VagAI')
+const isOrgAdmin = computed(() => ['owner', 'admin'].includes(user.value?.role))
 
 function handleLogout() {
   logout()

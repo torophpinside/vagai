@@ -26,6 +26,77 @@ export const useStats = () => {
   return useQuery({ queryKey: ['stats'], queryFn: () => api.get('/stats').then(res => res.data) })
 }
 
+export const useAnalyticsMatching = (params = {}) => {
+  return useQuery({
+    queryKey: ['analytics', 'matching', toValue(params)],
+    queryFn: () => api.get('/v1/analytics/matching-distribution', { params: toValue(params) }).then(res => res.data)
+  })
+}
+
+export const useAnalyticsResume = () => {
+  return useQuery({
+    queryKey: ['analytics', 'resume'],
+    queryFn: () => api.get('/v1/analytics/resume-insights').then(res => res.data)
+  })
+}
+
+export const useAnalyticsJobTrends = (params = {}) => {
+  return useQuery({
+    queryKey: ['analytics', 'job-trends', toValue(params)],
+    queryFn: () => api.get('/v1/analytics/job-trends', { params: toValue(params) }).then(res => res.data)
+  })
+}
+
+export const useAnalyticsOrgMetrics = (orgId) => {
+  return useQuery({
+    queryKey: ['analytics', 'org-metrics', orgId],
+    queryFn: () => api.get(`/v1/analytics/org/${orgId}`).then(res => res.data),
+    enabled: !!orgId
+  })
+}
+
+export const useAnalyticsInterviewPrep = () => {
+  return useQuery({
+    queryKey: ['analytics', 'interview-prep'],
+    queryFn: () => api.get('/v1/analytics/interview-prep').then(res => res.data)
+  })
+}
+
+export const useAnalyticsAIQuality = () => {
+  return useQuery({
+    queryKey: ['analytics', 'ai-quality'],
+    queryFn: () => api.get('/v1/analytics/ai-quality').then(res => res.data)
+  })
+}
+
+export const useAnalyticsTimeToHire = () => {
+  return useQuery({
+    queryKey: ['analytics', 'time-to-hire'],
+    queryFn: () => api.get('/v1/analytics/time-to-hire').then(res => res.data)
+  })
+}
+
+export const useAnalyticsSkillsGap = (params = {}) => {
+  return useQuery({
+    queryKey: ['analytics', 'skills-gap', toValue(params)],
+    queryFn: () => api.get('/v1/analytics/skills-gap', { params: toValue(params) }).then(res => res.data)
+  })
+}
+
+export const useAnalyticsFunnel = () => {
+  return useQuery({
+    queryKey: ['analytics', 'funnel'],
+    queryFn: () => api.get('/v1/analytics/funnel').then(res => res.data)
+  })
+}
+
+export const useAnalyticsGeographic = () => {
+  return useQuery({
+    queryKey: ['analytics', 'geographic'],
+    queryFn: () => api.get('/v1/analytics/geographic').then(res => res.data)
+  })
+}
+
 export const useJobs = (filters = {}) => {
   return useQuery({
     queryKey: ['jobs', filters],
