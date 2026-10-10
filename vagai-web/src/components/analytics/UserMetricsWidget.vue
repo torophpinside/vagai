@@ -4,7 +4,7 @@
     <EmptyState :data="data" :loading="loading" :error="error">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Kpi :label="'Vagas'" :value="metrics?.jobs_posted" />
-        <Kpi :label="'Currículos'" :value="metrics?.resumes_uploaded" />
+        <Kpi :label="'Análises de currículo / mês'" :value="metrics?.resume_analyses_monthly ?? metrics?.resumes_uploaded" />
         <Kpi :label="'Matches'" :value="metrics?.matches_made" />
         <Kpi :label="'Conversão'" :value="pct(metrics?.conversion_rate)" :suffix="'%'" />
       </div>

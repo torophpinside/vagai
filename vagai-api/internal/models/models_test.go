@@ -215,7 +215,7 @@ func TestPlanModel(t *testing.T) {
 		PriceMonthly:    4900,
 		PriceYearly:     49000,
 		MaxJobs:         500,
-		MaxResumes:      10,
+		MaxResumeAnalyses: 10,
 		MaxSites:        20,
 		MaxCrawlsPerDay: 50,
 	}

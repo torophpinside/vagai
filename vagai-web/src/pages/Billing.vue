@@ -20,9 +20,9 @@
               {{ planPrice === 0 ? 'Grátis' : `R$ ${planPrice / 100}/mês` }}
             </div>
           </div>
-          <button v-if="planSlug === 'free'" @click="handleChangePlan('pro')" :disabled="changingPlan" class="btn-primary flex items-center gap-2">
+          <button v-if="upgradePlan" @click="handleChangePlan(upgradePlan)" :disabled="changingPlan" class="btn-primary flex items-center gap-2">
             <Loader2 v-if="changingPlan" class="w-4 h-4 animate-spin" />
-            Upgrade para Pro
+            Upgrade para {{ upgradePlan.name }}
           </button>
         </div>
 
@@ -35,10 +35,10 @@
             </div>
           </div>
           <div>
-            <div class="text-xs text-slate-500">Currículos</div>
-            <div class="text-lg font-bold text-white mt-1">{{ usage.resumes }} / {{ maxResumes }}</div>
+            <div class="text-xs text-slate-500">Análises de currículo / mês</div>
+            <div class="text-lg font-bold text-white mt-1">{{ usage.resume_analyses ?? 0 }} / {{ maxResumeAnalyses }}</div>
             <div class="w-full bg-slate-700 rounded-full h-2 mt-2">
-              <div class="bg-indigo-500 h-2 rounded-full" :style="{ width: usageBar(usage.resumes, maxResumesRaw) + '%' }"></div>
+              <div class="bg-indigo-500 h-2 rounded-full" :style="{ width: usageBar(usage.resume_analyses ?? 0, maxResumeAnalysesRaw) + '%' }"></div>
             </div>
           </div>
           <div>
@@ -62,14 +62,14 @@
             <span v-if="plan.price_monthly > 0" class="text-sm font-normal text-slate-400">/mês</span>
           </div>
           <ul class="mt-4 space-y-2">
-            <li v-for="feature in parseFeatures(plan.features)" :key="feature" class="text-sm text-slate-300 flex items-center gap-2">
+            <li v-for="perk in planPerks(plan)" :key="perk" class="text-sm text-slate-300 flex items-center gap-2">
               <Check class="w-4 h-4 text-emerald-400" />
-              {{ feature }}
+              {{ perk }}
             </li>
           </ul>
-          <button v-if="planSlug !== plan.slug" @click="handleChangePlan(plan.slug)" :disabled="changingPlan" class="w-full mt-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+          <button v-if="planSlug !== plan.slug" @click="handleChangePlan(plan)" :disabled="changingPlan" class="w-full mt-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
             <Loader2 v-if="changingPlan" class="w-4 h-4 animate-spin" />
-            {{ planSlug === 'free' ? 'Começar' : 'Downgrade' }}
+            {{ planActionLabel(plan) }}
           </button>
           <button v-else class="w-full mt-6 py-3 bg-indigo-600 text-white font-medium rounded-lg cursor-default">
             Plano atual
@@ -88,34 +88,71 @@ import { useMe, usePlans, changePlan as changePlanApi } from '../services/api'
 const { data: meData, isLoading: meLoading, isError: meError } = useMe()
 const { data: plansData, isLoading: plansLoading, isError: plansError } = usePlans()
 
+const plans = computed(() => plansData.value || [])
+
 const planName = computed(() => meData.value?.plan?.name || '-')
 const planSlug = computed(() => meData.value?.plan?.slug || meData.value?.user?.plan || 'free')
 const planPrice = computed(() => meData.value?.plan?.price_monthly ?? 0)
 
+const upgradePlan = computed(() => {
+  return plans.value
+    .filter((p) => p.slug !== planSlug.value && p.price_monthly > planPrice.value)
+    .sort((a, b) => a.price_monthly - b.price_monthly)[0] || null
+})
+
 const maxJobsRaw = computed(() => meData.value?.plan?.max_jobs ?? -1)
-const maxResumesRaw = computed(() => meData.value?.plan?.max_resumes ?? -1)
+const maxResumeAnalysesRaw = computed(() => meData.value?.plan?.max_resume_analyses ?? -1)
 const maxSitesRaw = computed(() => meData.value?.plan?.max_sites ?? -1)
 
 const maxJobs = computed(() => maxJobsRaw.value === -1 ? '∞' : maxJobsRaw.value)
-const maxResumes = computed(() => maxResumesRaw.value === -1 ? '∞' : maxResumesRaw.value)
+const maxResumeAnalyses = computed(() => maxResumeAnalysesRaw.value === -1 ? '∞' : maxResumeAnalysesRaw.value)
 const maxSites = computed(() => maxSitesRaw.value === -1 ? '∞' : maxSitesRaw.value)
 
 const usage = computed(() => meData.value?.usage || { jobs: 0, resumes: 0, sites: 0 })
 
 const changingPlan = ref(false)
 
-async function handleChangePlan(slug) {
-  const label = slug === 'free' ? 'Free' : 'Pro'
-  if (!confirm(`Deseja alterar para o plano ${label}?`)) return
+async function handleChangePlan(plan) {
+  const target = typeof plan === 'string' ? { slug: plan, name: plan } : plan
+  if (!confirm(`Deseja alterar para o plano ${target.name}?`)) return
   changingPlan.value = true
   try {
-    await changePlanApi(slug)
+    await changePlanApi(target.slug)
     window.location.reload()
   } catch (err) {
     alert(err.response?.data?.error || 'Erro ao alterar plano')
   } finally {
     changingPlan.value = false
   }
+}
+
+function planActionLabel(plan) {
+  if (plan.price_monthly > planPrice.value) return 'Fazer upgrade'
+  if (plan.price_monthly === 0) return 'Mudar para grátis'
+  if (plan.price_monthly < planPrice.value) return 'Fazer downgrade'
+  return 'Mudar para este plano'
+}
+
+function planPerks(plan) {
+  const perks = [
+    limitLabel(plan.max_jobs, 'vaga', 'vagas', 'Vagas ilimitadas'),
+    limitLabel(plan.max_resume_analyses, 'análise de currículo/mês', 'análises de currículo/mês', 'Análises de currículo ilimitadas'),
+    limitLabel(plan.max_sites, 'fonte de busca', 'fontes de busca', 'Fontes de busca ilimitadas'),
+  ]
+  if (plan.ai_matching) perks.push('Matching por IA')
+  if (plan.interview_prep) perks.push('Preparação')
+  const seen = new Set()
+  return perks.concat(parseFeatures(plan.features)).filter((perk) => {
+    const key = perk.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function limitLabel(value, singular, plural, unlimited) {
+  if (value === -1) return unlimited
+  return `${value} ${value === 1 ? singular : plural}`
 }
 
 function usageBar(current, max) {

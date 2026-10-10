@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anomalyco/vagai-api/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -54,6 +55,21 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", claims.Role)
+		c.Next()
+	}
+}
+
+// RequireAdmin bloqueia qualquer requisição cujo papel não seja admin. Deve
+// rodar após JWTAuth (que popula "user_role" a partir das claims do token).
+// Protege as rotas /api/admin/* (gestão de planos — spec 012).
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("user_role")
+		if r, ok := role.(string); !ok || r != string(models.RoleAdmin) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Acesso restrito a administradores"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }

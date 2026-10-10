@@ -115,20 +115,6 @@ func ParseResume(c *gin.Context) {
 		return
 	}
 
-	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceResumes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
-		return
-	}
-	if !allowed {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error":   fmt.Sprintf("Limite de curriculos atingido: %d/%d", current, maxLimit),
-			"current": current,
-			"limit":   maxLimit,
-		})
-		return
-	}
-
 	resume := models.Resume{
 		UserID: userID,
 		Name:           truncateName(file.Filename, 255),

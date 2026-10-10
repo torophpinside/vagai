@@ -113,9 +113,9 @@ func userScope(c *gin.Context, db *gorm.DB) *gorm.DB {
 type planResource string
 
 const (
-	resourceSites   planResource = "sites"
-	resourceResumes planResource = "resumes"
-	resourceJobs    planResource = "jobs"
+	resourceSites          planResource = "sites"
+	resourceJobs           planResource = "jobs"
+	resourceResumeAnalyses planResource = "resume_analyses"
 )
 
 func checkPlanLimit(db *gorm.DB, userID uint, resource planResource) (allowed bool, current int, maxLimit int, err error) {
@@ -132,8 +132,8 @@ func checkPlanLimit(db *gorm.DB, userID uint, resource planResource) (allowed bo
 	switch resource {
 	case resourceSites:
 		maxLimit = plan.MaxSites
-	case resourceResumes:
-		maxLimit = plan.MaxResumes
+	case resourceResumeAnalyses:
+		maxLimit = plan.MaxResumeAnalyses
 	case resourceJobs:
 		maxLimit = plan.MaxJobs
 	}
@@ -146,8 +146,11 @@ func checkPlanLimit(db *gorm.DB, userID uint, resource planResource) (allowed bo
 	switch resource {
 	case resourceSites:
 		db.Model(&models.Site{}).Where("user_id = ?", userID).Count(&count)
-	case resourceResumes:
-		db.Model(&models.Resume{}).Where("user_id = ? AND file_path <> ''", userID).Count(&count)
+	case resourceResumeAnalyses:
+		now := time.Now()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		db.Model(&models.ResumeAnalysis{}).
+			Where("user_id = ? AND created_at >= ?", userID, monthStart).Count(&count)
 	case resourceJobs:
 		db.Model(&models.Job{}).Where("user_id = ?", userID).Count(&count)
 	}
@@ -872,20 +875,6 @@ func UploadResume(c *gin.Context) {
 	}
 	ufh.Close()
 
-	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceResumes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
-		return
-	}
-	if !allowed {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error":   fmt.Sprintf("Limite de currículos atingido: %d/%d", current, maxLimit),
-			"current": current,
-			"limit":   maxLimit,
-		})
-		return
-	}
-
 	uploadDir := "./uploads/resumes"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao criar diretório de uploads"})
@@ -944,6 +933,20 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 	afh.Close()
+
+	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceResumeAnalyses)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   fmt.Sprintf("Limite de análises de currículo atingido este mês: %d/%d", current, maxLimit),
+			"current": current,
+			"limit":   maxLimit,
+		})
+		return
+	}
 
 	tmpDir := "./uploads/resumes"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
@@ -1134,9 +1137,26 @@ func GetResumeAnalysis(c *gin.Context) {
 	c.JSON(http.StatusOK, formatAnalysisResponse(analysis))
 }
 
+// ListPlans devolve os planos visíveis ao usuário logado: todos os ativos, mais
+// o próprio plano mesmo que esteja inativo (para resolver o cartão "seu plano
+// atual"). Mantém o formato de array puro consumido por usePlans (FR-010).
 func ListPlans(c *gin.Context) {
+	userSlug := ""
+	if userID := c.GetUint("user_id"); userID != 0 {
+		var user models.User
+		if err := DB.Select("plan_slug").First(&user, userID).Error; err == nil {
+			userSlug = user.PlanSlug
+		}
+	}
+
 	var plans []models.Plan
-	DB.Find(&plans)
+	query := DB.Order("id")
+	if userSlug != "" {
+		query = query.Where("active = ? OR slug = ?", true, userSlug)
+	} else {
+		query = query.Where("active = ?", true)
+	}
+	query.Find(&plans)
 	if plans == nil {
 		plans = []models.Plan{}
 	}

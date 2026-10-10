@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -11,6 +12,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// defaultPlanSlug resolve o plano de cadastro pela cadeia: padrão ativo →
+// 'free' ativo → primeiro gratuito ativo. Nunca cria usuário sem plano
+// (FR-013/SC-007): se nada servir, devolve erro e o Register responde 500.
+func defaultPlanSlug() (string, error) {
+	var plan models.Plan
+	if err := DB.Where("is_default = ? AND active = ?", true, true).Order("id").First(&plan).Error; err == nil {
+		return plan.Slug, nil
+	}
+	if err := DB.Where("slug = ? AND active = ?", "free", true).First(&plan).Error; err == nil {
+		return plan.Slug, nil
+	}
+	if err := DB.Where("type = ? AND active = ?", models.PlanTypeFree, true).Order("id").First(&plan).Error; err == nil {
+		return plan.Slug, nil
+	}
+	return "", fmt.Errorf("nenhum plano disponível para cadastro")
+}
 
 func Register(c *gin.Context) {
 	var body struct {
@@ -42,13 +60,19 @@ func Register(c *gin.Context) {
 		role = models.RoleAdmin
 	}
 
+	planSlug, err := defaultPlanSlug()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Nenhum plano disponível para cadastro"})
+		return
+	}
+
 	trialEnds := time.Now().Add(14 * 24 * time.Hour)
 	user := models.User{
 		Name:               body.Name,
 		Email:              email,
 		PasswordHash:       string(hashedPassword),
 		Role:               role,
-		PlanSlug:           "free",
+		PlanSlug:           planSlug,
 		SubscriptionStatus: models.SubStatusTrial,
 		TrialEndsAt:        &trialEnds,
 	}
@@ -113,18 +137,18 @@ func Login(c *gin.Context) {
 // userResponse serializa os dados públicos do usuário para o frontend.
 func userResponse(user models.User) gin.H {
 	return gin.H{
-		"id":                  user.ID,
-		"name":                user.Name,
-		"email":               user.Email,
-		"avatar":              user.Avatar,
-		"timezone":            user.Timezone,
-		"city":                user.City,
-		"role":                user.Role,
-		"plan":                user.PlanSlug,
-		"plan_slug":           user.PlanSlug,
-		"subscription_status": user.SubscriptionStatus,
+		"id":                   user.ID,
+		"name":                 user.Name,
+		"email":                user.Email,
+		"avatar":               user.Avatar,
+		"timezone":             user.Timezone,
+		"city":                 user.City,
+		"role":                 user.Role,
+		"plan":                 user.PlanSlug,
+		"plan_slug":            user.PlanSlug,
+		"subscription_status":  user.SubscriptionStatus,
 		"subscription_ends_at": user.SubscriptionEndsAt,
-		"trial_ends_at":       user.TrialEndsAt,
+		"trial_ends_at":        user.TrialEndsAt,
 	}
 }
 
@@ -140,9 +164,11 @@ func GetMe(c *gin.Context) {
 	var plan models.Plan
 	DB.Where("slug = ?", user.PlanSlug).First(&plan)
 
-	var jobCount, resumeCount, siteCount int64
+	var jobCount, analysisCount, siteCount int64
 	DB.Model(&models.Job{}).Where("user_id = ?", userID).Count(&jobCount)
-	DB.Model(&models.Resume{}).Where("user_id = ?", userID).Count(&resumeCount)
+	now := time.Now()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	DB.Model(&models.ResumeAnalysis{}).Where("user_id = ? AND created_at >= ?", userID, monthStart).Count(&analysisCount)
 	DB.Model(&models.Site{}).Where("user_id = ?", userID).Count(&siteCount)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -157,23 +183,25 @@ func GetMe(c *gin.Context) {
 			"plan":     user.PlanSlug,
 		},
 		"plan": gin.H{
-			"name":          plan.Name,
-			"slug":          plan.Slug,
-			"price_monthly": plan.PriceMonthly,
-			"price_yearly":  plan.PriceYearly,
-			"max_jobs":      plan.MaxJobs,
-			"max_resumes":   plan.MaxResumes,
-			"max_sites":     plan.MaxSites,
-			"features":      plan.Features,
+			"name":           plan.Name,
+			"slug":           plan.Slug,
+			"price_monthly":  plan.PriceMonthly,
+			"price_yearly":   plan.PriceYearly,
+			"max_jobs":            plan.MaxJobs,
+			"max_resume_analyses": plan.MaxResumeAnalyses,
+			"max_sites":           plan.MaxSites,
+			"ai_matching":         plan.AIMatching,
+			"interview_prep":      plan.InterviewPrep,
+			"features":            plan.Features,
 		},
 		"usage": gin.H{
-			"jobs":    jobCount,
-			"resumes": resumeCount,
-			"sites":   siteCount,
+			"jobs":            jobCount,
+			"resume_analyses": analysisCount,
+			"sites":           siteCount,
 		},
 		"subscription": gin.H{
-			"status":             user.SubscriptionStatus,
-			"current_period_end": user.SubscriptionEndsAt,
+			"status":               user.SubscriptionStatus,
+			"current_period_end":   user.SubscriptionEndsAt,
 			"cancel_at_period_end": false,
 		},
 	})
@@ -265,7 +293,7 @@ func ChangePlan(c *gin.Context) {
 	}
 
 	var plan models.Plan
-	if err := DB.Where("slug = ?", body.PlanSlug).First(&plan).Error; err != nil {
+	if err := DB.Where("slug = ? AND active = ?", body.PlanSlug, true).First(&plan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Plano não encontrado"})
 		return
 	}
@@ -294,13 +322,15 @@ func ChangePlan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Plano alterado para " + plan.Name,
 		"plan": gin.H{
-			"name":          plan.Name,
-			"slug":          plan.Slug,
-			"price_monthly": plan.PriceMonthly,
-			"max_jobs":      plan.MaxJobs,
-			"max_resumes":   plan.MaxResumes,
-			"max_sites":     plan.MaxSites,
-			"features":      plan.Features,
+			"name":                plan.Name,
+			"slug":                plan.Slug,
+			"price_monthly":       plan.PriceMonthly,
+			"max_jobs":            plan.MaxJobs,
+			"max_resume_analyses": plan.MaxResumeAnalyses,
+			"max_sites":           plan.MaxSites,
+			"ai_matching":         plan.AIMatching,
+			"interview_prep":      plan.InterviewPrep,
+			"features":            plan.Features,
 		},
 	})
 }

@@ -1,13 +1,13 @@
 import { useRouter, useRoute, createRouter, createWebHistory } from "vue-router";
 import { computed, mergeProps, unref, useSSRContext, reactive, ref, watch, resolveComponent, withCtx, openBlock, createBlock, Fragment, renderList, createVNode, createCommentVNode, createTextVNode, toDisplayString, onMounted, onUnmounted } from "vue";
 import { ssrRenderAttrs, ssrInterpolate, ssrRenderComponent, ssrRenderAttr, ssrRenderList, ssrRenderClass, ssrIncludeBooleanAttr, ssrRenderStyle, ssrLooseContain, ssrLooseEqual, ssrRenderSlot } from "vue/server-renderer";
-import { u as useStats, a as useSites, b as useJobs, D as DropdownMenu, l as listSites, c as useMatches, d as listInterviewPreps, e as useResumeAnalyses, f as useMe, g as useNegativeKeywords, h as updateProfile, i as addSite, j as deleteSite, k as updateSite, m as updateNegativeKeywords, n as useAuth, o as usePlans, p as getResumeData, q as generateResumePDF, r as updateResumeData, s as createResume, t as getInterviewPrep, v as saveQuestionAnswer, w as useInterviewPreps, x as useAnalyticsMatching, y as useAnalyticsResume, z as useAnalyticsJobTrends, A as useAnalyticsUserMetrics, B as useAnalyticsInterviewPrep, C as useAnalyticsAIQuality, E as useAnalyticsTimeToHire, F as useAnalyticsSkillsGap, G as useAnalyticsFunnel, H as useAnalyticsGeographic } from "../ssr-check.js";
+import { u as useStats, a as useSites, b as useJobs, D as DropdownMenu, l as listSites, c as useMatches, d as listInterviewPreps, e as useResumeAnalyses, f as useMe, g as useNegativeKeywords, h as updateProfile, i as addSite, j as deleteSite, k as updateSite, m as updateNegativeKeywords, n as useAuth, o as usePlans, p as getResumeData, q as generateResumePDF, r as updateResumeData, s as createResume, t as getInterviewPrep, v as saveQuestionAnswer, w as useInterviewPreps, x as useAnalyticsMatching, y as useAnalyticsResume, z as useAnalyticsJobTrends, A as useAnalyticsUserMetrics, B as useAnalyticsInterviewPrep, C as useAnalyticsAIQuality, E as useAnalyticsTimeToHire, F as useAnalyticsSkillsGap, G as useAnalyticsFunnel, H as useAnalyticsGeographic, I as useAdminPlans } from "../ssr-check.js";
 import { Bar, Doughnut } from "vue-chartjs";
-import { Briefcase, TrendingUp, CheckCircle2, Target, Send, Rocket, Globe, Activity, Code2, Cpu, PieChart, Layers, Search, X, Filter, ChevronDown, Plus, RefreshCcw, ExternalLink, Trash2, ChevronLeft, ChevronRight, ArrowLeft, Loader2, RefreshCw, ArrowUpDown, Building2, Calendar, EyeOff, CheckCircle, Paperclip, Sparkles, BrainCircuit, GraduationCap, Upload, FileText, Loader, ThumbsUp, AlertTriangle, AlertCircle, Lightbulb, History, FileX, MapPin, CreditCard, Power, Ban, Check, User, Wrench, Award, Save, Download, CircleCheck, CircleAlert, FileSearch, Eye, Wand2, Play, Inbox, Timer, Puzzle } from "lucide-vue-next";
+import { Briefcase, TrendingUp, CheckCircle2, Target, Send, Rocket, Globe, Activity, Code2, Cpu, PieChart, Layers, Search, X, Filter, ChevronDown, Plus, RefreshCcw, ExternalLink, Trash2, ChevronLeft, ChevronRight, ArrowLeft, Loader2, RefreshCw, ArrowUpDown, Building2, Calendar, EyeOff, CheckCircle, Paperclip, Sparkles, BrainCircuit, GraduationCap, Upload, FileText, Loader, ThumbsUp, AlertTriangle, AlertCircle, Lightbulb, History, FileX, MapPin, CreditCard, Power, Ban, Check, User, Wrench, Award, Save, Download, CircleCheck, CircleAlert, FileSearch, Eye, Wand2, Play, Inbox, Timer, Puzzle, Pencil, Star } from "lucide-vue-next";
 import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement, LineElement, PointElement } from "chart.js";
 import { useQueryClient, useMutation } from "@tanstack/vue-query";
 import "axios";
-const _sfc_main$x = {
+const _sfc_main$y = {
   __name: "Dashboard",
   __ssrInlineRender: true,
   setup(__props) {
@@ -133,13 +133,13 @@ const _sfc_main$x = {
     };
   }
 };
-const _sfc_setup$x = _sfc_main$x.setup;
-_sfc_main$x.setup = (props, ctx) => {
+const _sfc_setup$y = _sfc_main$y.setup;
+_sfc_main$y.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Dashboard.vue");
-  return _sfc_setup$x ? _sfc_setup$x(props, ctx) : void 0;
+  return _sfc_setup$y ? _sfc_setup$y(props, ctx) : void 0;
 };
-const _sfc_main$w = {
+const _sfc_main$x = {
   __name: "Jobs",
   __ssrInlineRender: true,
   setup(__props) {
@@ -529,13 +529,13 @@ const _sfc_main$w = {
     };
   }
 };
-const _sfc_setup$w = _sfc_main$w.setup;
-_sfc_main$w.setup = (props, ctx) => {
+const _sfc_setup$x = _sfc_main$x.setup;
+_sfc_main$x.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Jobs.vue");
-  return _sfc_setup$w ? _sfc_setup$w(props, ctx) : void 0;
+  return _sfc_setup$x ? _sfc_setup$x(props, ctx) : void 0;
 };
-const _sfc_main$v = {
+const _sfc_main$w = {
   __name: "JobAdd",
   __ssrInlineRender: true,
   setup(__props) {
@@ -722,13 +722,13 @@ const _sfc_main$v = {
     };
   }
 };
-const _sfc_setup$v = _sfc_main$v.setup;
-_sfc_main$v.setup = (props, ctx) => {
+const _sfc_setup$w = _sfc_main$w.setup;
+_sfc_main$w.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/JobAdd.vue");
-  return _sfc_setup$v ? _sfc_setup$v(props, ctx) : void 0;
+  return _sfc_setup$w ? _sfc_setup$w(props, ctx) : void 0;
 };
-const _sfc_main$u = {
+const _sfc_main$v = {
   __name: "Matches",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1163,13 +1163,13 @@ const _sfc_main$u = {
     };
   }
 };
-const _sfc_setup$u = _sfc_main$u.setup;
-_sfc_main$u.setup = (props, ctx) => {
+const _sfc_setup$v = _sfc_main$v.setup;
+_sfc_main$v.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Matches.vue");
-  return _sfc_setup$u ? _sfc_setup$u(props, ctx) : void 0;
+  return _sfc_setup$v ? _sfc_setup$v(props, ctx) : void 0;
 };
-const _sfc_main$t = {
+const _sfc_main$u = {
   __name: "Applied",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1322,13 +1322,13 @@ const _sfc_main$t = {
     };
   }
 };
-const _sfc_setup$t = _sfc_main$t.setup;
-_sfc_main$t.setup = (props, ctx) => {
+const _sfc_setup$u = _sfc_main$u.setup;
+_sfc_main$u.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Applied.vue");
-  return _sfc_setup$t ? _sfc_setup$t(props, ctx) : void 0;
+  return _sfc_setup$u ? _sfc_setup$u(props, ctx) : void 0;
 };
-const _sfc_main$s = {
+const _sfc_main$t = {
   __name: "Analysis",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1470,13 +1470,13 @@ const _sfc_main$s = {
     };
   }
 };
-const _sfc_setup$s = _sfc_main$s.setup;
-_sfc_main$s.setup = (props, ctx) => {
+const _sfc_setup$t = _sfc_main$t.setup;
+_sfc_main$t.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Analysis.vue");
-  return _sfc_setup$s ? _sfc_setup$s(props, ctx) : void 0;
+  return _sfc_setup$t ? _sfc_setup$t(props, ctx) : void 0;
 };
-const _sfc_main$r = {
+const _sfc_main$s = {
   __name: "Settings",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1659,18 +1659,19 @@ const _sfc_main$r = {
     };
   }
 };
-const _sfc_setup$r = _sfc_main$r.setup;
-_sfc_main$r.setup = (props, ctx) => {
+const _sfc_setup$s = _sfc_main$s.setup;
+_sfc_main$s.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Settings.vue");
-  return _sfc_setup$r ? _sfc_setup$r(props, ctx) : void 0;
+  return _sfc_setup$s ? _sfc_setup$s(props, ctx) : void 0;
 };
-const _sfc_main$q = {
+const _sfc_main$r = {
   __name: "Billing",
   __ssrInlineRender: true,
   setup(__props) {
     const { data: meData, isLoading: meLoading, isError: meError } = useMe();
     const { data: plansData, isLoading: plansLoading, isError: plansError } = usePlans();
+    const plans = computed(() => plansData.value || []);
     const planName = computed(() => {
       var _a, _b;
       return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.name) || "-";
@@ -1683,26 +1684,55 @@ const _sfc_main$q = {
       var _a, _b;
       return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.price_monthly) ?? 0;
     });
+    const upgradePlan = computed(() => {
+      return plans.value.filter((p) => p.slug !== planSlug.value && p.price_monthly > planPrice.value).sort((a, b) => a.price_monthly - b.price_monthly)[0] || null;
+    });
     const maxJobsRaw = computed(() => {
       var _a, _b;
       return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.max_jobs) ?? -1;
     });
-    const maxResumesRaw = computed(() => {
+    const maxResumeAnalysesRaw = computed(() => {
       var _a, _b;
-      return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.max_resumes) ?? -1;
+      return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.max_resume_analyses) ?? -1;
     });
     const maxSitesRaw = computed(() => {
       var _a, _b;
       return ((_b = (_a = meData.value) == null ? void 0 : _a.plan) == null ? void 0 : _b.max_sites) ?? -1;
     });
     const maxJobs = computed(() => maxJobsRaw.value === -1 ? "∞" : maxJobsRaw.value);
-    const maxResumes = computed(() => maxResumesRaw.value === -1 ? "∞" : maxResumesRaw.value);
+    const maxResumeAnalyses = computed(() => maxResumeAnalysesRaw.value === -1 ? "∞" : maxResumeAnalysesRaw.value);
     const maxSites = computed(() => maxSitesRaw.value === -1 ? "∞" : maxSitesRaw.value);
     const usage = computed(() => {
       var _a;
       return ((_a = meData.value) == null ? void 0 : _a.usage) || { jobs: 0, resumes: 0, sites: 0 };
     });
     const changingPlan = ref(false);
+    function planActionLabel(plan) {
+      if (plan.price_monthly > planPrice.value) return "Fazer upgrade";
+      if (plan.price_monthly === 0) return "Mudar para grátis";
+      if (plan.price_monthly < planPrice.value) return "Fazer downgrade";
+      return "Mudar para este plano";
+    }
+    function planPerks(plan) {
+      const perks = [
+        limitLabel(plan.max_jobs, "vaga", "vagas", "Vagas ilimitadas"),
+        limitLabel(plan.max_resume_analyses, "análise de currículo/mês", "análises de currículo/mês", "Análises de currículo ilimitadas"),
+        limitLabel(plan.max_sites, "fonte de busca", "fontes de busca", "Fontes de busca ilimitadas")
+      ];
+      if (plan.ai_matching) perks.push("Matching por IA");
+      if (plan.interview_prep) perks.push("Preparação");
+      const seen = /* @__PURE__ */ new Set();
+      return perks.concat(parseFeatures(plan.features)).filter((perk) => {
+        const key = perk.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    function limitLabel(value, singular, plural, unlimited) {
+      if (value === -1) return unlimited;
+      return `${value} ${value === 1 ? singular : plural}`;
+    }
     function usageBar(current, max) {
       if (max === -1) return 0;
       return Math.min(100, current / max * 100);
@@ -1724,18 +1754,18 @@ const _sfc_main$q = {
         _push(`<div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"> Erro ao carregar dados do plano. </div>`);
       } else if (unref(meData)) {
         _push(`<!--[--><div class="glass-card p-6 mb-8"><div class="flex items-center justify-between"><div><div class="text-sm text-slate-400">Plano atual</div><div class="text-2xl font-bold text-white mt-1">${ssrInterpolate(planName.value)}</div><div class="text-sm text-slate-400 mt-1">${ssrInterpolate(planPrice.value === 0 ? "Grátis" : `R$ ${planPrice.value / 100}/mês`)}</div></div>`);
-        if (planSlug.value === "free") {
+        if (upgradePlan.value) {
           _push(`<button${ssrIncludeBooleanAttr(changingPlan.value) ? " disabled" : ""} class="btn-primary flex items-center gap-2">`);
           if (changingPlan.value) {
             _push(ssrRenderComponent(unref(Loader2), { class: "w-4 h-4 animate-spin" }, null, _parent));
           } else {
             _push(`<!---->`);
           }
-          _push(` Upgrade para Pro </button>`);
+          _push(` Upgrade para ${ssrInterpolate(upgradePlan.value.name)}</button>`);
         } else {
           _push(`<!---->`);
         }
-        _push(`</div><div class="mt-6 pt-6 border-t border-white/5 grid grid-cols-3 gap-6"><div><div class="text-xs text-slate-500">Vagas</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.jobs)} / ${ssrInterpolate(maxJobs.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.jobs, maxJobsRaw.value) + "%" })}"></div></div></div><div><div class="text-xs text-slate-500">Currículos</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.resumes)} / ${ssrInterpolate(maxResumes.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.resumes, maxResumesRaw.value) + "%" })}"></div></div></div><div><div class="text-xs text-slate-500">Sites</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.sites)} / ${ssrInterpolate(maxSites.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.sites, maxSitesRaw.value) + "%" })}"></div></div></div></div></div><h2 class="text-lg font-semibold text-white mb-4">Planos disponíveis</h2>`);
+        _push(`</div><div class="mt-6 pt-6 border-t border-white/5 grid grid-cols-3 gap-6"><div><div class="text-xs text-slate-500">Vagas</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.jobs)} / ${ssrInterpolate(maxJobs.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.jobs, maxJobsRaw.value) + "%" })}"></div></div></div><div><div class="text-xs text-slate-500">Análises de currículo / mês</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.resume_analyses ?? 0)} / ${ssrInterpolate(maxResumeAnalyses.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.resume_analyses ?? 0, maxResumeAnalysesRaw.value) + "%" })}"></div></div></div><div><div class="text-xs text-slate-500">Sites</div><div class="text-lg font-bold text-white mt-1">${ssrInterpolate(usage.value.sites)} / ${ssrInterpolate(maxSites.value)}</div><div class="w-full bg-slate-700 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="${ssrRenderStyle({ width: usageBar(usage.value.sites, maxSitesRaw.value) + "%" })}"></div></div></div></div></div><h2 class="text-lg font-semibold text-white mb-4">Planos disponíveis</h2>`);
         if (unref(plansLoading)) {
           _push(`<div class="text-slate-500 text-sm">Carregando planos...</div>`);
         } else if (unref(plansError)) {
@@ -1750,10 +1780,10 @@ const _sfc_main$q = {
               _push(`<!---->`);
             }
             _push(`</div><ul class="mt-4 space-y-2"><!--[-->`);
-            ssrRenderList(parseFeatures(plan.features), (feature) => {
+            ssrRenderList(planPerks(plan), (perk) => {
               _push(`<li class="text-sm text-slate-300 flex items-center gap-2">`);
               _push(ssrRenderComponent(unref(Check), { class: "w-4 h-4 text-emerald-400" }, null, _parent));
-              _push(` ${ssrInterpolate(feature)}</li>`);
+              _push(` ${ssrInterpolate(perk)}</li>`);
             });
             _push(`<!--]--></ul>`);
             if (planSlug.value !== plan.slug) {
@@ -1763,7 +1793,7 @@ const _sfc_main$q = {
               } else {
                 _push(`<!---->`);
               }
-              _push(` ${ssrInterpolate(planSlug.value === "free" ? "Começar" : "Downgrade")}</button>`);
+              _push(` ${ssrInterpolate(planActionLabel(plan))}</button>`);
             } else {
               _push(`<button class="w-full mt-6 py-3 bg-indigo-600 text-white font-medium rounded-lg cursor-default"> Plano atual </button>`);
             }
@@ -1779,13 +1809,13 @@ const _sfc_main$q = {
     };
   }
 };
-const _sfc_setup$q = _sfc_main$q.setup;
-_sfc_main$q.setup = (props, ctx) => {
+const _sfc_setup$r = _sfc_main$r.setup;
+_sfc_main$r.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Billing.vue");
-  return _sfc_setup$q ? _sfc_setup$q(props, ctx) : void 0;
+  return _sfc_setup$r ? _sfc_setup$r(props, ctx) : void 0;
 };
-const _sfc_main$p = {
+const _sfc_main$q = {
   __name: "Login",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1830,13 +1860,13 @@ const _sfc_main$p = {
     };
   }
 };
-const _sfc_setup$p = _sfc_main$p.setup;
-_sfc_main$p.setup = (props, ctx) => {
+const _sfc_setup$q = _sfc_main$q.setup;
+_sfc_main$q.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/auth/Login.vue");
-  return _sfc_setup$p ? _sfc_setup$p(props, ctx) : void 0;
+  return _sfc_setup$q ? _sfc_setup$q(props, ctx) : void 0;
 };
-const _sfc_main$o = {
+const _sfc_main$p = {
   __name: "Register",
   __ssrInlineRender: true,
   setup(__props) {
@@ -1882,13 +1912,13 @@ const _sfc_main$o = {
     };
   }
 };
-const _sfc_setup$o = _sfc_main$o.setup;
-_sfc_main$o.setup = (props, ctx) => {
+const _sfc_setup$p = _sfc_main$p.setup;
+_sfc_main$p.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/auth/Register.vue");
-  return _sfc_setup$o ? _sfc_setup$o(props, ctx) : void 0;
+  return _sfc_setup$p ? _sfc_setup$p(props, ctx) : void 0;
 };
-const _sfc_main$n = {
+const _sfc_main$o = {
   __name: "ExperienceEntry",
   __ssrInlineRender: true,
   props: {
@@ -1906,13 +1936,13 @@ const _sfc_main$n = {
     };
   }
 };
-const _sfc_setup$n = _sfc_main$n.setup;
-_sfc_main$n.setup = (props, ctx) => {
+const _sfc_setup$o = _sfc_main$o.setup;
+_sfc_main$o.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/ExperienceEntry.vue");
-  return _sfc_setup$n ? _sfc_setup$n(props, ctx) : void 0;
+  return _sfc_setup$o ? _sfc_setup$o(props, ctx) : void 0;
 };
-const _sfc_main$m = {
+const _sfc_main$n = {
   __name: "EducationEntry",
   __ssrInlineRender: true,
   props: {
@@ -1930,13 +1960,13 @@ const _sfc_main$m = {
     };
   }
 };
-const _sfc_setup$m = _sfc_main$m.setup;
-_sfc_main$m.setup = (props, ctx) => {
+const _sfc_setup$n = _sfc_main$n.setup;
+_sfc_main$n.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/EducationEntry.vue");
-  return _sfc_setup$m ? _sfc_setup$m(props, ctx) : void 0;
+  return _sfc_setup$n ? _sfc_setup$n(props, ctx) : void 0;
 };
-const _sfc_main$l = {
+const _sfc_main$m = {
   __name: "TagInput",
   __ssrInlineRender: true,
   props: {
@@ -1955,13 +1985,13 @@ const _sfc_main$l = {
     };
   }
 };
-const _sfc_setup$l = _sfc_main$l.setup;
-_sfc_main$l.setup = (props, ctx) => {
+const _sfc_setup$m = _sfc_main$m.setup;
+_sfc_main$m.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/TagInput.vue");
-  return _sfc_setup$l ? _sfc_setup$l(props, ctx) : void 0;
+  return _sfc_setup$m ? _sfc_setup$m(props, ctx) : void 0;
 };
-const _sfc_main$k = {
+const _sfc_main$l = {
   __name: "ResumeForm",
   __ssrInlineRender: true,
   props: {
@@ -2029,7 +2059,7 @@ const _sfc_main$k = {
       } else {
         _push(`<div class="space-y-4"><!--[-->`);
         ssrRenderList(form.experience, (exp, i) => {
-          _push(ssrRenderComponent(_sfc_main$n, {
+          _push(ssrRenderComponent(_sfc_main$o, {
             key: i,
             "model-value": exp,
             "onUpdate:modelValue": ($event) => form.experience[i] = $event,
@@ -2048,7 +2078,7 @@ const _sfc_main$k = {
       } else {
         _push(`<div class="space-y-4"><!--[-->`);
         ssrRenderList(form.education, (edu, i) => {
-          _push(ssrRenderComponent(_sfc_main$m, {
+          _push(ssrRenderComponent(_sfc_main$n, {
             key: i,
             "model-value": edu,
             "onUpdate:modelValue": ($event) => form.education[i] = $event,
@@ -2060,7 +2090,7 @@ const _sfc_main$k = {
       _push(`</div><div class="glass-card p-8"><div class="flex items-center gap-3 mb-6"><div class="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-400">`);
       _push(ssrRenderComponent(unref(Wrench), { class: "w-5 h-5" }, null, _parent));
       _push(`</div><h3 class="text-lg font-bold text-white font-outfit">Habilidades</h3></div>`);
-      _push(ssrRenderComponent(_sfc_main$l, {
+      _push(ssrRenderComponent(_sfc_main$m, {
         modelValue: form.skills,
         "onUpdate:modelValue": ($event) => form.skills = $event,
         placeholder: "Ex: JavaScript, Python, React..."
@@ -2068,7 +2098,7 @@ const _sfc_main$k = {
       _push(`</div><div class="glass-card p-8"><div class="flex items-center gap-3 mb-6"><div class="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center text-cyan-400">`);
       _push(ssrRenderComponent(unref(Globe), { class: "w-5 h-5" }, null, _parent));
       _push(`</div><h3 class="text-lg font-bold text-white font-outfit">Idiomas</h3></div>`);
-      _push(ssrRenderComponent(_sfc_main$l, {
+      _push(ssrRenderComponent(_sfc_main$m, {
         modelValue: form.languages,
         "onUpdate:modelValue": ($event) => form.languages = $event,
         placeholder: "Ex: Portugues, Ingles, Espanhol..."
@@ -2076,7 +2106,7 @@ const _sfc_main$k = {
       _push(`</div><div class="glass-card p-8"><div class="flex items-center gap-3 mb-6"><div class="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400">`);
       _push(ssrRenderComponent(unref(Award), { class: "w-5 h-5" }, null, _parent));
       _push(`</div><h3 class="text-lg font-bold text-white font-outfit">Certificacoes</h3></div>`);
-      _push(ssrRenderComponent(_sfc_main$l, {
+      _push(ssrRenderComponent(_sfc_main$m, {
         modelValue: form.certifications,
         "onUpdate:modelValue": ($event) => form.certifications = $event,
         placeholder: "Ex: AWS Solutions Architect, PMP..."
@@ -2089,14 +2119,14 @@ const _sfc_main$k = {
     };
   }
 };
-const _sfc_setup$k = _sfc_main$k.setup;
-_sfc_main$k.setup = (props, ctx) => {
+const _sfc_setup$l = _sfc_main$l.setup;
+_sfc_main$l.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/ResumeForm.vue");
-  return _sfc_setup$k ? _sfc_setup$k(props, ctx) : void 0;
+  return _sfc_setup$l ? _sfc_setup$l(props, ctx) : void 0;
 };
 const STORAGE_KEY = "vagai_resume_draft";
-const _sfc_main$j = {
+const _sfc_main$k = {
   __name: "ResumeEditor",
   __ssrInlineRender: true,
   setup(__props) {
@@ -2261,7 +2291,7 @@ const _sfc_main$j = {
       _push(`</div>`);
       if (resumeData.value) {
         _push(`<div class="space-y-6">`);
-        _push(ssrRenderComponent(_sfc_main$k, {
+        _push(ssrRenderComponent(_sfc_main$l, {
           ref_key: "resumeFormRef",
           ref: resumeFormRef,
           "initial-data": resumeData.value,
@@ -2281,14 +2311,14 @@ const _sfc_main$j = {
     };
   }
 };
-const _sfc_setup$j = _sfc_main$j.setup;
-_sfc_main$j.setup = (props, ctx) => {
+const _sfc_setup$k = _sfc_main$k.setup;
+_sfc_main$k.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/ResumeEditor.vue");
-  return _sfc_setup$j ? _sfc_setup$j(props, ctx) : void 0;
+  return _sfc_setup$k ? _sfc_setup$k(props, ctx) : void 0;
 };
 const REVIEW_DAYS = 3;
-const _sfc_main$i = {
+const _sfc_main$j = {
   __name: "InterviewPrep",
   __ssrInlineRender: true,
   setup(__props) {
@@ -2679,13 +2709,13 @@ const _sfc_main$i = {
     };
   }
 };
-const _sfc_setup$i = _sfc_main$i.setup;
-_sfc_main$i.setup = (props, ctx) => {
+const _sfc_setup$j = _sfc_main$j.setup;
+_sfc_main$j.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/InterviewPrep.vue");
-  return _sfc_setup$i ? _sfc_setup$i(props, ctx) : void 0;
+  return _sfc_setup$j ? _sfc_setup$j(props, ctx) : void 0;
 };
-const _sfc_main$h = {
+const _sfc_main$i = {
   __name: "InterviewPreparations",
   __ssrInlineRender: true,
   setup(__props) {
@@ -2865,13 +2895,13 @@ const _sfc_main$h = {
     };
   }
 };
-const _sfc_setup$h = _sfc_main$h.setup;
-_sfc_main$h.setup = (props, ctx) => {
+const _sfc_setup$i = _sfc_main$i.setup;
+_sfc_main$i.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/InterviewPreparations.vue");
-  return _sfc_setup$h ? _sfc_setup$h(props, ctx) : void 0;
+  return _sfc_setup$i ? _sfc_setup$i(props, ctx) : void 0;
 };
-const _sfc_main$g = {
+const _sfc_main$h = {
   __name: "SpontaneousPrep",
   __ssrInlineRender: true,
   setup(__props) {
@@ -2915,13 +2945,13 @@ const _sfc_main$g = {
     };
   }
 };
-const _sfc_setup$g = _sfc_main$g.setup;
-_sfc_main$g.setup = (props, ctx) => {
+const _sfc_setup$h = _sfc_main$h.setup;
+_sfc_main$h.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/SpontaneousPrep.vue");
-  return _sfc_setup$g ? _sfc_setup$g(props, ctx) : void 0;
+  return _sfc_setup$h ? _sfc_setup$h(props, ctx) : void 0;
 };
-const _sfc_main$f = {
+const _sfc_main$g = {
   __name: "Card",
   __ssrInlineRender: true,
   props: {
@@ -2944,13 +2974,13 @@ const _sfc_main$f = {
     };
   }
 };
-const _sfc_setup$f = _sfc_main$f.setup;
-_sfc_main$f.setup = (props, ctx) => {
+const _sfc_setup$g = _sfc_main$g.setup;
+_sfc_main$g.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/Card.vue");
-  return _sfc_setup$f ? _sfc_setup$f(props, ctx) : void 0;
+  return _sfc_setup$g ? _sfc_setup$g(props, ctx) : void 0;
 };
-const _sfc_main$e = {
+const _sfc_main$f = {
   __name: "EmptyState",
   __ssrInlineRender: true,
   props: {
@@ -2984,13 +3014,13 @@ const _sfc_main$e = {
     };
   }
 };
-const _sfc_setup$e = _sfc_main$e.setup;
-_sfc_main$e.setup = (props, ctx) => {
+const _sfc_setup$f = _sfc_main$f.setup;
+_sfc_main$f.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/EmptyState.vue");
-  return _sfc_setup$e ? _sfc_setup$e(props, ctx) : void 0;
+  return _sfc_setup$f ? _sfc_setup$f(props, ctx) : void 0;
 };
-const _sfc_main$d = {
+const _sfc_main$e = {
   __name: "Kpi",
   __ssrInlineRender: true,
   props: {
@@ -3004,11 +3034,11 @@ const _sfc_main$d = {
     };
   }
 };
-const _sfc_setup$d = _sfc_main$d.setup;
-_sfc_main$d.setup = (props, ctx) => {
+const _sfc_setup$e = _sfc_main$e.setup;
+_sfc_main$e.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/Kpi.vue");
-  return _sfc_setup$d ? _sfc_setup$d(props, ctx) : void 0;
+  return _sfc_setup$e ? _sfc_setup$e(props, ctx) : void 0;
 };
 Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement, LineElement, PointElement);
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#3b82f6"];
@@ -3023,7 +3053,7 @@ const pieOptions = {
   maintainAspectRatio: false,
   plugins: { legend: { position: "right" } }
 };
-const _sfc_main$c = {
+const _sfc_main$d = {
   __name: "MatchingWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -3052,7 +3082,7 @@ const _sfc_main$c = {
       return Math.round((Number(v) || 0) * 100);
     }
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Efetividade do Matching",
         subtitle: "Distribuição de similaridade, média, mediana e conversão"
       }, _attrs), {
@@ -3067,7 +3097,7 @@ const _sfc_main$c = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -3076,21 +3106,21 @@ const _sfc_main$c = {
                 var _a, _b, _c, _d, _e, _f, _g, _h;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Total de Matches",
                     value: (_a = summary.value) == null ? void 0 : _a.total_matches
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Score Médio",
                     value: pct((_b = summary.value) == null ? void 0 : _b.average_score),
                     suffix: "%"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Score Mediano",
                     value: pct((_c = summary.value) == null ? void 0 : _c.median_score),
                     suffix: "%"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Taxa de Conversão",
                     value: pct((_d = summary.value) == null ? void 0 : _d.conversion_rate),
                     suffix: "%"
@@ -3114,21 +3144,21 @@ const _sfc_main$c = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Total de Matches",
                         value: (_e = summary.value) == null ? void 0 : _e.total_matches
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: pct((_f = summary.value) == null ? void 0 : _f.average_score),
                         suffix: "%"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Mediano",
                         value: pct((_g = summary.value) == null ? void 0 : _g.median_score),
                         suffix: "%"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Taxa de Conversão",
                         value: pct((_h = summary.value) == null ? void 0 : _h.conversion_rate),
                         suffix: "%"
@@ -3176,7 +3206,7 @@ const _sfc_main$c = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -3185,21 +3215,21 @@ const _sfc_main$c = {
                   var _a, _b, _c, _d;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Total de Matches",
                         value: (_a = summary.value) == null ? void 0 : _a.total_matches
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: pct((_b = summary.value) == null ? void 0 : _b.average_score),
                         suffix: "%"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Mediano",
                         value: pct((_c = summary.value) == null ? void 0 : _c.median_score),
                         suffix: "%"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Taxa de Conversão",
                         value: pct((_d = summary.value) == null ? void 0 : _d.conversion_rate),
                         suffix: "%"
@@ -3252,13 +3282,13 @@ const _sfc_main$c = {
     };
   }
 };
-const _sfc_setup$c = _sfc_main$c.setup;
-_sfc_main$c.setup = (props, ctx) => {
+const _sfc_setup$d = _sfc_main$d.setup;
+_sfc_main$d.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/MatchingWidget.vue");
-  return _sfc_setup$c ? _sfc_setup$c(props, ctx) : void 0;
+  return _sfc_setup$d ? _sfc_setup$d(props, ctx) : void 0;
 };
-const _sfc_main$b = {
+const _sfc_main$c = {
   __name: "FacetList",
   __ssrInlineRender: true,
   props: {
@@ -3284,19 +3314,19 @@ const _sfc_main$b = {
     };
   }
 };
-const _sfc_setup$b = _sfc_main$b.setup;
-_sfc_main$b.setup = (props, ctx) => {
+const _sfc_setup$c = _sfc_main$c.setup;
+_sfc_main$c.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/FacetList.vue");
-  return _sfc_setup$b ? _sfc_setup$b(props, ctx) : void 0;
+  return _sfc_setup$c ? _sfc_setup$c(props, ctx) : void 0;
 };
-const _sfc_main$a = {
+const _sfc_main$b = {
   __name: "ResumeWidget",
   __ssrInlineRender: true,
   setup(__props) {
     const { data, isLoading: loading, isError: error } = useAnalyticsResume();
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Qualidade de Currículos",
         subtitle: "Pontos fortes, fracos e melhorias mais frequentes"
       }, _attrs), {
@@ -3311,7 +3341,7 @@ const _sfc_main$a = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -3320,17 +3350,17 @@ const _sfc_main$a = {
                 var _a, _b, _c, _d, _e, _f;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-1 lg:grid-cols-3 gap-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$b, {
+                  _push3(ssrRenderComponent(_sfc_main$c, {
                     title: "Pontos Fortes",
                     items: (_a = unref(data)) == null ? void 0 : _a.top_strengths,
                     color: "bg-emerald-500"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$b, {
+                  _push3(ssrRenderComponent(_sfc_main$c, {
                     title: "Pontos Fracos",
                     items: (_b = unref(data)) == null ? void 0 : _b.top_weaknesses,
                     color: "bg-red-500"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$b, {
+                  _push3(ssrRenderComponent(_sfc_main$c, {
                     title: "Sugestões",
                     items: (_c = unref(data)) == null ? void 0 : _c.top_suggestions,
                     color: "bg-amber-500",
@@ -3340,17 +3370,17 @@ const _sfc_main$a = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-1 lg:grid-cols-3 gap-8" }, [
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Pontos Fortes",
                         items: (_d = unref(data)) == null ? void 0 : _d.top_strengths,
                         color: "bg-emerald-500"
                       }, null, 8, ["items"]),
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Pontos Fracos",
                         items: (_e = unref(data)) == null ? void 0 : _e.top_weaknesses,
                         color: "bg-red-500"
                       }, null, 8, ["items"]),
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Sugestões",
                         items: (_f = unref(data)) == null ? void 0 : _f.top_suggestions,
                         color: "bg-amber-500",
@@ -3364,7 +3394,7 @@ const _sfc_main$a = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -3373,17 +3403,17 @@ const _sfc_main$a = {
                   var _a, _b, _c;
                   return [
                     createVNode("div", { class: "grid grid-cols-1 lg:grid-cols-3 gap-8" }, [
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Pontos Fortes",
                         items: (_a = unref(data)) == null ? void 0 : _a.top_strengths,
                         color: "bg-emerald-500"
                       }, null, 8, ["items"]),
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Pontos Fracos",
                         items: (_b = unref(data)) == null ? void 0 : _b.top_weaknesses,
                         color: "bg-red-500"
                       }, null, 8, ["items"]),
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         title: "Sugestões",
                         items: (_c = unref(data)) == null ? void 0 : _c.top_suggestions,
                         color: "bg-amber-500",
@@ -3402,13 +3432,13 @@ const _sfc_main$a = {
     };
   }
 };
-const _sfc_setup$a = _sfc_main$a.setup;
-_sfc_main$a.setup = (props, ctx) => {
+const _sfc_setup$b = _sfc_main$b.setup;
+_sfc_main$b.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/ResumeWidget.vue");
-  return _sfc_setup$a ? _sfc_setup$a(props, ctx) : void 0;
+  return _sfc_setup$b ? _sfc_setup$b(props, ctx) : void 0;
 };
-const _sfc_main$9 = {
+const _sfc_main$a = {
   __name: "JobTrendsWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -3430,7 +3460,7 @@ const _sfc_main$9 = {
       };
     });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Tendências de Vagas",
         subtitle: "Status, principais usuários e volume de postagens"
       }, _attrs), {
@@ -3445,7 +3475,7 @@ const _sfc_main$9 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -3458,7 +3488,7 @@ const _sfc_main$9 = {
                     options: unref(barOptions)
                   }, null, _parent3, _scopeId2));
                   _push3(`</div><div${_scopeId2}><h3 class="text-xs text-slate-400 uppercase tracking-widest mb-4"${_scopeId2}>Principais Usuários</h3>`);
-                  _push3(ssrRenderComponent(_sfc_main$b, {
+                  _push3(ssrRenderComponent(_sfc_main$c, {
                     items: topUsers.value,
                     color: "bg-amber-500"
                   }, null, _parent3, _scopeId2));
@@ -3475,7 +3505,7 @@ const _sfc_main$9 = {
                       ]),
                       createVNode("div", null, [
                         createVNode("h3", { class: "text-xs text-slate-400 uppercase tracking-widest mb-4" }, "Principais Usuários"),
-                        createVNode(_sfc_main$b, {
+                        createVNode(_sfc_main$c, {
                           items: topUsers.value,
                           color: "bg-amber-500"
                         }, null, 8, ["items"])
@@ -3488,7 +3518,7 @@ const _sfc_main$9 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -3504,7 +3534,7 @@ const _sfc_main$9 = {
                     ]),
                     createVNode("div", null, [
                       createVNode("h3", { class: "text-xs text-slate-400 uppercase tracking-widest mb-4" }, "Principais Usuários"),
-                      createVNode(_sfc_main$b, {
+                      createVNode(_sfc_main$c, {
                         items: topUsers.value,
                         color: "bg-amber-500"
                       }, null, 8, ["items"])
@@ -3521,13 +3551,13 @@ const _sfc_main$9 = {
     };
   }
 };
-const _sfc_setup$9 = _sfc_main$9.setup;
-_sfc_main$9.setup = (props, ctx) => {
+const _sfc_setup$a = _sfc_main$a.setup;
+_sfc_main$a.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/JobTrendsWidget.vue");
-  return _sfc_setup$9 ? _sfc_setup$9(props, ctx) : void 0;
+  return _sfc_setup$a ? _sfc_setup$a(props, ctx) : void 0;
 };
-const _sfc_main$8 = {
+const _sfc_main$9 = {
   __name: "UserMetricsWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -3554,7 +3584,7 @@ const _sfc_main$8 = {
       return FEATURES[key] || key;
     }
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Métricas do Usuário",
         subtitle: "Plano, assinatura e conversão"
       }, _attrs), {
@@ -3569,60 +3599,60 @@ const _sfc_main$8 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
             }, {
               default: withCtx((_2, _push3, _parent3, _scopeId2) => {
-                var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+                var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Vagas",
                     value: (_a = metrics.value) == null ? void 0 : _a.jobs_posted
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
-                    label: "Currículos",
-                    value: (_b = metrics.value) == null ? void 0 : _b.resumes_uploaded
+                  _push3(ssrRenderComponent(_sfc_main$e, {
+                    label: "Análises de currículo / mês",
+                    value: ((_b = metrics.value) == null ? void 0 : _b.resume_analyses_monthly) ?? ((_c = metrics.value) == null ? void 0 : _c.resumes_uploaded)
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Matches",
-                    value: (_c = metrics.value) == null ? void 0 : _c.matches_made
+                    value: (_d = metrics.value) == null ? void 0 : _d.matches_made
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Conversão",
-                    value: pct((_d = metrics.value) == null ? void 0 : _d.conversion_rate),
+                    value: pct((_e = metrics.value) == null ? void 0 : _e.conversion_rate),
                     suffix: "%"
                   }, null, _parent3, _scopeId2));
                   _push3(`</div><div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center"${_scopeId2}><!--[-->`);
-                  ssrRenderList(((_e = metrics.value) == null ? void 0 : _e.feature_utilization) || {}, (active, key) => {
+                  ssrRenderList(((_f = metrics.value) == null ? void 0 : _f.feature_utilization) || {}, (active, key) => {
                     _push3(`<div class="bg-slate-900/60 border border-white/5 rounded-xl p-4"${_scopeId2}><div class="text-xs text-slate-500 uppercase tracking-widest mb-2"${_scopeId2}>${ssrInterpolate(featureLabel(key))}</div><div class="${ssrRenderClass([active ? "text-emerald-400" : "text-slate-600", "font-bold"])}"${_scopeId2}>${ssrInterpolate(active ? "Ativo" : "Inativo")}</div></div>`);
                   });
                   _push3(`<!--]--></div>`);
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Vagas",
-                        value: (_f = metrics.value) == null ? void 0 : _f.jobs_posted
+                        value: (_g = metrics.value) == null ? void 0 : _g.jobs_posted
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
-                        label: "Currículos",
-                        value: (_g = metrics.value) == null ? void 0 : _g.resumes_uploaded
+                      createVNode(_sfc_main$e, {
+                        label: "Análises de currículo / mês",
+                        value: ((_h = metrics.value) == null ? void 0 : _h.resume_analyses_monthly) ?? ((_i = metrics.value) == null ? void 0 : _i.resumes_uploaded)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Matches",
-                        value: (_h = metrics.value) == null ? void 0 : _h.matches_made
+                        value: (_j = metrics.value) == null ? void 0 : _j.matches_made
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Conversão",
-                        value: pct((_i = metrics.value) == null ? void 0 : _i.conversion_rate),
+                        value: pct((_k = metrics.value) == null ? void 0 : _k.conversion_rate),
                         suffix: "%"
                       }, null, 8, ["value"])
                     ]),
                     createVNode("div", { class: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center" }, [
-                      (openBlock(true), createBlock(Fragment, null, renderList(((_j = metrics.value) == null ? void 0 : _j.feature_utilization) || {}, (active, key) => {
+                      (openBlock(true), createBlock(Fragment, null, renderList(((_l = metrics.value) == null ? void 0 : _l.feature_utilization) || {}, (active, key) => {
                         return openBlock(), createBlock("div", {
                           key,
                           class: "bg-slate-900/60 border border-white/5 rounded-xl p-4"
@@ -3641,35 +3671,35 @@ const _sfc_main$8 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
               }, {
                 default: withCtx(() => {
-                  var _a, _b, _c, _d, _e;
+                  var _a, _b, _c, _d, _e, _f;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Vagas",
                         value: (_a = metrics.value) == null ? void 0 : _a.jobs_posted
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
-                        label: "Currículos",
-                        value: (_b = metrics.value) == null ? void 0 : _b.resumes_uploaded
+                      createVNode(_sfc_main$e, {
+                        label: "Análises de currículo / mês",
+                        value: ((_b = metrics.value) == null ? void 0 : _b.resume_analyses_monthly) ?? ((_c = metrics.value) == null ? void 0 : _c.resumes_uploaded)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Matches",
-                        value: (_c = metrics.value) == null ? void 0 : _c.matches_made
+                        value: (_d = metrics.value) == null ? void 0 : _d.matches_made
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Conversão",
-                        value: pct((_d = metrics.value) == null ? void 0 : _d.conversion_rate),
+                        value: pct((_e = metrics.value) == null ? void 0 : _e.conversion_rate),
                         suffix: "%"
                       }, null, 8, ["value"])
                     ]),
                     createVNode("div", { class: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center" }, [
-                      (openBlock(true), createBlock(Fragment, null, renderList(((_e = metrics.value) == null ? void 0 : _e.feature_utilization) || {}, (active, key) => {
+                      (openBlock(true), createBlock(Fragment, null, renderList(((_f = metrics.value) == null ? void 0 : _f.feature_utilization) || {}, (active, key) => {
                         return openBlock(), createBlock("div", {
                           key,
                           class: "bg-slate-900/60 border border-white/5 rounded-xl p-4"
@@ -3693,13 +3723,13 @@ const _sfc_main$8 = {
     };
   }
 };
-const _sfc_setup$8 = _sfc_main$8.setup;
-_sfc_main$8.setup = (props, ctx) => {
+const _sfc_setup$9 = _sfc_main$9.setup;
+_sfc_main$9.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/UserMetricsWidget.vue");
-  return _sfc_setup$8 ? _sfc_setup$8(props, ctx) : void 0;
+  return _sfc_setup$9 ? _sfc_setup$9(props, ctx) : void 0;
 };
-const _sfc_main$7 = {
+const _sfc_main$8 = {
   __name: "InterviewPrepWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -3726,7 +3756,7 @@ const _sfc_main$7 = {
       return { improving: "Melhorando", stable: "Estável", declining: "Caindo" }[t] || t || "—";
     }
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Preparação para Entrevistas",
         subtitle: "Categorias de perguntas, fontes e score de verificação"
       }, _attrs), {
@@ -3741,7 +3771,7 @@ const _sfc_main$7 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -3750,19 +3780,19 @@ const _sfc_main$7 = {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Preparações",
                     value: (_a = unref(data)) == null ? void 0 : _a.total_preparations
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Score Médio",
                     value: (_d = (_c = (_b = unref(data)) == null ? void 0 : _b.average_verification_score) == null ? void 0 : _c.toFixed) == null ? void 0 : _d.call(_c, 1)
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Tendência",
                     value: trendLabel((_e = unref(data)) == null ? void 0 : _e.verification_trend)
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Categorias",
                     value: categoryCount.value
                   }, null, _parent3, _scopeId2));
@@ -3780,19 +3810,19 @@ const _sfc_main$7 = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Preparações",
                         value: (_f = unref(data)) == null ? void 0 : _f.total_preparations
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: (_i = (_h = (_g = unref(data)) == null ? void 0 : _g.average_verification_score) == null ? void 0 : _h.toFixed) == null ? void 0 : _i.call(_h, 1)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tendência",
                         value: trendLabel((_j = unref(data)) == null ? void 0 : _j.verification_trend)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Categorias",
                         value: categoryCount.value
                       }, null, 8, ["value"])
@@ -3820,7 +3850,7 @@ const _sfc_main$7 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -3829,19 +3859,19 @@ const _sfc_main$7 = {
                   var _a, _b, _c, _d, _e;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Preparações",
                         value: (_a = unref(data)) == null ? void 0 : _a.total_preparations
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: (_d = (_c = (_b = unref(data)) == null ? void 0 : _b.average_verification_score) == null ? void 0 : _c.toFixed) == null ? void 0 : _d.call(_c, 1)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tendência",
                         value: trendLabel((_e = unref(data)) == null ? void 0 : _e.verification_trend)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Categorias",
                         value: categoryCount.value
                       }, null, 8, ["value"])
@@ -3874,13 +3904,13 @@ const _sfc_main$7 = {
     };
   }
 };
-const _sfc_setup$7 = _sfc_main$7.setup;
-_sfc_main$7.setup = (props, ctx) => {
+const _sfc_setup$8 = _sfc_main$8.setup;
+_sfc_main$8.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/InterviewPrepWidget.vue");
-  return _sfc_setup$7 ? _sfc_setup$7(props, ctx) : void 0;
+  return _sfc_setup$8 ? _sfc_setup$8(props, ctx) : void 0;
 };
-const _sfc_main$6 = {
+const _sfc_main$7 = {
   __name: "AIQualityWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -3910,7 +3940,7 @@ const _sfc_main$6 = {
       return { improving: "Melhorando", stable: "Estável", declining: "Caindo" }[t] || t || "—";
     }
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Qualidade de Análises de IA",
         subtitle: "Distribuição de score, status e sucesso por fonte"
       }, _attrs), {
@@ -3925,7 +3955,7 @@ const _sfc_main$6 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -3934,20 +3964,20 @@ const _sfc_main$6 = {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Análises",
                     value: (_a = unref(data)) == null ? void 0 : _a.total_analyses
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Score Médio",
                     value: (_d = (_c = (_b = unref(data)) == null ? void 0 : _b.average_score) == null ? void 0 : _c.toFixed) == null ? void 0 : _d.call(_c, 1)
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Tempo Médio",
                     value: (_e = unref(data)) == null ? void 0 : _e.average_processing_seconds,
                     suffix: "s"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Tendência",
                     value: trendLabel((_f = unref(data)) == null ? void 0 : _f.verification_trend)
                   }, null, _parent3, _scopeId2));
@@ -3957,7 +3987,7 @@ const _sfc_main$6 = {
                     options: unref(barOptions)
                   }, null, _parent3, _scopeId2));
                   _push3(`</div><div${_scopeId2}><h3 class="text-xs text-slate-400 uppercase tracking-widest mb-4"${_scopeId2}>Sucesso por Fonte</h3>`);
-                  _push3(ssrRenderComponent(_sfc_main$b, {
+                  _push3(ssrRenderComponent(_sfc_main$c, {
                     items: sourceList.value,
                     color: "bg-cyan-500",
                     "label-key": "source"
@@ -3966,20 +3996,20 @@ const _sfc_main$6 = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análises",
                         value: (_g = unref(data)) == null ? void 0 : _g.total_analyses
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: (_j = (_i = (_h = unref(data)) == null ? void 0 : _h.average_score) == null ? void 0 : _i.toFixed) == null ? void 0 : _j.call(_i, 1)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tempo Médio",
                         value: (_k = unref(data)) == null ? void 0 : _k.average_processing_seconds,
                         suffix: "s"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tendência",
                         value: trendLabel((_l = unref(data)) == null ? void 0 : _l.verification_trend)
                       }, null, 8, ["value"])
@@ -3994,7 +4024,7 @@ const _sfc_main$6 = {
                       ]),
                       createVNode("div", null, [
                         createVNode("h3", { class: "text-xs text-slate-400 uppercase tracking-widest mb-4" }, "Sucesso por Fonte"),
-                        createVNode(_sfc_main$b, {
+                        createVNode(_sfc_main$c, {
                           items: sourceList.value,
                           color: "bg-cyan-500",
                           "label-key": "source"
@@ -4008,7 +4038,7 @@ const _sfc_main$6 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -4017,20 +4047,20 @@ const _sfc_main$6 = {
                   var _a, _b, _c, _d, _e, _f;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análises",
                         value: (_a = unref(data)) == null ? void 0 : _a.total_analyses
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Score Médio",
                         value: (_d = (_c = (_b = unref(data)) == null ? void 0 : _b.average_score) == null ? void 0 : _c.toFixed) == null ? void 0 : _d.call(_c, 1)
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tempo Médio",
                         value: (_e = unref(data)) == null ? void 0 : _e.average_processing_seconds,
                         suffix: "s"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Tendência",
                         value: trendLabel((_f = unref(data)) == null ? void 0 : _f.verification_trend)
                       }, null, 8, ["value"])
@@ -4045,7 +4075,7 @@ const _sfc_main$6 = {
                       ]),
                       createVNode("div", null, [
                         createVNode("h3", { class: "text-xs text-slate-400 uppercase tracking-widest mb-4" }, "Sucesso por Fonte"),
-                        createVNode(_sfc_main$b, {
+                        createVNode(_sfc_main$c, {
                           items: sourceList.value,
                           color: "bg-cyan-500",
                           "label-key": "source"
@@ -4064,13 +4094,13 @@ const _sfc_main$6 = {
     };
   }
 };
-const _sfc_setup$6 = _sfc_main$6.setup;
-_sfc_main$6.setup = (props, ctx) => {
+const _sfc_setup$7 = _sfc_main$7.setup;
+_sfc_main$7.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/AIQualityWidget.vue");
-  return _sfc_setup$6 ? _sfc_setup$6(props, ctx) : void 0;
+  return _sfc_setup$7 ? _sfc_setup$7(props, ctx) : void 0;
 };
-const _sfc_main$5 = {
+const _sfc_main$6 = {
   __name: "TimeToHireWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -4091,7 +4121,7 @@ const _sfc_main$5 = {
       return (Number(v) || 0).toFixed(1);
     }
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Tempo até a Contratação",
         subtitle: "Duração média e mediana por estágio do pipeline"
       }, _attrs), {
@@ -4106,7 +4136,7 @@ const _sfc_main$5 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -4115,32 +4145,32 @@ const _sfc_main$5 = {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Match (média)",
                     value: days((_a = unref(data)) == null ? void 0 : _a.average_time_to_match_days),
                     suffix: "d"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Análise (média)",
                     value: days((_b = unref(data)) == null ? void 0 : _b.average_time_to_analysis_days),
                     suffix: "d"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Apply (média)",
                     value: days((_c = unref(data)) == null ? void 0 : _c.average_time_to_apply_days),
                     suffix: "d"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Match (mediana)",
                     value: days((_d = unref(data)) == null ? void 0 : _d.median_time_to_match_days),
                     suffix: "d"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Análise (mediana)",
                     value: days((_e = unref(data)) == null ? void 0 : _e.median_time_to_analysis_days),
                     suffix: "d"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Apply (mediana)",
                     value: days((_f = unref(data)) == null ? void 0 : _f.median_time_to_apply_days),
                     suffix: "d"
@@ -4154,32 +4184,32 @@ const _sfc_main$5 = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Match (média)",
                         value: days((_g = unref(data)) == null ? void 0 : _g.average_time_to_match_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análise (média)",
                         value: days((_h = unref(data)) == null ? void 0 : _h.average_time_to_analysis_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Apply (média)",
                         value: days((_i = unref(data)) == null ? void 0 : _i.average_time_to_apply_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Match (mediana)",
                         value: days((_j = unref(data)) == null ? void 0 : _j.median_time_to_match_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análise (mediana)",
                         value: days((_k = unref(data)) == null ? void 0 : _k.median_time_to_analysis_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Apply (mediana)",
                         value: days((_l = unref(data)) == null ? void 0 : _l.median_time_to_apply_days),
                         suffix: "d"
@@ -4199,7 +4229,7 @@ const _sfc_main$5 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -4208,32 +4238,32 @@ const _sfc_main$5 = {
                   var _a, _b, _c, _d, _e, _f;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Match (média)",
                         value: days((_a = unref(data)) == null ? void 0 : _a.average_time_to_match_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análise (média)",
                         value: days((_b = unref(data)) == null ? void 0 : _b.average_time_to_analysis_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Apply (média)",
                         value: days((_c = unref(data)) == null ? void 0 : _c.average_time_to_apply_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Match (mediana)",
                         value: days((_d = unref(data)) == null ? void 0 : _d.median_time_to_match_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Análise (mediana)",
                         value: days((_e = unref(data)) == null ? void 0 : _e.median_time_to_analysis_days),
                         suffix: "d"
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Apply (mediana)",
                         value: days((_f = unref(data)) == null ? void 0 : _f.median_time_to_apply_days),
                         suffix: "d"
@@ -4258,13 +4288,13 @@ const _sfc_main$5 = {
     };
   }
 };
-const _sfc_setup$5 = _sfc_main$5.setup;
-_sfc_main$5.setup = (props, ctx) => {
+const _sfc_setup$6 = _sfc_main$6.setup;
+_sfc_main$6.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/TimeToHireWidget.vue");
-  return _sfc_setup$5 ? _sfc_setup$5(props, ctx) : void 0;
+  return _sfc_setup$6 ? _sfc_setup$6(props, ctx) : void 0;
 };
-const _sfc_main$4 = {
+const _sfc_main$5 = {
   __name: "ChipList",
   __ssrInlineRender: true,
   props: {
@@ -4289,13 +4319,13 @@ const _sfc_main$4 = {
     };
   }
 };
-const _sfc_setup$4 = _sfc_main$4.setup;
-_sfc_main$4.setup = (props, ctx) => {
+const _sfc_setup$5 = _sfc_main$5.setup;
+_sfc_main$5.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/ChipList.vue");
-  return _sfc_setup$4 ? _sfc_setup$4(props, ctx) : void 0;
+  return _sfc_setup$5 ? _sfc_setup$5(props, ctx) : void 0;
 };
-const _sfc_main$3 = {
+const _sfc_main$4 = {
   __name: "SkillGapWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -4313,7 +4343,7 @@ const _sfc_main$3 = {
       };
     });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Gap de Skills",
         subtitle: "Sobreposição entre vagas e candidatos por categoria"
       }, _attrs), {
@@ -4328,7 +4358,7 @@ const _sfc_main$3 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -4342,12 +4372,12 @@ const _sfc_main$3 = {
                     options: unref(barOptions)
                   }, null, _parent3, _scopeId2));
                   _push3(`</div><div class="space-y-6"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$4, {
+                  _push3(ssrRenderComponent(_sfc_main$5, {
                     title: "Habilidades em Demanda",
                     items: (_a = unref(data)) == null ? void 0 : _a.in_demand_skills,
                     color: "bg-lime-500"
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$4, {
+                  _push3(ssrRenderComponent(_sfc_main$5, {
                     title: "Habilidades Sobrepostas",
                     items: (_b = unref(data)) == null ? void 0 : _b.overlapping_skills,
                     color: "bg-indigo-500"
@@ -4364,12 +4394,12 @@ const _sfc_main$3 = {
                         }, null, 8, ["data", "options"])
                       ]),
                       createVNode("div", { class: "space-y-6" }, [
-                        createVNode(_sfc_main$4, {
+                        createVNode(_sfc_main$5, {
                           title: "Habilidades em Demanda",
                           items: (_c = unref(data)) == null ? void 0 : _c.in_demand_skills,
                           color: "bg-lime-500"
                         }, null, 8, ["items"]),
-                        createVNode(_sfc_main$4, {
+                        createVNode(_sfc_main$5, {
                           title: "Habilidades Sobrepostas",
                           items: (_d = unref(data)) == null ? void 0 : _d.overlapping_skills,
                           color: "bg-indigo-500"
@@ -4383,7 +4413,7 @@ const _sfc_main$3 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -4400,12 +4430,12 @@ const _sfc_main$3 = {
                         }, null, 8, ["data", "options"])
                       ]),
                       createVNode("div", { class: "space-y-6" }, [
-                        createVNode(_sfc_main$4, {
+                        createVNode(_sfc_main$5, {
                           title: "Habilidades em Demanda",
                           items: (_a = unref(data)) == null ? void 0 : _a.in_demand_skills,
                           color: "bg-lime-500"
                         }, null, 8, ["items"]),
-                        createVNode(_sfc_main$4, {
+                        createVNode(_sfc_main$5, {
                           title: "Habilidades Sobrepostas",
                           items: (_b = unref(data)) == null ? void 0 : _b.overlapping_skills,
                           color: "bg-indigo-500"
@@ -4424,13 +4454,13 @@ const _sfc_main$3 = {
     };
   }
 };
-const _sfc_setup$3 = _sfc_main$3.setup;
-_sfc_main$3.setup = (props, ctx) => {
+const _sfc_setup$4 = _sfc_main$4.setup;
+_sfc_main$4.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/SkillGapWidget.vue");
-  return _sfc_setup$3 ? _sfc_setup$3(props, ctx) : void 0;
+  return _sfc_setup$4 ? _sfc_setup$4(props, ctx) : void 0;
 };
-const _sfc_main$2 = {
+const _sfc_main$3 = {
   __name: "FunnelWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -4448,7 +4478,7 @@ const _sfc_main$2 = {
       };
     });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Funil de Conversão",
         subtitle: "Estágios do usuário e pontos de abandono"
       }, _attrs), {
@@ -4463,7 +4493,7 @@ const _sfc_main$2 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -4529,7 +4559,7 @@ const _sfc_main$2 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -4582,13 +4612,13 @@ const _sfc_main$2 = {
     };
   }
 };
-const _sfc_setup$2 = _sfc_main$2.setup;
-_sfc_main$2.setup = (props, ctx) => {
+const _sfc_setup$3 = _sfc_main$3.setup;
+_sfc_main$3.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/FunnelWidget.vue");
-  return _sfc_setup$2 ? _sfc_setup$2(props, ctx) : void 0;
+  return _sfc_setup$3 ? _sfc_setup$3(props, ctx) : void 0;
 };
-const _sfc_main$1 = {
+const _sfc_main$2 = {
   __name: "GeographicWidget",
   __ssrInlineRender: true,
   setup(__props) {
@@ -4608,7 +4638,7 @@ const _sfc_main$1 = {
       };
     });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(ssrRenderComponent(_sfc_main$f, mergeProps({
+      _push(ssrRenderComponent(_sfc_main$g, mergeProps({
         title: "Insights Geográficos",
         subtitle: "Distribuição de usuários e vagas, e proporção remoto/presencial"
       }, _attrs), {
@@ -4623,7 +4653,7 @@ const _sfc_main$1 = {
         }),
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(ssrRenderComponent(_sfc_main$e, {
+            _push2(ssrRenderComponent(_sfc_main$f, {
               data: unref(data),
               loading: unref(loading),
               error: unref(error)
@@ -4632,19 +4662,19 @@ const _sfc_main$1 = {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
                 if (_push3) {
                   _push3(`<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"${_scopeId2}>`);
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Cidades",
                     value: (_b = (_a = unref(data)) == null ? void 0 : _a.users_by_city) == null ? void 0 : _b.length
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Fusos",
                     value: (_d = (_c = unref(data)) == null ? void 0 : _c.users_by_timezone) == null ? void 0 : _d.length
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Cidades de Vagas",
                     value: (_f = (_e = unref(data)) == null ? void 0 : _e.jobs_by_city) == null ? void 0 : _f.length
                   }, null, _parent3, _scopeId2));
-                  _push3(ssrRenderComponent(_sfc_main$d, {
+                  _push3(ssrRenderComponent(_sfc_main$e, {
                     label: "Proporção",
                     value: (_g = unref(data)) == null ? void 0 : _g.remote_to_on_site_ratio
                   }, null, _parent3, _scopeId2));
@@ -4662,19 +4692,19 @@ const _sfc_main$1 = {
                 } else {
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Cidades",
                         value: (_i = (_h = unref(data)) == null ? void 0 : _h.users_by_city) == null ? void 0 : _i.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Fusos",
                         value: (_k = (_j = unref(data)) == null ? void 0 : _j.users_by_timezone) == null ? void 0 : _k.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Cidades de Vagas",
                         value: (_m = (_l = unref(data)) == null ? void 0 : _l.jobs_by_city) == null ? void 0 : _m.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Proporção",
                         value: (_n = unref(data)) == null ? void 0 : _n.remote_to_on_site_ratio
                       }, null, 8, ["value"])
@@ -4702,7 +4732,7 @@ const _sfc_main$1 = {
             }, _parent2, _scopeId));
           } else {
             return [
-              createVNode(_sfc_main$e, {
+              createVNode(_sfc_main$f, {
                 data: unref(data),
                 loading: unref(loading),
                 error: unref(error)
@@ -4711,19 +4741,19 @@ const _sfc_main$1 = {
                   var _a, _b, _c, _d, _e, _f, _g;
                   return [
                     createVNode("div", { class: "grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, [
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Cidades",
                         value: (_b = (_a = unref(data)) == null ? void 0 : _a.users_by_city) == null ? void 0 : _b.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Fusos",
                         value: (_d = (_c = unref(data)) == null ? void 0 : _c.users_by_timezone) == null ? void 0 : _d.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Cidades de Vagas",
                         value: (_f = (_e = unref(data)) == null ? void 0 : _e.jobs_by_city) == null ? void 0 : _f.length
                       }, null, 8, ["value"]),
-                      createVNode(_sfc_main$d, {
+                      createVNode(_sfc_main$e, {
                         label: "Proporção",
                         value: (_g = unref(data)) == null ? void 0 : _g.remote_to_on_site_ratio
                       }, null, 8, ["value"])
@@ -4756,28 +4786,181 @@ const _sfc_main$1 = {
     };
   }
 };
-const _sfc_setup$1 = _sfc_main$1.setup;
-_sfc_main$1.setup = (props, ctx) => {
+const _sfc_setup$2 = _sfc_main$2.setup;
+_sfc_main$2.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/analytics/GeographicWidget.vue");
-  return _sfc_setup$1 ? _sfc_setup$1(props, ctx) : void 0;
+  return _sfc_setup$2 ? _sfc_setup$2(props, ctx) : void 0;
 };
-const _sfc_main = {
+const _sfc_main$1 = {
   __name: "Analytics",
   __ssrInlineRender: true,
   setup(__props) {
     return (_ctx, _push, _parent, _attrs) => {
       _push(`<div${ssrRenderAttrs(mergeProps({ class: "space-y-12" }, _attrs))}><div class="flex items-end justify-between"><div><h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Analytics</h1><p class="text-slate-400">Indicadores de matching, currículos, vagas e usuários.</p></div></div>`);
-      _push(ssrRenderComponent(_sfc_main$c, null, null, _parent));
+      _push(ssrRenderComponent(_sfc_main$d, null, null, _parent));
+      _push(ssrRenderComponent(_sfc_main$b, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$a, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$9, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$8, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$7, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$6, null, null, _parent));
-      _push(ssrRenderComponent(_sfc_main$5, null, null, _parent));
+      _push(ssrRenderComponent(_sfc_main$4, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$3, null, null, _parent));
       _push(ssrRenderComponent(_sfc_main$2, null, null, _parent));
-      _push(ssrRenderComponent(_sfc_main$1, null, null, _parent));
+      _push(`</div>`);
+    };
+  }
+};
+const _sfc_setup$1 = _sfc_main$1.setup;
+_sfc_main$1.setup = (props, ctx) => {
+  const ssrContext = useSSRContext();
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Analytics.vue");
+  return _sfc_setup$1 ? _sfc_setup$1(props, ctx) : void 0;
+};
+const _sfc_main = {
+  __name: "PlansAdmin",
+  __ssrInlineRender: true,
+  setup(__props) {
+    useQueryClient();
+    const { data: plansData, isLoading: plansLoading, isError: plansError } = useAdminPlans();
+    const plans = computed(() => plansData.value || []);
+    const formOpen = ref(false);
+    const editingId = ref(null);
+    const submitting = ref(false);
+    const formError = ref("");
+    const isEditing = computed(() => editingId.value !== null);
+    const form = ref(emptyForm());
+    function emptyForm() {
+      return {
+        name: "",
+        slug: "",
+        type: "free",
+        priceMonthly: 0,
+        priceYearly: 0,
+        maxJobs: 1e3,
+        maxResumeAnalyses: 1,
+        maxSites: 5,
+        maxCrawls: 10,
+        aiMatching: false,
+        interviewPrep: false,
+        features: "",
+        active: true,
+        isDefault: false
+      };
+    }
+    function formatPrice(cents) {
+      return (cents / 100).toFixed(2);
+    }
+    function parseFeatures(features) {
+      if (!features) return [];
+      try {
+        const parsed = JSON.parse(features);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    function planPerks(plan) {
+      const perks = [
+        limitLabel(plan.max_jobs, "vaga", "vagas", "Vagas ilimitadas"),
+        limitLabel(plan.max_resume_analyses, "análise de currículo/mês", "análises de currículo/mês", "Análises de currículo ilimitadas"),
+        limitLabel(plan.max_sites, "fonte de busca", "fontes de busca", "Fontes de busca ilimitadas")
+      ];
+      if (plan.ai_matching)
+        perks.push("Matching por IA");
+      else
+        perks.push("Matching Básico");
+      if (plan.interview_prep) perks.push("Preparação");
+      const seen = /* @__PURE__ */ new Set();
+      return perks.concat(parseFeatures(plan.features)).filter((perk) => {
+        const key = perk.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    function limitLabel(value, singular, plural, unlimited) {
+      if (value === -1) return unlimited;
+      return `${value} ${value === 1 ? singular : plural}`;
+    }
+    return (_ctx, _push, _parent, _attrs) => {
+      const _component_Loader2 = resolveComponent("Loader2");
+      _push(`<div${ssrRenderAttrs(mergeProps({ class: "space-y-10" }, _attrs))}><div class="flex items-start justify-between"><div><h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Planos</h1><p class="text-slate-400">Crie e edite os planos disponíveis na plataforma.</p></div><button class="h-11 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-900/20 active:scale-95 flex items-center gap-2">`);
+      _push(ssrRenderComponent(unref(Plus), { class: "w-4 h-4" }, null, _parent));
+      _push(` Novo plano </button></div>`);
+      if (unref(plansLoading)) {
+        _push(`<div class="text-slate-400 py-12 text-center">Carregando planos...</div>`);
+      } else if (unref(plansError)) {
+        _push(`<div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"> Erro ao carregar planos. </div>`);
+      } else {
+        _push(`<div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><!--[-->`);
+        ssrRenderList(plans.value, (plan) => {
+          _push(`<div class="glass-card p-6 space-y-4"><div class="flex items-start justify-between gap-3"><div><div class="flex items-center gap-2"><h2 class="text-xl font-bold text-white font-outfit">${ssrInterpolate(plan.name)}</h2><span class="${ssrRenderClass([plan.type === "paid" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300", "px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"])}">${ssrInterpolate(plan.type === "paid" ? "Pago" : "Grátis")}</span>`);
+          if (plan.is_default) {
+            _push(`<span class="px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300"> Padrão </span>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`</div><div class="text-xs text-slate-500 mt-1 font-mono">${ssrInterpolate(plan.slug)}</div></div><span class="${ssrRenderClass([plan.active ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-600/30 text-slate-400", "px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"])}">${ssrInterpolate(plan.active ? "Ativo" : "Inativo")}</span></div><div class="text-2xl font-bold text-white">${ssrInterpolate(plan.price_monthly === 0 ? "Grátis" : `R$ ${formatPrice(plan.price_monthly)}`)} `);
+          if (plan.price_monthly > 0) {
+            _push(`<span class="text-sm font-normal text-slate-400">/mês</span>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`</div><ul class="space-y-1.5"><!--[-->`);
+          ssrRenderList(planPerks(plan), (perk) => {
+            _push(`<li class="text-sm text-slate-300 flex items-center gap-2">`);
+            _push(ssrRenderComponent(unref(Check), { class: "w-4 h-4 text-emerald-400" }, null, _parent));
+            _push(` ${ssrInterpolate(perk)}</li>`);
+          });
+          _push(`<!--]--></ul><div class="pt-4 border-t border-white/5 flex flex-wrap gap-2"><button class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">`);
+          _push(ssrRenderComponent(unref(Pencil), { class: "w-3.5 h-3.5" }, null, _parent));
+          _push(` Editar </button>`);
+          if (!plan.is_default) {
+            _push(`<button class="px-3 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">`);
+            _push(ssrRenderComponent(unref(Star), { class: "w-3.5 h-3.5" }, null, _parent));
+            _push(` Tornar padrão </button>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`<button class="${ssrRenderClass([plan.active ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-emerald-600/80 hover:bg-emerald-600 text-white", "px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"])}">`);
+          _push(ssrRenderComponent(unref(Power), { class: "w-3.5 h-3.5" }, null, _parent));
+          _push(` ${ssrInterpolate(plan.active ? "Desativar" : "Ativar")}</button></div></div>`);
+        });
+        _push(`<!--]--></div>`);
+      }
+      if (formOpen.value) {
+        _push(`<div class="glass-card p-10 space-y-6"><div class="flex items-center justify-between"><h2 class="text-2xl font-bold text-white font-outfit">${ssrInterpolate(isEditing.value ? "Editar plano" : "Novo plano")}</h2><button class="text-slate-400 hover:text-white">`);
+        _push(ssrRenderComponent(unref(X), { class: "w-5 h-5" }, null, _parent));
+        _push(`</button></div><form class="space-y-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Nome</label><input${ssrRenderAttr("value", form.value.name)} type="text" class="input-field w-full h-12" placeholder="ex: Starter"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Identificador (slug)</label><input${ssrRenderAttr("value", form.value.slug)} type="text"${ssrIncludeBooleanAttr(isEditing.value) ? " disabled" : ""} class="input-field w-full h-12 disabled:opacity-60" placeholder="ex: starter">`);
+        if (isEditing.value) {
+          _push(`<p class="text-xs text-slate-500 ml-1">O identificador não pode ser alterado.</p>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`</div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Tipo</label><select class="input-field w-full h-12"><option value="free"${ssrIncludeBooleanAttr(Array.isArray(form.value.type) ? ssrLooseContain(form.value.type, "free") : ssrLooseEqual(form.value.type, "free")) ? " selected" : ""}>Gratuito</option><option value="paid"${ssrIncludeBooleanAttr(Array.isArray(form.value.type) ? ssrLooseContain(form.value.type, "paid") : ssrLooseEqual(form.value.type, "paid")) ? " selected" : ""}>Pago</option></select></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Preço mensal (R$)</label><input${ssrRenderAttr("value", form.value.priceMonthly)} type="number" min="0" step="0.01" class="input-field w-full h-12"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Preço anual (R$)</label><input${ssrRenderAttr("value", form.value.priceYearly)} type="number" min="0" step="0.01" class="input-field w-full h-12"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Máx. vagas (-1 = ilimitado)</label><input${ssrRenderAttr("value", form.value.maxJobs)} type="number" class="input-field w-full h-12"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Análises de currículo / mês (-1 = ilimitado)</label><input${ssrRenderAttr("value", form.value.maxResumeAnalyses)} type="number" class="input-field w-full h-12"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Máx. fontes</label><input${ssrRenderAttr("value", form.value.maxSites)} type="number" class="input-field w-full h-12"></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Crawls por dia</label><input${ssrRenderAttr("value", form.value.maxCrawls)} type="number" class="input-field w-full h-12"></div></div><div class="space-y-2"><label class="text-sm font-bold text-slate-400 uppercase tracking-widest ml-1">Recursos (um por linha)</label><textarea rows="4" class="input-field w-full py-3" placeholder="500 vagas
+2 currículos">${ssrInterpolate(form.value.features)}</textarea></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><label class="flex items-center gap-3 text-sm text-slate-300"><input${ssrIncludeBooleanAttr(Array.isArray(form.value.aiMatching) ? ssrLooseContain(form.value.aiMatching, null) : form.value.aiMatching) ? " checked" : ""} type="checkbox" class="w-4 h-4"> Matching por IA </label><label class="flex items-center gap-3 text-sm text-slate-300"><input${ssrIncludeBooleanAttr(Array.isArray(form.value.interviewPrep) ? ssrLooseContain(form.value.interviewPrep, null) : form.value.interviewPrep) ? " checked" : ""} type="checkbox" class="w-4 h-4"> Preparação </label></div>`);
+        if (isEditing.value) {
+          _push(`<label class="flex items-center gap-3 text-sm text-slate-300"><input${ssrIncludeBooleanAttr(Array.isArray(form.value.active) ? ssrLooseContain(form.value.active, null) : form.value.active) ? " checked" : ""} type="checkbox" class="w-4 h-4"> Plano ativo </label>`);
+        } else {
+          _push(`<!---->`);
+        }
+        if (formError.value) {
+          _push(`<div class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">${ssrInterpolate(formError.value)}</div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`<div class="flex items-center gap-3"><button type="submit"${ssrIncludeBooleanAttr(submitting.value) ? " disabled" : ""} class="h-11 px-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center gap-2">`);
+        if (submitting.value) {
+          _push(ssrRenderComponent(_component_Loader2, { class: "w-4 h-4 animate-spin" }, null, _parent));
+        } else {
+          _push(`<!---->`);
+        }
+        _push(` ${ssrInterpolate(isEditing.value ? "Salvar alterações" : "Criar plano")}</button><button type="button" class="h-11 px-6 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl transition-colors"> Cancelar </button></div></form></div>`);
+      } else {
+        _push(`<!---->`);
+      }
       _push(`</div>`);
     };
   }
@@ -4785,25 +4968,26 @@ const _sfc_main = {
 const _sfc_setup = _sfc_main.setup;
 _sfc_main.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/Analytics.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/pages/PlansAdmin.vue");
   return _sfc_setup ? _sfc_setup(props, ctx) : void 0;
 };
 const routes = [
-  { path: "/login", name: "Login", component: _sfc_main$p, meta: { guest: true } },
-  { path: "/register", name: "Register", component: _sfc_main$o, meta: { guest: true } },
-  { path: "/", name: "Dashboard", component: _sfc_main$x, meta: { requiresAuth: true } },
-  { path: "/jobs", name: "Jobs", component: _sfc_main$w, meta: { requiresAuth: true } },
-  { path: "/jobs/new", name: "JobAdd", component: _sfc_main$v, meta: { requiresAuth: true } },
-  { path: "/matches", name: "Matches", component: _sfc_main$u, meta: { requiresAuth: true } },
-  { path: "/applied", name: "Applied", component: _sfc_main$t, meta: { requiresAuth: true } },
-  { path: "/analysis", name: "Analysis", component: _sfc_main$s, meta: { requiresAuth: true } },
-  { path: "/analytics", name: "Analytics", component: _sfc_main, meta: { requiresAuth: true } },
-  { path: "/settings", name: "Settings", component: _sfc_main$r, meta: { requiresAuth: true } },
-  { path: "/settings/billing", name: "Billing", component: _sfc_main$q, meta: { requiresAuth: true } },
-  { path: "/resume-editor/:id", name: "ResumeEditor", component: _sfc_main$j, meta: { requiresAuth: true } },
-  { path: "/interview-prep", name: "InterviewPreparations", component: _sfc_main$h, meta: { requiresAuth: true } },
-  { path: "/interview-prep/avulsa", name: "SpontaneousPrep", component: _sfc_main$g, meta: { requiresAuth: true } },
-  { path: "/interview-prep/:id", name: "InterviewPrep", component: _sfc_main$i, meta: { requiresAuth: true } }
+  { path: "/login", name: "Login", component: _sfc_main$q, meta: { guest: true } },
+  { path: "/register", name: "Register", component: _sfc_main$p, meta: { guest: true } },
+  { path: "/", name: "Dashboard", component: _sfc_main$y, meta: { requiresAuth: true } },
+  { path: "/jobs", name: "Jobs", component: _sfc_main$x, meta: { requiresAuth: true } },
+  { path: "/jobs/new", name: "JobAdd", component: _sfc_main$w, meta: { requiresAuth: true } },
+  { path: "/matches", name: "Matches", component: _sfc_main$v, meta: { requiresAuth: true } },
+  { path: "/applied", name: "Applied", component: _sfc_main$u, meta: { requiresAuth: true } },
+  { path: "/analysis", name: "Analysis", component: _sfc_main$t, meta: { requiresAuth: true } },
+  { path: "/analytics", name: "Analytics", component: _sfc_main$1, meta: { requiresAuth: true } },
+  { path: "/admin/plans", name: "PlansAdmin", component: _sfc_main, meta: { requiresAuth: true, admin: true } },
+  { path: "/settings", name: "Settings", component: _sfc_main$s, meta: { requiresAuth: true } },
+  { path: "/settings/billing", name: "Billing", component: _sfc_main$r, meta: { requiresAuth: true } },
+  { path: "/resume-editor/:id", name: "ResumeEditor", component: _sfc_main$k, meta: { requiresAuth: true } },
+  { path: "/interview-prep", name: "InterviewPreparations", component: _sfc_main$i, meta: { requiresAuth: true } },
+  { path: "/interview-prep/avulsa", name: "SpontaneousPrep", component: _sfc_main$h, meta: { requiresAuth: true } },
+  { path: "/interview-prep/:id", name: "InterviewPrep", component: _sfc_main$j, meta: { requiresAuth: true } }
 ];
 const router = createRouter({
   history: createWebHistory(),

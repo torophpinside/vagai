@@ -161,14 +161,18 @@ func runMigrations(db *gorm.DB) error {
 func seedPlans(db *gorm.DB) error {
 	plans := []models.Plan{
 		{
-			Name: "Free", Slug: "free", PriceMonthly: 0, PriceYearly: 0,
-			MaxJobs: 1000, MaxResumes: 1, MaxSites: 5,
-			Features: `["1000 vagas", "1 currículo", "5 fontes", "Matching básico"]`,
+			Name: "Free", Slug: "free", Type: models.PlanTypeFree, Active: true, IsDefault: true,
+			PriceMonthly: 0, PriceYearly: 0,
+			MaxJobs: 1000, MaxResumeAnalyses: 1, MaxSites: 5,
+			AIMatching: false, InterviewPrep: false,
+			Features: `["Matching básico"]`,
 		},
 		{
-			Name: "Pro", Slug: "pro", PriceMonthly: 4900, PriceYearly: 49000,
-			MaxJobs: -1, MaxResumes: 3, MaxSites: 25,
-			Features: `["Vagas ilimitadas", "3 currículos", "25 fontes", "Matching por IA"]`,
+			Name: "Pro", Slug: "pro", Type: models.PlanTypePaid, Active: true,
+			PriceMonthly: 4900, PriceYearly: 49000,
+			MaxJobs: -1, MaxResumeAnalyses: 3, MaxSites: 25,
+			AIMatching: true, InterviewPrep: true,
+			Features: `[]`,
 		},
 	}
 	for _, plan := range plans {
@@ -201,6 +205,15 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 		// resolvido em middleware.ResolveAnalyticsUserID (admin globais,
 		// usuário comum os próprios dados).
 		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
+
+		// Rotas de gestão de planos (spec 012) — espelha o main.go.
+		admin := api.Group("/admin")
+		admin.Use(middleware.RequireAdmin())
+		{
+			admin.GET("/plans", handlers.ListPlansAdmin)
+			admin.POST("/plans", handlers.CreatePlan)
+			admin.PATCH("/plans/:id", handlers.UpdatePlan)
+		}
 
 		api.GET("/me", handlers.GetMe)
 		api.PATCH("/me", handlers.UpdateProfile)

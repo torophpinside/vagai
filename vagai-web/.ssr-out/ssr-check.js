@@ -3,7 +3,7 @@ import { ssrRenderAttrs, ssrRenderSlot, ssrRenderClass, ssrRenderComponent, ssrI
 import { useQuery, VueQueryPlugin } from "@tanstack/vue-query";
 import axios from "axios";
 import { useRouter } from "vue-router";
-import { Target, LayoutDashboard, Briefcase, CheckCircle2, Send, GraduationCap, FileText, BarChart3, FileEdit, Settings, CreditCard, LogOut, User, ChevronUp, ChevronDown } from "lucide-vue-next";
+import { Target, LayoutDashboard, Package, Briefcase, CheckCircle2, Send, GraduationCap, FileText, BarChart3, FileEdit, Settings, CreditCard, LogOut, User, ChevronUp, ChevronDown } from "lucide-vue-next";
 const API_URL = "/api";
 const api = axios.create({ baseURL: API_URL });
 let isRedirecting = false;
@@ -126,6 +126,9 @@ const useMe = () => {
 };
 const usePlans = () => {
   return useQuery({ queryKey: ["plans"], queryFn: () => api.get("/plans").then((res) => res.data) });
+};
+const useAdminPlans = () => {
+  return useQuery({ queryKey: ["plans", "admin"], queryFn: () => api.get("/admin/plans").then((res) => res.data) });
 };
 const useNegativeKeywords = (options = {}) => {
   return useQuery({ queryKey: ["negative-keywords"], queryFn: () => api.get("/negative-keywords").then((res) => res.data), ...options });
@@ -397,6 +400,28 @@ const _sfc_main = {
           }),
           _: 1
         }, _parent));
+        if (isAdmin.value) {
+          _push(ssrRenderComponent(_component_router_link, {
+            to: "/admin/plans",
+            class: "nav-link",
+            "active-class": "active"
+          }, {
+            default: withCtx((_, _push2, _parent2, _scopeId) => {
+              if (_push2) {
+                _push2(ssrRenderComponent(unref(Package), { class: "w-5 h-5" }, null, _parent2, _scopeId));
+                _push2(`<span${_scopeId}>Planos</span>`);
+              } else {
+                return [
+                  createVNode(unref(Package), { class: "w-5 h-5" }),
+                  createVNode("span", null, "Planos")
+                ];
+              }
+            }),
+            _: 1
+          }, _parent));
+        } else {
+          _push(`<!---->`);
+        }
         if (!isAdmin.value) {
           _push(ssrRenderComponent(_component_router_link, {
             to: "/jobs",
@@ -790,7 +815,7 @@ setTimeout(() => {
 }, 8e3);
 (async () => {
   try {
-    const { default: router } = await import("./assets/router-BOMWnfsH.js");
+    const { default: router } = await import("./assets/router-CBtgVjnp.js");
     const app = createSSRApp(_sfc_main);
     app.use(VueQueryPlugin);
     app.use(router);
@@ -839,6 +864,7 @@ export {
   useAnalyticsSkillsGap as F,
   useAnalyticsFunnel as G,
   useAnalyticsGeographic as H,
+  useAdminPlans as I,
   useSites as a,
   useJobs as b,
   useMatches as c,

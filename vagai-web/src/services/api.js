@@ -151,6 +151,13 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
+export const useAdminPlans = () => {
+  return useQuery({ queryKey: ['plans', 'admin'], queryFn: () => api.get('/admin/plans').then(res => res.data) })
+}
+
+export const adminCreatePlan = (data) => api.post('/admin/plans', data)
+export const adminUpdatePlan = (id, data) => api.patch(`/admin/plans/${id}`, data)
+
 export const useNegativeKeywords = (options = {}) => {
   return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data), ...options })
 }

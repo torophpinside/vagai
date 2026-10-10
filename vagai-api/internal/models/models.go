@@ -74,17 +74,32 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+// PlanType define o Tipo de Plano gerenciado pelo administrador.
+// - free: gratuito, sempre com preço zero
+// - paid: pago, com ao menos um preço maior que zero
+type PlanType string
+
+const (
+	PlanTypeFree PlanType = "free"
+	PlanTypePaid PlanType = "paid"
+)
+
 type Plan struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	Name            string    `gorm:"size:100;not null" json:"name"`
 	Slug            string    `gorm:"size:50;uniqueIndex;not null" json:"slug"`
+	Type            PlanType  `gorm:"size:8;default:free;not null;index" json:"type"`
 	PriceMonthly    int       `gorm:"default:0" json:"price_monthly"`
 	PriceYearly     int       `gorm:"default:0" json:"price_yearly"`
 	MaxJobs         int       `gorm:"default:100" json:"max_jobs"`
-	MaxResumes      int       `gorm:"default:3" json:"max_resumes"`
+	MaxResumeAnalyses int       `gorm:"default:3" json:"max_resume_analyses"`
 	MaxSites        int       `gorm:"default:5" json:"max_sites"`
 	MaxCrawlsPerDay int       `gorm:"default:10" json:"-"`
+	AIMatching      bool      `gorm:"default:false;not null" json:"ai_matching"`
+	InterviewPrep   bool      `gorm:"default:false;not null" json:"interview_prep"`
 	Features        string    `gorm:"type:json" json:"features"`
+	Active          bool      `gorm:"default:true;not null;index" json:"active"`
+	IsDefault       bool      `gorm:"default:false;not null" json:"is_default"`
 	StripePriceID   string    `gorm:"size:255" json:"-"`
 	CreatedAt       time.Time `json:"created_at"`
 }
