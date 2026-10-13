@@ -43,8 +43,11 @@ func Register(c *gin.Context) {
 	}
 
 	email := strings.ToLower(body.Email)
+	// Unscoped: contas na janela de reativação (soft-delete) mantêm o e-mail
+	// reservado — spec 013/FR-007; o e-mail só volta a ficar livre depois do
+	// expurgo definitivo, quando a linha deixa de existir.
 	var existingUser models.User
-	if err := DB.Where("email = ?", email).First(&existingUser).Error; err == nil {
+	if err := DB.Unscoped().Where("email = ?", email).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Email já cadastrado"})
 		return
 	}

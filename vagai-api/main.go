@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,6 +43,10 @@ func main() {
 	autoMigrate(db)
 	dropResumeAnalysisFK(db)
 	handlers.SetDB(db)
+
+	// Expurgo de contas excluídas (spec 013, research.md R3): roda no boot e
+	// depois a cada 24h; janela configurável via USER_DELETE_RETENTION_DAYS.
+	models.StartPurgeJob(db, userDeleteRetention())
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 16 << 20
@@ -85,13 +90,23 @@ func main() {
 		// (middleware.ResolveAnalyticsUserID).
 		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
 
-		// Gestão de planos (spec 012): acesso restrito ao administrador.
+		// Gestão de planos (spec 012) e usuários (spec 013): acesso
+		// restrito ao administrador.
 		admin := api.Group("/admin")
 		admin.Use(middleware.RequireAdmin())
 		{
 			admin.GET("/plans", handlers.ListPlansAdmin)
 			admin.POST("/plans", handlers.CreatePlan)
 			admin.PATCH("/plans/:id", handlers.UpdatePlan)
+
+			admin.GET("/users", handlers.ListUsersAdmin)
+			admin.GET("/users/:id", handlers.GetUserAdmin)
+			admin.PATCH("/users/:id", handlers.UpdateUserAdmin)
+			admin.PATCH("/users/:id/plan", handlers.AssignPlanAdmin)
+			admin.POST("/users/:id/suspend", handlers.SuspendUserAdmin)
+			admin.POST("/users/:id/restore", handlers.RestoreUserAdmin)
+			admin.DELETE("/users/:id", handlers.DeleteUserAdmin)
+			admin.POST("/users/:id/reactivate", handlers.ReactivateUserAdmin)
 		}
 
 		api.GET("/stats", handlers.GetStats)
@@ -246,6 +261,18 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// userDeleteRetention lê a janela de reativação de contas excluídas em dias
+// (default 30). Espelha handlers.userDeleteRetention para o boot do expurgo.
+func userDeleteRetention() time.Duration {
+	days := 30
+	if raw := strings.TrimSpace(os.Getenv("USER_DELETE_RETENTION_DAYS")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
+			days = n
+		}
+	}
+	return time.Duration(days) * 24 * time.Hour
 }
 
 // parseOrigins converte uma lista separada por vírgula de origens permitidas

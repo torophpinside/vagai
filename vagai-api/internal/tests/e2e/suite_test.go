@@ -206,13 +206,23 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 		// usuário comum os próprios dados).
 		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
 
-		// Rotas de gestão de planos (spec 012) — espelha o main.go.
+		// Rotas de gestão de planos (spec 012) e usuários (spec 013) —
+		// espelha o main.go.
 		admin := api.Group("/admin")
 		admin.Use(middleware.RequireAdmin())
 		{
 			admin.GET("/plans", handlers.ListPlansAdmin)
 			admin.POST("/plans", handlers.CreatePlan)
 			admin.PATCH("/plans/:id", handlers.UpdatePlan)
+
+			admin.GET("/users", handlers.ListUsersAdmin)
+			admin.GET("/users/:id", handlers.GetUserAdmin)
+			admin.PATCH("/users/:id", handlers.UpdateUserAdmin)
+			admin.PATCH("/users/:id/plan", handlers.AssignPlanAdmin)
+			admin.POST("/users/:id/suspend", handlers.SuspendUserAdmin)
+			admin.POST("/users/:id/restore", handlers.RestoreUserAdmin)
+			admin.DELETE("/users/:id", handlers.DeleteUserAdmin)
+			admin.POST("/users/:id/reactivate", handlers.ReactivateUserAdmin)
 		}
 
 		api.GET("/me", handlers.GetMe)

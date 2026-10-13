@@ -18,6 +18,10 @@
             <LayoutDashboard class="w-5 h-5" />
             <span>Dashboard</span>
           </router-link>
+          <router-link v-if="isAdmin" to="/admin/users" class="nav-link" active-class="active">
+            <Users class="w-5 h-5" />
+            <span>Usuários</span>
+          </router-link>
           <router-link v-if="isAdmin" to="/admin/plans" class="nav-link" active-class="active">
             <Package class="w-5 h-5" />
             <span>Planos</span>
@@ -125,6 +129,7 @@ import {
   LayoutDashboard,
   Briefcase,
   Package,
+  Users,
   CheckCircle2,
   Send,
   FileText,

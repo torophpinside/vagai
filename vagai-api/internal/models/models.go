@@ -56,6 +56,7 @@ type User struct {
 	Suspended          bool               `gorm:"default:false" json:"suspended"`
 	TrialEndsAt        *time.Time         `json:"trial_ends_at"`
 	EmailVerifiedAt    *time.Time         `json:"email_verified_at"`
+	PurgeAfter         *time.Time         `gorm:"index" json:"-"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	DeletedAt          gorm.DeletedAt     `gorm:"index" json:"-"`

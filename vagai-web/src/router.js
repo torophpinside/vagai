@@ -15,6 +15,7 @@ import InterviewPreparations from './pages/InterviewPreparations.vue'
 import SpontaneousPrep from './pages/SpontaneousPrep.vue'
 import Analytics from './pages/Analytics.vue'
 import PlansAdmin from './pages/PlansAdmin.vue'
+import UsersAdmin from './pages/UsersAdmin.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
@@ -27,6 +28,7 @@ const routes = [
   { path: '/analysis', name: 'Analysis', component: Analysis, meta: { requiresAuth: true } },
   { path: '/analytics', name: 'Analytics', component: Analytics, meta: { requiresAuth: true } },
   { path: '/admin/plans', name: 'PlansAdmin', component: PlansAdmin, meta: { requiresAuth: true, admin: true } },
+  { path: '/admin/users', name: 'UsersAdmin', component: UsersAdmin, meta: { requiresAuth: true, admin: true } },
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/settings/billing', name: 'Billing', component: Billing, meta: { requiresAuth: true } },
   { path: '/resume-editor/:id', name: 'ResumeEditor', component: ResumeEditor, meta: { requiresAuth: true } },

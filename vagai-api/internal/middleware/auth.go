@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/anomalyco/vagai-api/internal/models"
+	"github.com/anomalyco/vagai-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -48,6 +49,15 @@ func JWTAuth() gin.HandlerFunc {
 		claims, ok := token.Claims.(*Claims)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Claims inválidos"})
+			c.Abort()
+			return
+		}
+
+		// Sessão aberta de conta suspensa/excluída é bloqueada na hora
+		// (spec 013, FR-010/SC-003): marcador em memória/Redis gravado pelo
+		// handler de suspensão/exclusão.
+		if services.IsSuspended(claims.UserID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Conta suspensa"})
 			c.Abort()
 			return
 		}
