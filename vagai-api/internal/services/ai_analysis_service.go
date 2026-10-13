@@ -19,9 +19,9 @@ func NewAIAnalysisService(db *gorm.DB) *AIAnalysisService {
 }
 
 // CreateAnalysisResult creates a new AI analysis record with a pending status.
-func (s *AIAnalysisService) CreateAnalysisResult(ctx context.Context, orgID, prepID, questionID uint) (*models.AIAnalysisResult, error) {
+func (s *AIAnalysisService) CreateAnalysisResult(ctx context.Context, userID, prepID, questionID uint) (*models.AIAnalysisResult, error) {
 	result := &models.AIAnalysisResult{
-		OrganizationID: orgID,
+		UserID: userID,
 		PreparationID:  prepID,
 		QuestionID:     questionID,
 		Status:         models.AIAnalysisStatusPending,
@@ -72,9 +72,9 @@ func (s *AIAnalysisService) StartAsyncAnalysis(ctx context.Context, prepID uint,
 		log.Printf("[AIAnalysis] Starting async analysis for preparation %d", prepID)
 
 		// Replace previous feedback for this preparation (same org scope as its questions).
-		orgID := questions[0].OrganizationID
+		userID := questions[0].UserID
 		if err := s.db.WithContext(bgCtx).
-			Where("preparation_id = ? AND organization_id = ?", prepID, orgID).
+			Where("preparation_id = ? AND user_id = ?", prepID, userID).
 			Delete(&models.AIAnalysisResult{}).Error; err != nil {
 			log.Printf("[AIAnalysis] Error clearing previous results for preparation %d: %v", prepID, err)
 		}
@@ -83,7 +83,7 @@ func (s *AIAnalysisService) StartAsyncAnalysis(ctx context.Context, prepID uint,
 			// We need to fetch the answer from PracticeEntry since it's not in InterviewQuestion.
 			// Only answered questions are analyzed; unanswered ones get no feedback block.
 			var entry models.PracticeEntry
-			if err := s.db.Where("question_id = ? AND organization_id = ?", q.ID, q.OrganizationID).First(&entry).Error; err != nil {
+			if err := s.db.Where("question_id = ? AND user_id = ?", q.ID, q.UserID).First(&entry).Error; err != nil {
 				log.Printf("[AIAnalysis] Answer not found for question %d: %v", q.ID, err)
 				continue
 			}
@@ -92,7 +92,7 @@ func (s *AIAnalysisService) StartAsyncAnalysis(ctx context.Context, prepID uint,
 			}
 
 			// 1. Create pending result
-			res, err := s.CreateAnalysisResult(bgCtx, q.OrganizationID, prepID, q.ID)
+			res, err := s.CreateAnalysisResult(bgCtx, q.UserID, prepID, q.ID)
 			if err != nil {
 				log.Printf("[AIAnalysis] Error creating result for question %d: %v", q.ID, err)
 				continue

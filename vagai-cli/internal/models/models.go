@@ -16,30 +16,57 @@ const (
 	JobStatusIgnored   JobStatus = "ignored"
 )
 
-type Organization struct {
-	ID               uint           `gorm:"primaryKey" json:"id"`
-	Name             string         `gorm:"size:200;not null" json:"name"`
-	Slug             string         `gorm:"size:100;uniqueIndex;not null" json:"slug"`
-	Plan             string         `gorm:"size:50;default:free" json:"plan"`
-	NegativeKeywords string         `gorm:"type:json" json:"negative_keywords"`
-	StripeCustomerID string         `gorm:"size:255" json:"-"`
-	TrialEndsAt      *time.Time     `json:"trial_ends_at"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+// UserRole define o papel do usuário na plataforma SaaS.
+type UserRole string
+
+const (
+	RoleUser  UserRole = "user"
+	RoleAdmin UserRole = "admin"
+)
+
+type SubscriptionStatus string
+
+const (
+	SubStatusTrial    SubscriptionStatus = "trial"
+	SubStatusActive   SubscriptionStatus = "active"
+	SubStatusPastDue  SubscriptionStatus = "past_due"
+	SubStatusCanceled SubscriptionStatus = "canceled"
+	SubStatusExpired  SubscriptionStatus = "expired"
+)
+
+// User é o usuário da plataforma SaaS. Plano e assinatura Stripe são atributos
+// diretos do usuário (substitui Organization/Membership/Subscription).
+type User struct {
+	ID                 uint               `gorm:"primaryKey" json:"id"`
+	Name               string             `gorm:"size:200;not null" json:"name"`
+	Email              string             `gorm:"size:255;uniqueIndex;not null" json:"email"`
+	PasswordHash       string             `gorm:"size:255;not null" json:"-"`
+	Avatar             string             `gorm:"size:500" json:"avatar"`
+	Timezone           string             `gorm:"size:50;default:America/Sao_Paulo" json:"timezone"`
+	City               string             `gorm:"size:100" json:"city"`
+	Role               UserRole           `gorm:"size:20;default:user;not null;index" json:"role"`
+	PlanSlug           string             `gorm:"size:50;default:free;not null" json:"plan_slug"`
+	NegativeKeywords   string             `gorm:"type:json" json:"negative_keywords"`
+	StripeCustomerID   string             `gorm:"size:255;index" json:"-"`
+	SubscriptionStatus SubscriptionStatus `gorm:"size:20;default:trial" json:"subscription_status"`
+	SubscriptionEndsAt *time.Time         `json:"subscription_ends_at"`
+	Suspended          bool               `gorm:"default:false" json:"suspended"`
+	TrialEndsAt        *time.Time         `json:"trial_ends_at"`
+	EmailVerifiedAt    *time.Time         `json:"email_verified_at"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt     `gorm:"index" json:"-"`
 }
 
-type User struct {
-	ID           uint           `gorm:"primaryKey" json:"id"`
-	Name         string         `gorm:"size:200;not null" json:"name"`
-	Email        string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
-	PasswordHash string         `gorm:"size:255;not null" json:"-"`
-	Avatar       string         `gorm:"size:500" json:"avatar"`
-	Timezone     string         `gorm:"size:50;default:America/Sao_Paulo" json:"timezone"`
-	City         string         `gorm:"size:100" json:"city"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+func (u *User) BeforeSave(*gorm.DB) error {
+	if u.NegativeKeywords == "" {
+		u.NegativeKeywords = "[]"
+	}
+	return nil
+}
+
+func (u *User) IsAdmin() bool {
+	return u.Role == RoleAdmin
 }
 
 type Plan struct {
@@ -59,75 +86,80 @@ type Plan struct {
 
 type Site struct {
 	ID                  uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID      uint       `gorm:"index;default:0" json:"organization_id"`
+	UserID              uint       `gorm:"index;not null" json:"user_id"`
 	Name                string     `gorm:"size:100;not null" json:"name"`
 	URL                 string     `gorm:"size:500;not null" json:"url"`
 	SelectorLinks       string     `gorm:"size:255" json:"selector_links"`
 	SelectorCompany     string     `gorm:"size:255" json:"selector_company"`
 	SelectorDescription string     `gorm:"size:255" json:"selector_description"`
-	Active              bool       `gorm:"default:true" json:"active"`
-	DelaySeconds        int        `gorm:"default:0" json:"delay_seconds"`
+	DelaySeconds        int        `gorm:"default:2" json:"delay_seconds"`
 	RespectRobots       bool       `gorm:"default:true" json:"respect_robots"`
+	Active              bool       `gorm:"default:true" json:"active"`
 	LastCrawl           *time.Time `json:"last_crawl"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type Job struct {
-	ID             uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID uint       `gorm:"index;default:0;uniqueIndex:idx_job_url_org" json:"organization_id"`
-	SiteID         *uint      `gorm:"index" json:"site_id"`
-	Site           *Site      `gorm:"foreignKey:SiteID" json:"site,omitempty"`
-	Title          string     `gorm:"size:255" json:"title"`
-	Company        string     `gorm:"size:255" json:"company"`
-	Description    string     `gorm:"type:text" json:"description"`
-	URL            string     `gorm:"size:500;uniqueIndex:idx_job_url_org" json:"url"`
-	PostedDate     *time.Time `json:"posted_date"`
-	CollectedAt    time.Time  `gorm:"autoCreateTime" json:"collected_at"`
-	Status         JobStatus  `gorm:"size:20;default:new" json:"status"`
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	UserID      uint       `gorm:"index;not null;uniqueIndex:idx_job_url_user" json:"user_id"`
+	SiteID      *uint      `gorm:"index" json:"site_id"`
+	Site        *Site      `gorm:"foreignKey:SiteID" json:"site,omitempty"`
+	Title       string     `gorm:"size:255" json:"title"`
+	Company     string     `gorm:"size:255" json:"company"`
+	Description string     `gorm:"type:text" json:"description"`
+	URL         string     `gorm:"size:500;uniqueIndex:idx_job_url_user" json:"url"`
+	PostedDate  *time.Time `json:"posted_date"`
+	CollectedAt time.Time  `gorm:"autoCreateTime" json:"collected_at"`
+	Status      JobStatus  `gorm:"size:20;default:new" json:"status"`
 }
 
 type Resume struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID uint      `gorm:"index;default:0" json:"organization_id"`
-	Name           string    `gorm:"size:100" json:"name"`
-	FilePath       string    `gorm:"size:500" json:"file_path"`
-	Content        string    `gorm:"type:text" json:"content"`
-	Data           string    `gorm:"type:json" json:"data"`
-	Version        int       `json:"version"`
-	UploadedAt     time.Time `json:"uploaded_at"`
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	UserID     uint      `gorm:"index;not null" json:"user_id"`
+	Name       string    `gorm:"size:100" json:"name"`
+	FilePath   string    `gorm:"size:500" json:"file_path"`
+	Content    string    `gorm:"type:text" json:"content"`
+	Data       string    `gorm:"type:json" json:"data"`
+	Version    int       `json:"version"`
+	UploadedAt time.Time `json:"uploaded_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type Match struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID  uint      `gorm:"index;default:0" json:"organization_id"`
-	JobID           uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"job_id"`
-	Job             Job       `gorm:"foreignKey:JobID" json:"job,omitempty"`
-	ResumeID        *uint     `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
-	Resume          *Resume   `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
-	SimilarityScore float64   `gorm:"type:decimal(5,2)" json:"similarity_score"`
-	KeywordsMatched string    `gorm:"type:json" json:"keywords_matched"`
-	AIReason        string    `gorm:"type:text" json:"ai_reason"`
-	AnalyzedAt      time.Time `gorm:"autoCreateTime" json:"analyzed_at"`
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	UserID          uint       `gorm:"index;not null" json:"user_id"`
+	JobID           uint       `gorm:"uniqueIndex:idx_match_job_resume" json:"job_id"`
+	Job             Job        `gorm:"foreignKey:JobID" json:"job,omitempty"`
+	ResumeID        *uint      `gorm:"uniqueIndex:idx_match_job_resume" json:"resume_id"`
+	Resume          *Resume    `gorm:"foreignKey:ResumeID" json:"resume,omitempty"`
+	SimilarityScore float64    `gorm:"type:decimal(4,1)" json:"similarity_score"`
+	KeywordsMatched string     `gorm:"type:json" json:"keywords_matched"`
+	AIReason        string     `gorm:"type:text" json:"ai_reason"`
+	AnalyzedAt      time.Time  `gorm:"autoCreateTime" json:"analyzed_at"`
+	Applied         bool       `gorm:"default:false" json:"applied"`
+	AppliedAt       *time.Time `json:"applied_at"`
 }
 
 type AgentLog struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID uint      `gorm:"index;default:0" json:"organization_id"`
-	AgentName      string    `gorm:"size:50" json:"agent_name"`
-	Action         string    `gorm:"size:255" json:"action"`
-	Details        string    `gorm:"type:json" json:"details"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"index;not null" json:"user_id"`
+	AgentName string    `gorm:"size:50" json:"agent_name"`
+	Action    string    `gorm:"size:255" json:"action"`
+	Details   string    `gorm:"type:json" json:"details"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 type Schedule struct {
-	ID             uint       `gorm:"primaryKey" json:"id"`
-	OrganizationID uint       `gorm:"index;default:0" json:"organization_id"`
-	Name           string     `gorm:"size:100;uniqueIndex" json:"name"`
-	Command        string     `gorm:"size:500;not null" json:"command"`
-	Schedule       string     `gorm:"size:100;not null" json:"schedule"`
-	Active         bool       `gorm:"default:true" json:"active"`
-	LastRun        *time.Time `json:"last_run"`
-	NextRun        *time.Time `json:"next_run"`
-	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	ID         uint       `gorm:"primaryKey" json:"id"`
+	UserID     uint       `gorm:"index;not null" json:"user_id"`
+	Name       string     `gorm:"size:100;uniqueIndex" json:"name"`
+	Command    string     `gorm:"size:500;not null" json:"command"`
+	Schedule   string     `gorm:"size:100;not null" json:"schedule"`
+	Active     bool       `gorm:"default:true" json:"active"`
+	LastRun    *time.Time `json:"last_run"`
+	NextRun    *time.Time `json:"next_run"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 type ScheduleLog struct {

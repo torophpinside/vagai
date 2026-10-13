@@ -30,59 +30,10 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to connect to test database: %v", err)
 	}
 
-	db.AutoMigrate(&models.Organization{}, &models.User{}, &models.Membership{}, &models.Subscription{})
+	db.AutoMigrate(&models.User{}, &models.Plan{})
 
 	DB = db
 	return db
-}
-
-func TestGenerateSlug(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"Simple", "Test Org", "test-org"},
-		{"With Dots", "My.Company.Name", "my-company-name"},
-		{"Multiple Spaces", "Test    Org", "test-org"},
-		{"Mixed Case", "My AWESOME org", "my-awesome-org"},
-		{"Already Lower", "test-org", "test-org"},
-		{"With Numbers", "Org 123", "org-123"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := generateSlug(tt.input)
-			if result != tt.expected {
-				t.Errorf("generateSlug(%v) = %v, expected %v", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestGenerateSlug_NoDoubleDashes(t *testing.T) {
-	result := generateSlug("Test  --  Org")
-	if strings.Contains(result, "--") {
-		t.Errorf("generateSlug() should not contain double dashes, got %v", result)
-	}
-}
-
-func TestRandomString(t *testing.T) {
-	result := randomString(4)
-	if len(result) != 4 {
-		t.Errorf("randomString(4) length = %v, expected 4", len(result))
-	}
-
-	result2 := randomString(8)
-	if len(result2) != 8 {
-		t.Errorf("randomString(8) length = %v, expected 8", len(result2))
-	}
-
-	result3 := randomString(4)
-	result4 := randomString(4)
-	if result3 == result4 {
-		t.Log("Warning: Two consecutive random strings are equal (unlikely but possible)")
-	}
 }
 
 func TestGetMe_WithoutAuth(t *testing.T) {
@@ -94,9 +45,8 @@ func TestGetMe_WithoutAuth(t *testing.T) {
 
 	// Set context values that middleware would set
 	c.Set("user_id", uint(1))
-	c.Set("org_id", uint(1))
 	c.Set("user_email", "test@test.com")
-	c.Set("user_role", "owner")
+	c.Set("user_role", "user")
 
 	GetMe(c)
 
@@ -122,6 +72,9 @@ func TestUpdateProfile_InvalidBody(t *testing.T) {
 }
 
 func TestUpdateProfile_EmptyUpdates(t *testing.T) {
+	if DB == nil {
+		t.Skip("Skipping test that requires database connection")
+	}
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -224,11 +177,10 @@ func TestRegister_MissingFields(t *testing.T) {
 		name string
 		body string
 	}{
-		{"Missing Name", `{"email": "test@test.com", "password": "test1234", "organization": "Org"}`},
-		{"Missing Email", `{"name": "Test", "password": "test1234", "organization": "Org"}`},
-		{"Missing Password", `{"name": "Test", "email": "test@test.com", "organization": "Org"}`},
-		{"Missing Organization", `{"name": "Test", "email": "test@test.com", "password": "test1234"}`},
-		{"Short Password", `{"name": "Test", "email": "test@test.com", "password": "short", "organization": "Org"}`},
+		{"Missing Name", `{"email": "test@test.com", "password": "test1234"}`},
+		{"Missing Email", `{"name": "Test", "password": "test1234"}`},
+		{"Missing Password", `{"name": "Test", "email": "test@test.com"}`},
+		{"Short Password", `{"name": "Test", "email": "test@test.com", "password": "short"}`},
 	}
 
 	for _, tt := range tests {
@@ -255,7 +207,7 @@ func TestRegister_InvalidEmail(t *testing.T) {
 
 	router.POST("/register", Register)
 
-	body := `{"name": "Test", "email": "not-an-email", "password": "test1234", "organization": "Org"}`
+	body := `{"name": "Test", "email": "not-an-email", "password": "test1234"}`
 	req := httptest.NewRequest("POST", "/register", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
@@ -269,7 +221,7 @@ func TestChangePlan_InvalidBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("org_id", uint(1))
+	c.Set("user_id", uint(1))
 
 	c.Request = httptest.NewRequest("PUT", "/plan", strings.NewReader("invalid"))
 	c.Request.Header.Set("Content-Type", "application/json")
@@ -285,7 +237,7 @@ func TestChangePlan_MissingPlanSlug(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("org_id", uint(1))
+	c.Set("user_id", uint(1))
 
 	body := `{}`
 	c.Request = httptest.NewRequest("PUT", "/plan", strings.NewReader(body))
@@ -317,7 +269,7 @@ func TestGetDB_WithoutScoped(t *testing.T) {
 }
 
 func TestGenerateTokenIntegration(t *testing.T) {
-	token, err := middleware.GenerateToken(1, 1, "test@test.com", "owner")
+	token, err := middleware.GenerateToken(1, "test@test.com", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken() error = %v", err)
 	}
@@ -363,23 +315,20 @@ func TestLogin_BodyParsing(t *testing.T) {
 
 func TestRegister_BodyParsing(t *testing.T) {
 	var body struct {
-		Name         string `json:"name" binding:"required,min=2,max=200"`
-		Email        string `json:"email" binding:"required,email"`
-		Password     string `json:"password" binding:"required,min=8"`
-		Organization string `json:"organization" binding:"required,min=2,max=200"`
+		Name     string `json:"name" binding:"required,min=2,max=200"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=8"`
 	}
 
 	body.Name = "Test User"
 	body.Email = "test@test.com"
 	body.Password = "test1234"
-	body.Organization = "Test Org"
 
 	jsonBody, _ := json.Marshal(body)
 	var parsed struct {
-		Name         string `json:"name"`
-		Email        string `json:"email"`
-		Password     string `json:"password"`
-		Organization string `json:"organization"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	json.Unmarshal(jsonBody, &parsed)
 
@@ -481,20 +430,15 @@ func TestHandlers_ContextValues(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 
 	c.Set("user_id", uint(42))
-	c.Set("org_id", uint(100))
 	c.Set("user_email", "test@test.com")
 	c.Set("user_role", "admin")
 
 	userID, _ := c.Get("user_id")
-	orgID, _ := c.Get("org_id")
 	email, _ := c.Get("user_email")
 	role, _ := c.Get("user_role")
 
 	if userID.(uint) != 42 {
 		t.Errorf("user_id = %v, expected 42", userID)
-	}
-	if orgID.(uint) != 100 {
-		t.Errorf("org_id = %v, expected 100", orgID)
 	}
 	if email != "test@test.com" {
 		t.Errorf("user_email = %v, expected test@test.com", email)

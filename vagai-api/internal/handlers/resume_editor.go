@@ -20,7 +20,7 @@ import (
 
 func ParseResume(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -88,7 +88,7 @@ func ParseResume(c *gin.Context) {
 		}
 
 		var resume models.Resume
-		if err := db.Where("id = ? AND organization_id = ?", resumeID, orgID).First(&resume).Error; err != nil {
+		if err := db.Where("id = ? AND user_id = ?", resumeID, userID).First(&resume).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
 			} else {
@@ -115,22 +115,8 @@ func ParseResume(c *gin.Context) {
 		return
 	}
 
-	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceResumes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
-		return
-	}
-	if !allowed {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error":   fmt.Sprintf("Limite de curriculos atingido: %d/%d", current, maxLimit),
-			"current": current,
-			"limit":   maxLimit,
-		})
-		return
-	}
-
 	resume := models.Resume{
-		OrganizationID: orgID,
+		UserID: userID,
 		Name:           truncateName(file.Filename, 255),
 		FilePath:       filePath,
 		Content:        rawText,
@@ -154,7 +140,7 @@ func ParseResume(c *gin.Context) {
 
 func CreateResume(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var resumeData services.ResumeData
 	if err := c.ShouldBindJSON(&resumeData); err != nil {
@@ -174,7 +160,7 @@ func CreateResume(c *gin.Context) {
 	}
 
 	resume := models.Resume{
-		OrganizationID: orgID,
+		UserID: userID,
 		Name:           name,
 		Data:           string(dataJSON),
 		Content:        services.ResumeDataToText(resumeData),
@@ -196,7 +182,7 @@ func CreateResume(c *gin.Context) {
 
 func GetResumeData(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalido"})
@@ -204,7 +190,7 @@ func GetResumeData(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&resume).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", id, userID).First(&resume).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
 		} else {
@@ -239,7 +225,7 @@ func GetResumeData(c *gin.Context) {
 
 func DeleteResume(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalido"})
@@ -247,7 +233,7 @@ func DeleteResume(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&resume).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", id, userID).First(&resume).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
 		} else {
@@ -257,9 +243,9 @@ func DeleteResume(c *gin.Context) {
 	}
 
 	db.Model(&models.Match{}).
-		Where("organization_id = ? AND resume_id = ?", orgID, resume.ID).
+		Where("user_id = ? AND resume_id = ?", userID, resume.ID).
 		Update("resume_id", gorm.Expr("NULL"))
-	db.Where("organization_id = ? AND resume_id = ?", orgID, resume.ID).Delete(&models.ResumeAnalysis{})
+	db.Where("user_id = ? AND resume_id = ?", userID, resume.ID).Delete(&models.ResumeAnalysis{})
 
 	if err := db.Delete(&resume).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao excluir curriculo"})
@@ -277,7 +263,7 @@ func DeleteResume(c *gin.Context) {
 
 func UpdateResumeData(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalido"})
@@ -285,7 +271,7 @@ func UpdateResumeData(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&resume).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", id, userID).First(&resume).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
 		} else {
@@ -327,7 +313,7 @@ func UpdateResumeData(c *gin.Context) {
 
 func GenerateResumePDFHandler(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalido"})
@@ -335,7 +321,7 @@ func GenerateResumePDFHandler(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&resume).Error; err != nil {
+	if err := db.Where("id = ? AND user_id = ?", id, userID).First(&resume).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Curriculo nao encontrado"})
 		} else {

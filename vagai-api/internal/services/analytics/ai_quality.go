@@ -17,22 +17,22 @@ const (
 
 // AIQuality retorna os insights de qualidade das análises de IA (US6).
 // Retorna (nil, nil) quando não existem análises para o escopo informado (T045).
-func (s *Service) AIQuality(ctx context.Context, orgID uint) (*models.AIQualityInsights, error) {
+func (s *Service) AIQuality(ctx context.Context, userID uint) (*models.AIQualityInsights, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:ai-quality", orgID)
+	key := fmt.Sprintf("org:%d:ai-quality", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.AIQualityInsights, error) {
-		return aiqLoadInsights(db, orgID)
+		return aiqLoadInsights(db, userID)
 	})
 }
 
-func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error) {
+func aiqLoadInsights(db *gorm.DB, userID uint) (*models.AIQualityInsights, error) {
 	// Total de análises
 	var total int64
 	qTotal := db.Model(&models.AIAnalysisResult{})
-	if orgID > 0 {
-		qTotal = qTotal.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qTotal = qTotal.Where("user_id = ?", userID)
 	}
 	if err := qTotal.Count(&total).Error; err != nil {
 		return nil, err
@@ -57,8 +57,8 @@ func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error)
 		END AS bucket,
 		COUNT(*) AS cnt
 	`)
-	if orgID > 0 {
-		qb = qb.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qb = qb.Where("user_id = ?", userID)
 	}
 	qb = qb.Group("bucket")
 	if err := qb.Scan(&bucketRows).Error; err != nil {
@@ -83,8 +83,8 @@ func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error)
 	// AverageScore
 	var avg sql.NullFloat64
 	qa := db.Table("ai_analysis_results").Select("AVG(analysis_score) AS avg_score")
-	if orgID > 0 {
-		qa = qa.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qa = qa.Where("user_id = ?", userID)
 	}
 	if err := qa.Scan(&avg).Error; err != nil {
 		return nil, err
@@ -107,8 +107,8 @@ func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error)
 	}
 	var statusRows []aiqStatusRow
 	qs := db.Table("ai_analysis_results").Select("status, COUNT(*) AS cnt")
-	if orgID > 0 {
-		qs = qs.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qs = qs.Where("user_id = ?", userID)
 	}
 	qs = qs.Group("status")
 	if err := qs.Scan(&statusRows).Error; err != nil {
@@ -133,8 +133,8 @@ func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error)
 		SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) AS error,
 		SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending
 	`)
-	if orgID > 0 {
-		qsrc = qsrc.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qsrc = qsrc.Where("user_id = ?", userID)
 	}
 	qsrc = qsrc.Group("source")
 	if err := qsrc.Scan(&srcRows).Error; err != nil {
@@ -159,8 +159,8 @@ func aiqLoadInsights(db *gorm.DB, orgID uint) (*models.AIQualityInsights, error)
 	// T043 AverageProcessingSeconds: AVG(updated_at - created_at) where completed/error
 	var proc sql.NullFloat64
 	qp := db.Table("ai_analysis_results").Select("AVG(UNIX_TIMESTAMP(updated_at) - UNIX_TIMESTAMP(created_at)) AS proc_sec")
-	if orgID > 0 {
-		qp = qp.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qp = qp.Where("user_id = ?", userID)
 	}
 	qp = qp.Where("status IN ('completed','error')")
 	if err := qp.Scan(&proc).Error; err != nil {

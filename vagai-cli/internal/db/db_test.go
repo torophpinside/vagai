@@ -10,7 +10,7 @@ func TestCheckSitesLimit_ZeroOrgID(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if !allowed {
-		t.Error("Expected allowed = true for orgID=0")
+		t.Error("Expected allowed = true for userID=0")
 	}
 	if current != 0 {
 		t.Errorf("Expected current=0, got %d", current)

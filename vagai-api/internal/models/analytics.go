@@ -50,24 +50,24 @@ type ResumeQualityInsights struct {
 	TotalAnalyses  int64             `json:"total_analyses"`
 }
 
-// OrganizationSummary resume uma organização por volume de vagas.
-type OrganizationSummary struct {
-	OrganizationID uint   `json:"organization_id"`
-	Name           string `json:"name"`
-	JobCount       int64  `json:"job_count"`
+// UserSummary resume um usuário por volume de vagas.
+type UserSummary struct {
+	UserID   uint   `json:"user_id"`
+	Name     string `json:"name"`
+	JobCount int64  `json:"job_count"`
 }
 
 // JobMarketTrends é o resultado do US3.
 type JobMarketTrends struct {
-	JobsByStatus        map[JobStatus]int64    `json:"jobs_by_status"`
-	TopOrganizations    []OrganizationSummary  `json:"top_organizations"`
-	PostingVolume       map[string]int64       `json:"posting_volume"`
-	ActiveCompanies     int64                  `json:"active_companies"`
-	TotalJobs           int64                  `json:"total_jobs"`
-	PostingVolumeTotal  int64                  `json:"-"`
+	JobsByStatus       map[JobStatus]int64  `json:"jobs_by_status"`
+	TopUsers           []UserSummary        `json:"top_users"`
+	PostingVolume      map[string]int64     `json:"posting_volume"`
+	ActiveCompanies    int64                `json:"active_companies"`
+	TotalJobs          int64                `json:"total_jobs"`
+	PostingVolumeTotal int64                `json:"-"`
 }
 
-// FeatureUtilization indica quais features a organização efetivamente usa.
+// FeatureUtilization indica quais features o usuário efetivamente usa.
 type FeatureUtilization struct {
 	Matching      bool `json:"matching"`
 	AIAnalysis    bool `json:"ai_analysis"`
@@ -75,21 +75,21 @@ type FeatureUtilization struct {
 	SkillGap      bool `json:"skill_gap"`
 }
 
-// OrgMetrics é o resultado do US4.
-type OrgMetrics struct {
-	OrganizationID      uint                 `json:"organization_id"`
-	OrganizationName    string               `json:"organization_name"`
-	PlanType            string               `json:"plan"`
-	SubscriptionStatus  SubscriptionStatus   `json:"subscription_status"`
-	TrialToPaid         bool                 `json:"trial_to_paid"`
-	JobsPosted          int64                `json:"jobs_posted"`
-	ResumesUploaded     int64                `json:"resumes_uploaded"`
-	MatchesMade         int64                `json:"matches_made"`
-	ApplicationsMade    int64                `json:"applications_made"`
-	ConversionRate      float64              `json:"conversion_rate"`
-	FeatureUtilization  FeatureUtilization   `json:"feature_utilization"`
-	AverageTimeToMatchDays   float64         `json:"average_time_to_match_days"`
-	AverageTimeToAnalysisDays float64        `json:"average_time_to_analysis_days"`
+// UserMetrics é o resultado do US4.
+type UserMetrics struct {
+	UserID                    uint               `json:"user_id"`
+	UserName                  string             `json:"user_name"`
+	PlanType                  string             `json:"plan"`
+	SubscriptionStatus        SubscriptionStatus `json:"subscription_status"`
+	TrialToPaid               bool               `json:"trial_to_paid"`
+	JobsPosted                int64              `json:"jobs_posted"`
+	ResumesUploaded           int64              `json:"resumes_uploaded"`
+	MatchesMade               int64              `json:"matches_made"`
+	ApplicationsMade          int64              `json:"applications_made"`
+	ConversionRate            float64            `json:"conversion_rate"`
+	FeatureUtilization        FeatureUtilization `json:"feature_utilization"`
+	AverageTimeToMatchDays    float64            `json:"average_time_to_match_days"`
+	AverageTimeToAnalysisDays float64            `json:"average_time_to_analysis_days"`
 }
 
 // InterviewPrepAnalysis é o resultado do US5.

@@ -16,11 +16,11 @@ das preparações (ai/template), nota média de verificação e tendência
 de evolução das notas.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Interview Preparation Analysis", org)
+		printHeader("Interview Preparation Analysis", user)
 
 		type catRow struct {
 			Category string
@@ -30,8 +30,8 @@ de evolução das notas.`,
 		if err := db.DB.Raw(`
 			SELECT category, COUNT(*) AS cnt
 			FROM interview_questions
-			WHERE organization_id = ?
-			GROUP BY category`, org).Scan(&cats).Error; err != nil {
+			WHERE user_id = ?
+			GROUP BY category`, user).Scan(&cats).Error; err != nil {
 			return err
 		}
 
@@ -43,14 +43,14 @@ de evolução das notas.`,
 		if err := db.DB.Raw(`
 			SELECT source, COUNT(*) AS cnt
 			FROM interview_preparations
-			WHERE organization_id = ?
-			GROUP BY source`, org).Scan(&srcs).Error; err != nil {
+			WHERE user_id = ?
+			GROUP BY source`, user).Scan(&srcs).Error; err != nil {
 			return err
 		}
 
 		var total int64
 		if err := db.DB.Table("interview_preparations").
-			Where("organization_id = ?", org).
+			Where("user_id = ?", user).
 			Count(&total).Error; err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ de evolução das notas.`,
 		if err := db.DB.Raw(`
 			SELECT AVG(score) AS avg_score
 			FROM preparation_verification_histories
-			WHERE organization_id = ?`, org).Scan(&avgScore).Error; err != nil {
+			WHERE user_id = ?`, user).Scan(&avgScore).Error; err != nil {
 			return err
 		}
 
@@ -71,9 +71,9 @@ de evolução das notas.`,
 		if err := db.DB.Raw(`
 			SELECT score
 			FROM preparation_verification_histories
-			WHERE organization_id = ?
+			WHERE user_id = ?
 			ORDER BY verified_at ASC
-			LIMIT ?`, org, maxTrendRows).Scan(&scoreRows).Error; err != nil {
+			LIMIT ?`, user, maxTrendRows).Scan(&scoreRows).Error; err != nil {
 			return err
 		}
 

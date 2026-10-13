@@ -84,22 +84,22 @@ var (
 //
 // minFreq é a frequência mínima da skill nas vagas para entrar na análise
 // (default 1). Retorna nil quando não há dados suficientes (estado vazio).
-func (s *Service) SkillGap(ctx context.Context, orgID uint, minFreq int) (*models.SkillGapAnalysis, error) {
+func (s *Service) SkillGap(ctx context.Context, userID uint, minFreq int) (*models.SkillGapAnalysis, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
 	if minFreq < 1 {
 		minFreq = 1
 	}
-	key := fmt.Sprintf("org:%d:skills-gap:%d", orgID, minFreq)
+	key := fmt.Sprintf("org:%d:skills-gap:%d", userID, minFreq)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.SkillGapAnalysis, error) {
-		return loadSkillGap(db, orgID, minFreq)
+		return loadSkillGap(db, userID, minFreq)
 	})
 }
 
-func loadSkillGap(db *gorm.DB, orgID uint, minFreq int) (*models.SkillGapAnalysis, error) {
+func loadSkillGap(db *gorm.DB, userID uint, minFreq int) (*models.SkillGapAnalysis, error) {
 	// Estado vazio: sem jobs, matches nem currículos (T058).
-	empty, err := sgNoSourceData(db, orgID)
+	empty, err := sgNoSourceData(db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,13 +108,13 @@ func loadSkillGap(db *gorm.DB, orgID uint, minFreq int) (*models.SkillGapAnalysi
 	}
 
 	// T053 — skills das vagas via vocabulário curado (agregados condicionais).
-	jobFreq, err := sgJobSkillFrequencies(db, orgID)
+	jobFreq, err := sgJobSkillFrequencies(db, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// T054 — skills dos candidatos: matches.keywords_matched + resumes.data.
-	candFreq, err := sgCandidateSkillFrequencies(db, orgID)
+	candFreq, err := sgCandidateSkillFrequencies(db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +136,13 @@ func loadSkillGap(db *gorm.DB, orgID uint, minFreq int) (*models.SkillGapAnalysi
 }
 
 // sgNoSourceData reports se a organização não tem jobs, matches nem resumes.
-func sgNoSourceData(db *gorm.DB, orgID uint) (bool, error) {
+func sgNoSourceData(db *gorm.DB, userID uint) (bool, error) {
 	var total int64
 	for _, table := range []string{"jobs", "matches", "resumes"} {
 		var cnt int64
 		q := db.Table(table)
-		if orgID > 0 {
-			q = q.Where("organization_id = ?", orgID)
+		if userID > 0 {
+			q = q.Where("user_id = ?", userID)
 		}
 		if err := q.Count(&cnt).Error; err != nil {
 			return false, err
@@ -157,14 +157,14 @@ func sgNoSourceData(db *gorm.DB, orgID uint) (bool, error) {
 // (strings.Contains, SIMD) sobre o texto normalizado UMA vez por linha:
 // LIKE '%termo%' no MySQL é O(linha×termo×bytes) e estoura o budget de 5s em
 // descrições longas, mesmo com derived table.
-func sgJobSkillFrequencies(db *gorm.DB, orgID uint) (map[string]int64, error) {
+func sgJobSkillFrequencies(db *gorm.DB, userID uint) (map[string]int64, error) {
 	type jobText struct {
 		Title       string
 		Description string
 	}
 	q := db.Model(&models.Job{}).Select("title, description")
-	if orgID > 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 	var jobs []jobText
 	if err := q.Find(&jobs).Error; err != nil {
@@ -195,7 +195,7 @@ func sgJobSkillFrequencies(db *gorm.DB, orgID uint) (map[string]int64, error) {
 //
 //	(a) matches.keywords_matched — array JSON via JSON_TABLE;
 //	(b) resumes.data $.skills[*] — mesmo padrão de skillFrequency.
-func sgCandidateSkillFrequencies(db *gorm.DB, orgID uint) (map[string]int64, error) {
+func sgCandidateSkillFrequencies(db *gorm.DB, userID uint) (map[string]int64, error) {
 	out := make(map[string]int64)
 
 	// (a) keywords dos matches.
@@ -205,9 +205,9 @@ func sgCandidateSkillFrequencies(db *gorm.DB, orgID uint) (map[string]int64, err
 			JSON_TABLE(m.keywords_matched, '$[*]' COLUMNS (kw VARCHAR(200) PATH '$')) jt
 		WHERE JSON_VALID(m.keywords_matched)`
 	var matchArgs []any
-	if orgID > 0 {
-		matchQuery += " AND m.organization_id = ?"
-		matchArgs = append(matchArgs, orgID)
+	if userID > 0 {
+		matchQuery += " AND m.user_id = ?"
+		matchArgs = append(matchArgs, userID)
 	}
 	matchQuery += " GROUP BY LOWER(TRIM(jt.kw))"
 
@@ -224,9 +224,9 @@ func sgCandidateSkillFrequencies(db *gorm.DB, orgID uint) (map[string]int64, err
 			JSON_TABLE(r.data, '$.skills[*]' COLUMNS (item VARCHAR(200) PATH '$')) jt
 		WHERE JSON_VALID(r.data)`
 	var resumeArgs []any
-	if orgID > 0 {
-		resumeQuery += " AND r.organization_id = ?"
-		resumeArgs = append(resumeArgs, orgID)
+	if userID > 0 {
+		resumeQuery += " AND r.user_id = ?"
+		resumeArgs = append(resumeArgs, userID)
 	}
 	resumeQuery += " GROUP BY LOWER(TRIM(jt.item))"
 

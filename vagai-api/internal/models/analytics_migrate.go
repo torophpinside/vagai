@@ -12,11 +12,11 @@ import (
 // (data-model.md → Index Recommendations). Idempotente: índices já existentes
 // (por nome ou por mesma sequência de colunas) são ignorados.
 func MigrateAnalytics(db *gorm.DB) {
-	ensureIndex(db, "matches", "idx_match_organization", "organization_id")
-	ensureIndex(db, "resumes", "idx_resume_organization", "organization_id")
-	ensureIndex(db, "ai_analysis_results", "idx_ai_org_prep", "organization_id", "preparation_id")
-	ensureIndex(db, "interview_preparations", "idx_interview_org", "organization_id")
-	ensureIndex(db, "preparation_verification_histories", "idx_verification_org", "organization_id")
+	ensureIndex(db, "matches", "idx_match_user", "user_id")
+	ensureIndex(db, "resumes", "idx_resume_user", "user_id")
+	ensureIndex(db, "ai_analysis_results", "idx_ai_user_prep", "user_id", "preparation_id")
+	ensureIndex(db, "interview_preparations", "idx_interview_user", "user_id")
+	ensureIndex(db, "preparation_verification_histories", "idx_verification_user", "user_id")
 }
 
 // ensureIndex cria o índice se ainda não existir um índice com o mesmo nome

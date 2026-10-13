@@ -22,21 +22,21 @@ const (
 // (T049), mais o vetor StageTiming com as três etapas na ordem contratada
 // (FR-013, US7 — T047/T048/T049/T052).
 //
-// Retorna nil quando a organização (ou a visão global, orgID=0) não possui
+// Retorna nil quando a organização (ou a visão global, userID=0) não possui
 // nenhum match (estado vazio, T051).
-func (s *Service) TimeToHire(ctx context.Context, orgID uint) (*models.TimeToHireMetrics, error) {
+func (s *Service) TimeToHire(ctx context.Context, userID uint) (*models.TimeToHireMetrics, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:time-to-hire", orgID)
+	key := fmt.Sprintf("org:%d:time-to-hire", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.TimeToHireMetrics, error) {
-		return loadTimeToHire(db, orgID)
+		return loadTimeToHire(db, userID)
 	})
 }
 
-func loadTimeToHire(db *gorm.DB, orgID uint) (*models.TimeToHireMetrics, error) {
+func loadTimeToHire(db *gorm.DB, userID uint) (*models.TimeToHireMetrics, error) {
 	// T051 — estado vazio: nenhum match no escopo.
-	total, err := tthMatchCount(db, orgID)
+	total, err := tthMatchCount(db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func loadTimeToHire(db *gorm.DB, orgID uint) (*models.TimeToHireMetrics, error) 
 	matchAvg, matchMedian, matchSamples, err := tthStage(db,
 		"GREATEST(0, DATEDIFF(matches.analyzed_at, jobs.collected_at))",
 		"matches JOIN jobs ON jobs.id = matches.job_id",
-		tthWhere(tthOrgCond(orgID, "matches")), tthArgs(orgID)...)
+		tthWhere(tthOrgCond(userID, "matches")), tthArgs(userID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func loadTimeToHire(db *gorm.DB, orgID uint) (*models.TimeToHireMetrics, error) 
 		"ai_analysis_results"+
 			" JOIN interview_preparations ip ON ip.id = ai_analysis_results.preparation_id"+
 			" JOIN matches m ON m.id = ip.match_id",
-		tthWhere(tthOrgCond(orgID, "m")), tthArgs(orgID)...)
+		tthWhere(tthOrgCond(userID, "m")), tthArgs(userID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func loadTimeToHire(db *gorm.DB, orgID uint) (*models.TimeToHireMetrics, error) 
 		"GREATEST(0, DATEDIFF(matches.applied_at, jobs.collected_at))",
 		"matches JOIN jobs ON jobs.id = matches.job_id",
 		tthWhere("matches.applied = TRUE", "matches.applied_at IS NOT NULL",
-			tthOrgCond(orgID, "matches")), tthArgs(orgID)...)
+			tthOrgCond(userID, "matches")), tthArgs(userID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +90,12 @@ func loadTimeToHire(db *gorm.DB, orgID uint) (*models.TimeToHireMetrics, error) 
 	}, nil
 }
 
-// tthMatchCount conta os matches do escopo (0 = global, orgID=0).
-func tthMatchCount(db *gorm.DB, orgID uint) (int64, error) {
+// tthMatchCount conta os matches do escopo (0 = global, userID=0).
+func tthMatchCount(db *gorm.DB, userID uint) (int64, error) {
 	var total int64
 	q := db.Table("matches")
-	if orgID > 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 	if err := q.Count(&total).Error; err != nil {
 		return 0, err
@@ -150,21 +150,21 @@ func tthStage(db *gorm.DB, daysExpr, fromSQL, whereCond string, args ...any) (fl
 }
 
 // tthOrgCond devolve a condição de escopo por organização (vazio = global,
-// orgID=0 — visão de super admin, padrão de job_trends.go). O prefixo do
-// alias evita ambiguidade entre matches.organization_id e jobs.organization_id.
-func tthOrgCond(orgID uint, alias string) string {
-	if orgID == 0 {
+// userID=0 — visão de super admin, padrão de job_trends.go). O prefixo do
+// alias evita ambiguidade entre matches.user_id e jobs.user_id.
+func tthOrgCond(userID uint, alias string) string {
+	if userID == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%s.organization_id = ?", alias)
+	return fmt.Sprintf("%s.user_id = ?", alias)
 }
 
 // tthArgs devolve os argumentos correspondentes a tthOrgCond.
-func tthArgs(orgID uint) []any {
-	if orgID == 0 {
+func tthArgs(userID uint) []any {
+	if userID == 0 {
 		return nil
 	}
-	return []any{orgID}
+	return []any{userID}
 }
 
 // tthWhere junta condições não vazias com AND.

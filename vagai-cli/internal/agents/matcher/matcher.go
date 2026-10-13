@@ -166,16 +166,16 @@ func Run(threshold int, force bool) error {
 		log.Printf("🚀 Conexão com LM Studio estabelecida com sucesso!")
 	}
 
-	// Buscar todas as vagas novas de sites ativos, agrupadas por organização
+	// Buscar todas as vagas novas de sites ativos, agrupadas por usuário
 	var jobs []models.Job
 	query := db.DB.Where("status = ?", models.JobStatusNew).
 		Joins("JOIN sites ON sites.id = jobs.site_id").
 		Where("sites.active = ?", true).
-		Order("jobs.organization_id ASC")
+		Order("jobs.user_id ASC")
 	if force {
 		query = db.DB.Joins("JOIN sites ON sites.id = jobs.site_id").
 			Where("sites.active = ?", true).
-			Order("jobs.organization_id ASC")
+			Order("jobs.user_id ASC")
 	}
 	query.Find(&jobs)
 
@@ -184,20 +184,20 @@ func Run(threshold int, force bool) error {
 		return nil
 	}
 
-	// Agrupar vagas por organização para derivar currículo e cidade de cada uma
+	// Agrupar vagas por usuário para derivar currículo e cidade de cada uma
 	orgJobs := make(map[uint][]models.Job)
 	for _, job := range jobs {
-		if job.OrganizationID == 0 {
-			// Sem org definida (ex.: fetch manual), pula sem organização associada
-			log.Printf("Vaga %d sem organization_id definida, ignorada", job.ID)
+		if job.UserID == 0 {
+			// Sem user definido (ex.: fetch manual), pula sem organização associada
+			log.Printf("Vaga %d sem user_id definida, ignorada", job.ID)
 			continue
 		}
-		orgJobs[job.OrganizationID] = append(orgJobs[job.OrganizationID], job)
+		orgJobs[job.UserID] = append(orgJobs[job.UserID], job)
 	}
 
 	var totalMatches int
-	for orgID, orgJobList := range orgJobs {
-		matches := runForOrg(orgID, orgJobList, threshold)
+	for userID, orgJobList := range orgJobs {
+		matches := runForOrg(userID, orgJobList, threshold)
 		totalMatches += matches
 	}
 
@@ -205,13 +205,13 @@ func Run(threshold int, force bool) error {
 	return nil
 }
 
-func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
-	log.Printf("Processando %d vagas da organização %d", len(jobs), orgID)
+func runForOrg(userID uint, jobs []models.Job, threshold int) int {
+	log.Printf("Processando %d vagas do usuário %d", len(jobs), userID)
 
-	// Buscar cidade do usuário da organização
+	// Buscar cidade do usuário do usuário
 	var userCity string
 	var users []models.User
-	db.DB.Where("organization_id = ?", orgID).Find(&users)
+	db.DB.Where("user_id = ?", userID).Find(&users)
 	for _, u := range users {
 		if u.City != "" {
 			userCity = u.City
@@ -219,25 +219,25 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		}
 	}
 	if userCity != "" {
-		log.Printf("📍 Cidade do usuário (org %d): %s", orgID, userCity)
+		log.Printf("📍 Cidade do usuário (user %d): %s", userID, userCity)
 	} else {
-		log.Printf("📍 Nenhuma cidade configurada na organização %d. Filtro de localização desativado.", orgID)
+		log.Printf("📍 Nenhuma cidade configurada no usuário %d. Filtro de localização desativado.", userID)
 	}
 
-	// Palavras-chave de bloqueio configuradas na organização
-	var org models.Organization
+	// Palavras-chave de bloqueio configuradas no usuário
+	var user models.User
 	var negativeKeywords []string
-	if err := db.DB.First(&org, orgID).Error; err == nil {
-		negativeKeywords = loadNegativeKeywords(org.NegativeKeywords)
+	if err := db.DB.First(&user, userID).Error; err == nil {
+		negativeKeywords = loadNegativeKeywords(user.NegativeKeywords)
 	}
 	if len(negativeKeywords) > 0 {
-		log.Printf("⛔ Palavras-chave de bloqueio (org %d): %v", orgID, negativeKeywords)
+		log.Printf("⛔ Palavras-chave de bloqueio (user %d): %v", userID, negativeKeywords)
 	}
 
-	// Usar apenas o currículo mais recente da organização
+	// Usar apenas o currículo mais recente do usuário
 	var resume models.Resume
-	if err := db.DB.Where("organization_id = ?", orgID).Order("uploaded_at DESC").First(&resume).Error; err != nil {
-		log.Printf("Nenhum currículo encontrado para org %d", orgID)
+	if err := db.DB.Where("user_id = ?", userID).Order("uploaded_at DESC").First(&resume).Error; err != nil {
+		log.Printf("Nenhum currículo encontrado para user %d", userID)
 		return 0
 	}
 	resume.Content = resumeText(resume)
@@ -286,7 +286,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 			log.Printf("Aviso no matching job=%d resume=%d: %v", result.jobID, result.resumeID, result.err)
 			continue
 		}
-		// Buscar organization_id do job
+		// Buscar user_id do job
 		var job models.Job
 		db.DB.First(&job, result.jobID)
 
@@ -297,7 +297,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		}
 
 		match := models.Match{
-			OrganizationID:  job.OrganizationID,
+			UserID:  job.UserID,
 			JobID:           result.jobID,
 			ResumeID:        &result.resumeID,
 			SimilarityScore: result.score,
@@ -320,7 +320,7 @@ func runForOrg(orgID uint, jobs []models.Job, threshold int) int {
 		}
 	}
 
-	log.Printf("Matcher Agent finalizado para org %d. %d matches encontrados", orgID, matchCount)
+	log.Printf("Matcher Agent finalizado para user %d. %d matches encontrados", userID, matchCount)
 	return matchCount
 }
 
@@ -375,7 +375,7 @@ func processTask(job models.Job, resume models.Resume, userCity string, negative
 
 const negativeKeywordScorePenalty = 3.0
 
-// loadNegativeKeywords decodifica a coluna JSON negative_keywords da organização.
+// loadNegativeKeywords decodifica a coluna JSON negative_keywords do usuário.
 func loadNegativeKeywords(raw string) []string {
 	if raw == "" {
 		return nil

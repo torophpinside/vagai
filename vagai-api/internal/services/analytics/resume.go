@@ -20,35 +20,35 @@ const (
 // (FR-011, US2 — T017/T018).
 //
 // Retorna nil quando a organização não possui análises de currículo.
-func (s *Service) ResumeInsights(ctx context.Context, orgID uint) (*models.ResumeQualityInsights, error) {
+func (s *Service) ResumeInsights(ctx context.Context, userID uint) (*models.ResumeQualityInsights, error) {
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:resume-insights", orgID)
+	key := fmt.Sprintf("org:%d:resume-insights", userID)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.ResumeQualityInsights, error) {
-		return loadResumeInsights(db, orgID)
+		return loadResumeInsights(db, userID)
 	})
 }
 
-func loadResumeInsights(db *gorm.DB, orgID uint) (*models.ResumeQualityInsights, error) {
+func loadResumeInsights(db *gorm.DB, userID uint) (*models.ResumeQualityInsights, error) {
 	// T017 — frequência de forças/fragilidades/sugestões nos JSON das análises.
-	strengths, err := jsonColumnFrequency(db, "resume_analyses", "strengths", orgID, 10)
+	strengths, err := jsonColumnFrequency(db, "resume_analyses", "strengths", userID, 10)
 	if err != nil {
 		return nil, err
 	}
-	weaknesses, err := jsonColumnFrequency(db, "resume_analyses", "weaknesses", orgID, 10)
+	weaknesses, err := jsonColumnFrequency(db, "resume_analyses", "weaknesses", userID, 10)
 	if err != nil {
 		return nil, err
 	}
-	suggestions, err := jsonColumnFrequency(db, "resume_analyses", "suggestions", orgID, 10)
+	suggestions, err := jsonColumnFrequency(db, "resume_analyses", "suggestions", userID, 10)
 	if err != nil {
 		return nil, err
 	}
 
 	var total int64
 	qTotal := db.Table("resume_analyses")
-	if orgID > 0 {
-		qTotal = qTotal.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		qTotal = qTotal.Where("user_id = ?", userID)
 	}
 	if err := qTotal.Count(&total).Error; err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func loadResumeInsights(db *gorm.DB, orgID uint) (*models.ResumeQualityInsights,
 	}
 
 	// T018 — frequência de skills (lista skills[] do JSON de currículos).
-	skills, err := skillFrequency(db, orgID, 50)
+	skills, err := skillFrequency(db, userID, 50)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +76,11 @@ func loadResumeInsights(db *gorm.DB, orgID uint) (*models.ResumeQualityInsights,
 }
 
 // jsonColumnFrequency conta as ocorrências de cada item de um array JSON de
-// uma coluna, escopado por organization_id. Usa JSON_TABLE (MySQL 8) com
+// uma coluna, escopado por user_id. Usa JSON_TABLE (MySQL 8) com
 // guarda JSON_VALID para tolerar colunas malformadas.
-func jsonColumnFrequency(db *gorm.DB, table, column string, orgID uint, limit int) ([]itemCount, error) {
-	where := " AND t.organization_id = ?"
-	if orgID == 0 {
+func jsonColumnFrequency(db *gorm.DB, table, column string, userID uint, limit int) ([]itemCount, error) {
+	where := " AND t.user_id = ?"
+	if userID == 0 {
 		where = ""
 	}
 	query := fmt.Sprintf(`
@@ -93,8 +93,8 @@ func jsonColumnFrequency(db *gorm.DB, table, column string, orgID uint, limit in
 		LIMIT %d`, table, column, column, where, limit)
 
 	var args []any
-	if orgID > 0 {
-		args = append(args, orgID)
+	if userID > 0 {
+		args = append(args, userID)
 	}
 	var rows []itemCount
 	if err := db.Raw(query, args...).Scan(&rows).Error; err != nil {
@@ -105,12 +105,12 @@ func jsonColumnFrequency(db *gorm.DB, table, column string, orgID uint, limit in
 
 // skillFrequency agrega a lista skills[] do JSON de currículos parseado,
 // normalizada para minúsculas.
-func skillFrequency(db *gorm.DB, orgID uint, limit int) (map[string]int, error) {
+func skillFrequency(db *gorm.DB, userID uint, limit int) (map[string]int, error) {
 	where := " WHERE"
 	var args []any
-	if orgID > 0 {
-		where = " WHERE r.organization_id = ? AND"
-		args = append(args, orgID)
+	if userID > 0 {
+		where = " WHERE r.user_id = ? AND"
+		args = append(args, userID)
 	}
 	var rows []itemCount
 	err := db.Raw(`

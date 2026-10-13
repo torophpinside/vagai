@@ -82,11 +82,11 @@ var skillsGapCmd = &cobra.Command{
 demanda e taxa de match por categoria.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Skills Gap Analysis", org)
+		printHeader("Skills Gap Analysis", user)
 
 		minFreq := skillsGapMinFreq
 		if minFreq < 1 {
@@ -96,7 +96,7 @@ demanda e taxa de match por categoria.`,
 		var sources int64
 		for _, table := range []string{"jobs", "matches", "resumes"} {
 			var cnt int64
-			if err := db.DB.Table(table).Where("organization_id = ?", org).Count(&cnt).Error; err != nil {
+			if err := db.DB.Table(table).Where("user_id = ?", user).Count(&cnt).Error; err != nil {
 				return err
 			}
 			sources += cnt
@@ -107,11 +107,11 @@ demanda e taxa de match por categoria.`,
 			return nil
 		}
 
-		jobFreq, err := sgJobSkillFrequencies(db.DB, org)
+		jobFreq, err := sgJobSkillFrequencies(db.DB, user)
 		if err != nil {
 			return err
 		}
-		candFreq, err := sgCandidateSkillFrequencies(db.DB, org)
+		candFreq, err := sgCandidateSkillFrequencies(db.DB, user)
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func sgPrintNameList(skills []string) {
 
 // sgJobSkillFrequencies conta as menções do vocabulário em title+description
 // das vagas da organização, em uma única query com agregados condicionais.
-func sgJobSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, error) {
+func sgJobSkillFrequencies(gormDB *gorm.DB, user uint) (map[string]int64, error) {
 	terms := sgAllTerms()
 	text := "LOWER(CONCAT(COALESCE(title, ''), ' ', COALESCE(description, '')))"
 
@@ -189,8 +189,8 @@ func sgJobSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, error) 
 		parts[i] = fmt.Sprintf("SUM(%s) AS %s", strings.Join(conds, " OR "), alias)
 	}
 
-	query := "SELECT " + strings.Join(parts, ", ") + " FROM jobs WHERE organization_id = ?"
-	rows, err := gormDB.Raw(query, org).Rows()
+	query := "SELECT " + strings.Join(parts, ", ") + " FROM jobs WHERE user_id = ?"
+	rows, err := gormDB.Raw(query, user).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func sgJobSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, error) 
 
 // sgCandidateSkillFrequencies agrega matches.keywords_matched e
 // resumes.data $.skills[*] por JSON_TABLE e soma as contagens em Go.
-func sgCandidateSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, error) {
+func sgCandidateSkillFrequencies(gormDB *gorm.DB, user uint) (map[string]int64, error) {
 	out := make(map[string]int64)
 
 	var matchRows []sgSkillCountRow
@@ -241,8 +241,8 @@ func sgCandidateSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, e
 		SELECT LOWER(TRIM(jt.kw)) AS skill, COUNT(*) AS cnt
 		FROM matches m,
 			JSON_TABLE(m.keywords_matched, '$[*]' COLUMNS (kw VARCHAR(200) PATH '$')) jt
-		WHERE m.organization_id = ? AND JSON_VALID(m.keywords_matched)
-		GROUP BY LOWER(TRIM(jt.kw))`, org).Scan(&matchRows).Error; err != nil {
+		WHERE m.user_id = ? AND JSON_VALID(m.keywords_matched)
+		GROUP BY LOWER(TRIM(jt.kw))`, user).Scan(&matchRows).Error; err != nil {
 		return nil, err
 	}
 	sgMergeCounts(out, matchRows)
@@ -252,8 +252,8 @@ func sgCandidateSkillFrequencies(gormDB *gorm.DB, org uint) (map[string]int64, e
 		SELECT LOWER(TRIM(jt.item)) AS skill, COUNT(*) AS cnt
 		FROM resumes r,
 			JSON_TABLE(r.data, '$.skills[*]' COLUMNS (item VARCHAR(200) PATH '$')) jt
-		WHERE r.organization_id = ? AND JSON_VALID(r.data)
-		GROUP BY LOWER(TRIM(jt.item))`, org).Scan(&resumeRows).Error; err != nil {
+		WHERE r.user_id = ? AND JSON_VALID(r.data)
+		GROUP BY LOWER(TRIM(jt.item))`, user).Scan(&resumeRows).Error; err != nil {
 		return nil, err
 	}
 	sgMergeCounts(out, resumeRows)

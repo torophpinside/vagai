@@ -77,25 +77,25 @@ function initAuth() {
 
 async function login(email, password) {
   const response = await api.post('/auth/login', { email, password })
-  const { token, user: userData, organization } = response.data
+  const { token, user: userData } = response.data
 
-  persistSession(token, { ...userData, organization })
+  persistSession(token, userData)
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-  user.value = { ...userData, organization }
+  user.value = userData
   isAuthenticated.value = true
 
   return response.data
 }
 
-async function register(name, email, password, organization) {
-  const response = await api.post('/auth/register', { name, email, password, organization })
-  const { token, user: userData, organization: orgData } = response.data
+async function register(name, email, password) {
+  const response = await api.post('/auth/register', { name, email, password })
+  const { token, user: userData } = response.data
 
-  persistSession(token, { ...userData, organization: orgData })
+  persistSession(token, userData)
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-  user.value = { ...userData, organization: orgData }
+  user.value = userData
   isAuthenticated.value = true
 
   return response.data

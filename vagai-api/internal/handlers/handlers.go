@@ -93,36 +93,47 @@ func NormalizeURL(rawURL string) string {
 }
 
 func getDB(c *gin.Context) *gorm.DB {
-	if scoped, exists := c.Get("scoped_db"); exists {
-		return scoped.(*gorm.DB)
-	}
 	return DB
+}
+
+// isAdmin reporta se o request autenticado pertence a um administrador.
+func isAdmin(c *gin.Context) bool {
+	return c.GetString("user_role") == string(models.RoleAdmin)
+}
+
+// userScope aplica o filtro de user_id na query. Administradores enxergam
+// todos os registros (sem filtro); usuários comuns enxergam apenas os seus.
+func userScope(c *gin.Context, db *gorm.DB) *gorm.DB {
+	if isAdmin(c) {
+		return db
+	}
+	return db.Where("user_id = ?", c.GetUint("user_id"))
 }
 
 type planResource string
 
 const (
-	resourceSites   planResource = "sites"
-	resourceResumes planResource = "resumes"
-	resourceJobs    planResource = "jobs"
+	resourceSites          planResource = "sites"
+	resourceJobs           planResource = "jobs"
+	resourceResumeAnalyses planResource = "resume_analyses"
 )
 
-func checkPlanLimit(db *gorm.DB, orgID uint, resource planResource) (allowed bool, current int, maxLimit int, err error) {
-	var org models.Organization
-	if err := db.First(&org, orgID).Error; err != nil {
+func checkPlanLimit(db *gorm.DB, userID uint, resource planResource) (allowed bool, current int, maxLimit int, err error) {
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
 		return false, 0, 0, err
 	}
 
 	var plan models.Plan
-	if err := db.Where("slug = ?", org.Plan).First(&plan).Error; err != nil {
+	if err := db.Where("slug = ?", user.PlanSlug).First(&plan).Error; err != nil {
 		return false, 0, 0, err
 	}
 
 	switch resource {
 	case resourceSites:
 		maxLimit = plan.MaxSites
-	case resourceResumes:
-		maxLimit = plan.MaxResumes
+	case resourceResumeAnalyses:
+		maxLimit = plan.MaxResumeAnalyses
 	case resourceJobs:
 		maxLimit = plan.MaxJobs
 	}
@@ -134,11 +145,14 @@ func checkPlanLimit(db *gorm.DB, orgID uint, resource planResource) (allowed boo
 	var count int64
 	switch resource {
 	case resourceSites:
-		db.Model(&models.Site{}).Where("organization_id = ?", orgID).Count(&count)
-	case resourceResumes:
-		db.Model(&models.Resume{}).Where("organization_id = ? AND file_path <> ''", orgID).Count(&count)
+		db.Model(&models.Site{}).Where("user_id = ?", userID).Count(&count)
+	case resourceResumeAnalyses:
+		now := time.Now()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		db.Model(&models.ResumeAnalysis{}).
+			Where("user_id = ? AND created_at >= ?", userID, monthStart).Count(&count)
 	case resourceJobs:
-		db.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&count)
+		db.Model(&models.Job{}).Where("user_id = ?", userID).Count(&count)
 	}
 	current = int(count)
 
@@ -147,9 +161,8 @@ func checkPlanLimit(db *gorm.DB, orgID uint, resource planResource) (allowed boo
 
 func ListJobs(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 
-	query := db.Where("organization_id = ?", orgID)
+	query := userScope(c, db)
 
 	if status := c.Query("status"); status != "" {
 		statuses := strings.Split(status, ",")
@@ -266,7 +279,7 @@ func ExtractJob(c *gin.Context) {
 
 func CreateJob(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var job models.Job
 	if err := c.ShouldBindJSON(&job); err != nil {
@@ -286,7 +299,7 @@ func CreateJob(c *gin.Context) {
 
 	job.URL = NormalizeURL(job.URL)
 
-	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceJobs)
+	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceJobs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
 		return
@@ -301,12 +314,12 @@ func CreateJob(c *gin.Context) {
 	}
 
 	var existing models.Job
-	if err := db.Where("url = ? AND organization_id = ?", job.URL, orgID).First(&existing).Error; err == nil {
+	if err := db.Where("url = ? AND user_id = ?", job.URL, userID).First(&existing).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Vaga já cadastrada com esta URL"})
 		return
 	}
 
-	job.OrganizationID = orgID
+	job.UserID = userID
 	job.Status = models.JobStatusNew
 
 	if err := db.Create(&job).Error; err != nil {
@@ -320,10 +333,9 @@ func CreateJob(c *gin.Context) {
 
 func GetJob(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var job models.Job
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).Preload("Site").First(&job).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).Preload("Site").First(&job).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
 		return
 	}
@@ -338,10 +350,9 @@ func GetJob(c *gin.Context) {
 
 func UpdateJobStatus(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var job models.Job
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&job).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&job).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada"})
 		return
 	}
@@ -357,21 +368,23 @@ func UpdateJobStatus(c *gin.Context) {
 	job.Status = models.JobStatus(body.Status)
 	db.Save(&job)
 
-	var org models.Organization
-	if err := db.First(&org, orgID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar organização"})
+	ownerID := job.UserID
+
+	var user models.User
+	if err := db.First(&user, ownerID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar usuário"})
 		return
 	}
 	var negativeKeywords []string
-	if org.NegativeKeywords != "" {
-		if err := json.Unmarshal([]byte(org.NegativeKeywords), &negativeKeywords); err != nil {
+	if user.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(user.NegativeKeywords), &negativeKeywords); err != nil {
 			log.Printf("Erro ao decodificar negative_keywords: %v", err)
 		}
 	}
 
 	if body.Status == "matched" {
 		var resumes []models.Resume
-		if err := db.Where("organization_id = ?", orgID).Find(&resumes).Error; err == nil {
+		if err := db.Where("user_id = ?", ownerID).Find(&resumes).Error; err == nil {
 			for i := range resumes {
 				resume := &resumes[i]
 				if resume.Data == "" && resume.Content == "" {
@@ -392,7 +405,7 @@ func UpdateJobStatus(c *gin.Context) {
 
 				keywordsJSON, _ := json.Marshal(result.KeywordsMatched)
 				match := models.Match{
-					OrganizationID:  orgID,
+					UserID:          ownerID,
 					JobID:           job.ID,
 					ResumeID:        &resume.ID,
 					SimilarityScore: result.Score,
@@ -415,7 +428,7 @@ func UpdateJobStatus(c *gin.Context) {
 
 func RematchMatches(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	threshold := 65
 	if t, err := strconv.Atoi(c.DefaultQuery("threshold", "65")); err == nil && t > 0 {
@@ -423,7 +436,7 @@ func RematchMatches(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	if err := db.Where("organization_id = ?", orgID).
+	if err := db.Where("user_id = ?", userID).
 		Where("data <> '' OR content <> ''").
 		Order("uploaded_at DESC").
 		First(&resume).Error; err != nil {
@@ -439,30 +452,26 @@ func RematchMatches(c *gin.Context) {
 		}
 	}
 
-	var org models.Organization
-	if err := db.First(&org, orgID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar organização"})
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar usuário"})
 		return
 	}
 	var negativeKeywords []string
-	if org.NegativeKeywords != "" {
-		if err := json.Unmarshal([]byte(org.NegativeKeywords), &negativeKeywords); err != nil {
+	if user.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(user.NegativeKeywords), &negativeKeywords); err != nil {
 			log.Printf("Erro ao decodificar negative_keywords: %v", err)
 		}
 	}
 
 	var jobs []models.Job
-	if err := db.Where("organization_id = ? AND status IN ?", orgID, []string{"new", "matched"}).
+	if err := db.Where("user_id = ? AND status IN ?", userID, []string{"new", "matched"}).
 		Find(&jobs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar vagas"})
 		return
 	}
 
-	var userCity string
-	var user models.User
-	if err := db.Where("organization_id = ? AND city <> ''", orgID).First(&user).Error; err == nil {
-		userCity = user.City
-	}
+	userCity := user.City
 
 	created, updated, excluded := 0, 0, 0
 	for _, job := range jobs {
@@ -480,7 +489,7 @@ func RematchMatches(c *gin.Context) {
 
 		keywordsJSON, _ := json.Marshal(result.KeywordsMatched)
 		match := models.Match{
-			OrganizationID:  orgID,
+			UserID:          userID,
 			JobID:           job.ID,
 			ResumeID:        &resume.ID,
 			SimilarityScore: result.Score,
@@ -521,15 +530,17 @@ func RematchMatches(c *gin.Context) {
 
 func ListMatches(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	threshold, _ := strconv.Atoi(c.DefaultQuery("threshold", "65"))
 	sortOrder := c.DefaultQuery("sort", "desc")
 	appliedFilter := c.DefaultQuery("applied", "false")
 
 	query := db.Model(&models.Match{}).
-		Where("matches.organization_id = ?", orgID).
 		Joins("JOIN jobs ON jobs.id = matches.job_id").
 		Where("similarity_score >= ?", threshold)
+
+	if !isAdmin(c) {
+		query = query.Where("matches.user_id = ?", c.GetUint("user_id"))
+	}
 
 	if appliedFilter == "true" {
 		query = query.Where("matches.applied = ?", true).
@@ -592,10 +603,9 @@ func ListMatches(c *gin.Context) {
 
 func UpdateMatch(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var match models.Match
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&match).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&match).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
 		return
 	}
@@ -621,10 +631,9 @@ func UpdateMatch(c *gin.Context) {
 
 func DeleteMatch(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var match models.Match
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&match).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&match).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Match não encontrado"})
 		return
 	}
@@ -639,16 +648,15 @@ func DeleteMatch(c *gin.Context) {
 
 func GetStats(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 
 	var totalJobs, totalMatches, totalSites, totalApplied int64
-	db.Model(&models.Job{}).Where("organization_id = ?", orgID).Count(&totalJobs)
-	db.Model(&models.Match{}).Where("organization_id = ?", orgID).Count(&totalMatches)
-	db.Model(&models.Match{}).Where("organization_id = ? AND applied = ?", orgID, true).Count(&totalApplied)
-	db.Model(&models.Site{}).Where("organization_id = ? AND active = ?", orgID, true).Count(&totalSites)
+	userScope(c, db.Model(&models.Job{})).Count(&totalJobs)
+	userScope(c, db.Model(&models.Match{})).Count(&totalMatches)
+	userScope(c, db.Model(&models.Match{})).Where("applied = ?", true).Count(&totalApplied)
+	userScope(c, db.Model(&models.Site{})).Where("active = ?", true).Count(&totalSites)
 
 	var jobs []models.Job
-	db.Where("organization_id = ?", orgID).Find(&jobs)
+	userScope(c, db.Model(&models.Job{})).Find(&jobs)
 
 	languageCount := make(map[string]int)
 	keywordCount := make(map[string]int)
@@ -707,15 +715,13 @@ func GetStats(c *gin.Context) {
 
 func ListSites(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	var sites []models.Site
-	db.Where("organization_id = ?", orgID).Find(&sites)
+	userScope(c, db).Find(&sites)
 	c.JSON(http.StatusOK, sites)
 }
 
 func DeleteSite(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
@@ -723,7 +729,7 @@ func DeleteSite(c *gin.Context) {
 	}
 
 	var site models.Site
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&site).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&site).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
 		} else {
@@ -749,7 +755,6 @@ func DeleteSite(c *gin.Context) {
 
 func UpdateSite(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
@@ -757,7 +762,7 @@ func UpdateSite(c *gin.Context) {
 	}
 
 	var site models.Site
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&site).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&site).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Site não encontrado"})
 		} else {
@@ -784,7 +789,7 @@ func UpdateSite(c *gin.Context) {
 
 func AddSite(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var site models.Site
 	if err := c.ShouldBindJSON(&site); err != nil {
@@ -792,11 +797,11 @@ func AddSite(c *gin.Context) {
 		return
 	}
 
-	// A organização é sempre derivada do JWT autenticado: ignora qualquer valor
-	// enviado no body, impedindo um usuário de criar um site em outra organização.
-	site.OrganizationID = orgID
+	// O usuário é sempre derivado do JWT autenticado: ignora qualquer valor
+	// enviado no body, impedindo um usuário de criar um site para outro.
+	site.UserID = userID
 
-	allowed, current, maxLimit, err := checkPlanLimit(db, site.OrganizationID, resourceSites)
+	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceSites)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
 		return
@@ -838,9 +843,8 @@ func AddSite(c *gin.Context) {
 
 func ListResumes(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	var resumes []models.Resume
-	db.Where("organization_id = ?", orgID).Find(&resumes)
+	userScope(c, db).Find(&resumes)
 	c.JSON(http.StatusOK, resumes)
 }
 
@@ -852,7 +856,7 @@ func UploadResume(c *gin.Context) {
 		return
 	}
 
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	// Validação de upload (tamanho + magic bytes) antes de persistir.
 	ufh, err := file.Open()
@@ -870,20 +874,6 @@ func UploadResume(c *gin.Context) {
 		return
 	}
 	ufh.Close()
-
-	allowed, current, maxLimit, err := checkPlanLimit(db, orgID, resourceResumes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
-		return
-	}
-	if !allowed {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error":   fmt.Sprintf("Limite de currículos atingido: %d/%d", current, maxLimit),
-			"current": current,
-			"limit":   maxLimit,
-		})
-		return
-	}
 
 	uploadDir := "./uploads/resumes"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
@@ -904,7 +894,7 @@ func UploadResume(c *gin.Context) {
 	}
 
 	var resume models.Resume
-	resume.OrganizationID = orgID
+	resume.UserID = userID
 	resume.Name = truncateName(file.Filename, 255)
 	resume.FilePath = filePath
 	resume.Content = content
@@ -920,7 +910,7 @@ func UploadResume(c *gin.Context) {
 
 func AnalyzeResume(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -943,6 +933,20 @@ func AnalyzeResume(c *gin.Context) {
 		return
 	}
 	afh.Close()
+
+	allowed, current, maxLimit, err := checkPlanLimit(db, userID, resourceResumeAnalyses)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar limite do plano"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   fmt.Sprintf("Limite de análises de currículo atingido este mês: %d/%d", current, maxLimit),
+			"current": current,
+			"limit":   maxLimit,
+		})
+		return
+	}
 
 	tmpDir := "./uploads/resumes"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
@@ -987,7 +991,7 @@ func AnalyzeResume(c *gin.Context) {
 	fullAnalysis, _ := analysisResult["fullAnalysis"].(string)
 
 	analysis := models.ResumeAnalysis{
-		OrganizationID: orgID,
+		UserID:         userID,
 		FileName:       truncateName(file.Filename, 255),
 		FullAnalysis:   fullAnalysis,
 		Strengths:      string(strengths),
@@ -1010,7 +1014,7 @@ func AnalyzeResume(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":              analysis.ID,
-		"organization_id": analysis.OrganizationID,
+		"user_id":         analysis.UserID,
 		"file_name":       analysis.FileName,
 		"fullAnalysis":    analysis.FullAnalysis,
 		"strengths":       parsedStrengths,
@@ -1022,7 +1026,6 @@ func AnalyzeResume(c *gin.Context) {
 
 func DeleteResumeAnalysis(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
@@ -1030,7 +1033,7 @@ func DeleteResumeAnalysis(c *gin.Context) {
 	}
 
 	var analysis models.ResumeAnalysis
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&analysis).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&analysis).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Análise não encontrada"})
 		} else {
@@ -1054,7 +1057,7 @@ func formatAnalysisResponse(a models.ResumeAnalysis) gin.H {
 	json.Unmarshal([]byte(a.Suggestions), &suggestions)
 	return gin.H{
 		"id":              a.ID,
-		"organization_id": a.OrganizationID,
+		"user_id":         a.UserID,
 		"file_name":       a.FileName,
 		"fullAnalysis":    a.FullAnalysis,
 		"strengths":       strengths,
@@ -1066,17 +1069,17 @@ func formatAnalysisResponse(a models.ResumeAnalysis) gin.H {
 
 func GetNegativeKeywords(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
-	var org models.Organization
-	if err := db.First(&org, orgID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Organização não encontrada"})
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
 		return
 	}
 
 	var keywords []string
-	if org.NegativeKeywords != "" {
-		if err := json.Unmarshal([]byte(org.NegativeKeywords), &keywords); err != nil {
+	if user.NegativeKeywords != "" {
+		if err := json.Unmarshal([]byte(user.NegativeKeywords), &keywords); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao decodificar palavras-chave"})
 			return
 		}
@@ -1087,7 +1090,7 @@ func GetNegativeKeywords(c *gin.Context) {
 
 func UpdateNegativeKeywords(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var body struct {
 		Keywords []string `json:"keywords"`
@@ -1103,7 +1106,7 @@ func UpdateNegativeKeywords(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&models.Organization{}).Where("id = ?", orgID).Update("negative_keywords", string(keywordsJSON)).Error; err != nil {
+	if err := db.Model(&models.User{}).Where("id = ?", userID).Update("negative_keywords", string(keywordsJSON)).Error; err != nil {
 		log.Printf("Erro ao atualizar palavras-chave: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar palavras-chave"})
 		return
@@ -1114,9 +1117,8 @@ func UpdateNegativeKeywords(c *gin.Context) {
 
 func ListResumeAnalyses(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	var analyses []models.ResumeAnalysis
-	db.Where("organization_id = ?", orgID).Order("created_at desc").Find(&analyses)
+	userScope(c, db).Order("created_at desc").Find(&analyses)
 	result := make([]gin.H, len(analyses))
 	for i, a := range analyses {
 		result[i] = formatAnalysisResponse(a)
@@ -1126,19 +1128,35 @@ func ListResumeAnalyses(c *gin.Context) {
 
 func GetResumeAnalysis(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var analysis models.ResumeAnalysis
-	if err := db.Where("id = ? AND organization_id = ?", id, orgID).First(&analysis).Error; err != nil {
+	if err := userScope(c, db).Where("id = ?", id).First(&analysis).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Análise não encontrada"})
 		return
 	}
 	c.JSON(http.StatusOK, formatAnalysisResponse(analysis))
 }
 
+// ListPlans devolve os planos visíveis ao usuário logado: todos os ativos, mais
+// o próprio plano mesmo que esteja inativo (para resolver o cartão "seu plano
+// atual"). Mantém o formato de array puro consumido por usePlans (FR-010).
 func ListPlans(c *gin.Context) {
+	userSlug := ""
+	if userID := c.GetUint("user_id"); userID != 0 {
+		var user models.User
+		if err := DB.Select("plan_slug").First(&user, userID).Error; err == nil {
+			userSlug = user.PlanSlug
+		}
+	}
+
 	var plans []models.Plan
-	DB.Find(&plans)
+	query := DB.Order("id")
+	if userSlug != "" {
+		query = query.Where("active = ? OR slug = ?", true, userSlug)
+	} else {
+		query = query.Where("active = ?", true)
+	}
+	query.Find(&plans)
 	if plans == nil {
 		plans = []models.Plan{}
 	}

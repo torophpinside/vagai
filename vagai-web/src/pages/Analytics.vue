@@ -3,14 +3,14 @@
     <div class="flex items-end justify-between">
       <div>
         <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Analytics</h1>
-        <p class="text-slate-400">Indicadores de matching, currículos, vagas e organização.</p>
+        <p class="text-slate-400">Indicadores de matching, currículos, vagas e usuários.</p>
       </div>
     </div>
 
     <MatchingWidget />
     <ResumeWidget />
     <JobTrendsWidget />
-    <OrgMetricsWidget />
+    <UserMetricsWidget />
     <InterviewPrepWidget />
     <AIQualityWidget />
     <TimeToHireWidget />
@@ -24,7 +24,7 @@
 import MatchingWidget from '../components/analytics/MatchingWidget.vue'
 import ResumeWidget from '../components/analytics/ResumeWidget.vue'
 import JobTrendsWidget from '../components/analytics/JobTrendsWidget.vue'
-import OrgMetricsWidget from '../components/analytics/OrgMetricsWidget.vue'
+import UserMetricsWidget from '../components/analytics/UserMetricsWidget.vue'
 import InterviewPrepWidget from '../components/analytics/InterviewPrepWidget.vue'
 import AIQualityWidget from '../components/analytics/AIQualityWidget.vue'
 import TimeToHireWidget from '../components/analytics/TimeToHireWidget.vue'

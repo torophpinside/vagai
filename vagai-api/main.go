@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +44,10 @@ func main() {
 	dropResumeAnalysisFK(db)
 	handlers.SetDB(db)
 
+	// Expurgo de contas excluídas (spec 013, research.md R3): roda no boot e
+	// depois a cada 24h; janela configurável via USER_DELETE_RETENTION_DAYS.
+	models.StartPurgeJob(db, userDeleteRetention())
+
 	r := gin.Default()
 	r.MaxMultipartMemory = 16 << 20
 
@@ -79,11 +84,30 @@ func main() {
 
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuth())
-	api.Use(middleware.ScopedDB(db))
 	{
-		// Analytics (specs/010-data-analytics): /api/v1/analytics/* — acesso
-		// restrito a org admins e super admins (FR-020).
+		// Analytics (specs/010-data-analytics): /api/v1/analytics/* —
+		// autenticado; admin vê dados globais, usuário comum os próprios
+		// (middleware.ResolveAnalyticsUserID).
 		handlers.RegisterAnalyticsRoutes(api.Group("/v1/analytics"))
+
+		// Gestão de planos (spec 012) e usuários (spec 013): acesso
+		// restrito ao administrador.
+		admin := api.Group("/admin")
+		admin.Use(middleware.RequireAdmin())
+		{
+			admin.GET("/plans", handlers.ListPlansAdmin)
+			admin.POST("/plans", handlers.CreatePlan)
+			admin.PATCH("/plans/:id", handlers.UpdatePlan)
+
+			admin.GET("/users", handlers.ListUsersAdmin)
+			admin.GET("/users/:id", handlers.GetUserAdmin)
+			admin.PATCH("/users/:id", handlers.UpdateUserAdmin)
+			admin.PATCH("/users/:id/plan", handlers.AssignPlanAdmin)
+			admin.POST("/users/:id/suspend", handlers.SuspendUserAdmin)
+			admin.POST("/users/:id/restore", handlers.RestoreUserAdmin)
+			admin.DELETE("/users/:id", handlers.DeleteUserAdmin)
+			admin.POST("/users/:id/reactivate", handlers.ReactivateUserAdmin)
+		}
 
 		api.GET("/stats", handlers.GetStats)
 		api.GET("/plans", handlers.ListPlans)
@@ -148,11 +172,8 @@ func main() {
 func autoMigrate(db *gorm.DB) {
 	log.Println("Running migrations...")
 	db.AutoMigrate(
-		&models.Organization{},
 		&models.User{},
-		&models.Membership{},
 		&models.Plan{},
-		&models.Subscription{},
 		&models.ApiKey{},
 		&models.AuditLog{},
 		&models.Site{},
@@ -170,6 +191,7 @@ func autoMigrate(db *gorm.DB) {
 	)
 
 	seedPlans(db)
+	models.BackfillPlans(db)
 	ensureNullablePrepColumns(db)
 	models.MigrateAnalytics(db)
 	models.CreateAnalyticsViews(db)
@@ -201,17 +223,24 @@ func dropResumeAnalysisFK(db *gorm.DB) {
 	db.Exec("ALTER TABLE resume_analyses DROP INDEX fk_resume_analyses_resume")
 }
 
+// seedPlans garante que os planos base existam. Não sobrescreve planos já
+// cadastrados: a partir da gestão pelo administrador (spec 012), os valores
+// persistidos são a fonte da verdade e não devem ser resetados a cada boot.
 func seedPlans(db *gorm.DB) {
 	plans := []models.Plan{
 		{
-			Name: "Free", Slug: "free", PriceMonthly: 0, PriceYearly: 0,
-			MaxJobs: 1000, MaxResumes: 1, MaxSites: 5,
-			Features: `["1000 vagas", "1 currículo", "5 fontes", "Matching básico"]`,
+			Name: "Free", Slug: "free", Type: models.PlanTypeFree, Active: true, IsDefault: true,
+			PriceMonthly: 0, PriceYearly: 0,
+			MaxJobs: 1000, MaxResumeAnalyses: 1, MaxSites: 5,
+			AIMatching: false, InterviewPrep: false,
+			Features: `["Matching básico"]`,
 		},
 		{
-			Name: "Pro", Slug: "pro", PriceMonthly: 4900, PriceYearly: 49000,
-			MaxJobs: -1, MaxResumes: 3, MaxSites: 25,
-			Features: `["Vagas ilimitadas", "3 currículos", "25 fontes", "Matching por IA"]`,
+			Name: "Pro", Slug: "pro", Type: models.PlanTypePaid, Active: true,
+			PriceMonthly: 4900, PriceYearly: 49000,
+			MaxJobs: -1, MaxResumeAnalyses: 3, MaxSites: 25,
+			AIMatching: true, InterviewPrep: true,
+			Features: `[]`,
 		},
 	}
 
@@ -219,18 +248,31 @@ func seedPlans(db *gorm.DB) {
 		var existing models.Plan
 		if err := db.Where("slug = ?", plan.Slug).First(&existing).Error; err != nil {
 			db.Create(&plan)
-		} else {
-			plan.ID = existing.ID
-			db.Model(&existing).Updates(plan)
 		}
 	}
 }
+
+// backfillPlans preenche as colunas de gestão (type/active/is_default) em
+// bancos que já existiam antes da spec 012, de forma idempotente (FR-012).
+// A implementação vive em models.BackfillPlans para ser testável (E2E).
 
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return defaultValue
+}
+
+// userDeleteRetention lê a janela de reativação de contas excluídas em dias
+// (default 30). Espelha handlers.userDeleteRetention para o boot do expurgo.
+func userDeleteRetention() time.Duration {
+	days := 30
+	if raw := strings.TrimSpace(os.Getenv("USER_DELETE_RETENTION_DAYS")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
+			days = n
+		}
+	}
+	return time.Duration(days) * 24 * time.Hour
 }
 
 // parseOrigins converte uma lista separada por vírgula de origens permitidas

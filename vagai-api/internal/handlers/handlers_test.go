@@ -221,16 +221,16 @@ func TestShouldBindJSON_Invalid(t *testing.T) {
 func TestHandler_ContextSetGet(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 
-	c.Set("scoped_db", "test_db")
+	c.Set("user_email", "test@example.com")
 	c.Set("user_id", uint(1))
-	c.Set("org_id", uint(10))
+	c.Set("user_role", "admin")
 
-	scopedDB, exists := c.Get("scoped_db")
+	userEmail, exists := c.Get("user_email")
 	if !exists {
-		t.Fatal("scoped_db not found")
+		t.Fatal("user_email not found")
 	}
-	if scopedDB != "test_db" {
-		t.Errorf("scoped_db = %v, expected test_db", scopedDB)
+	if userEmail != "test@example.com" {
+		t.Errorf("user_email = %v, expected test@example.com", userEmail)
 	}
 
 	userID, _ := c.Get("user_id")

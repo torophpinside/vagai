@@ -14,11 +14,11 @@ var resumeInsightsCmd = &cobra.Command{
 currículos, além da frequência de skills nos currículos parseados.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Resume Quality Insights", org)
+		printHeader("Resume Quality Insights", user)
 
 		type itemCount struct {
 			Item string
@@ -29,15 +29,15 @@ currículos, além da frequência de skills nos currículos parseados.`,
 				SELECT jt.item AS item, COUNT(*) AS cnt
 				FROM resume_analyses t,
 					JSON_TABLE(t.%s, '$[*]' COLUMNS (item VARCHAR(500) PATH '$')) jt
-				WHERE t.organization_id = ? AND JSON_VALID(t.%s)
+				WHERE t.user_id = ? AND JSON_VALID(t.%s)
 				GROUP BY jt.item ORDER BY cnt DESC LIMIT %d`, column, column, limit)
 			var rows []itemCount
-			err := db.DB.Raw(q, org).Scan(&rows).Error
+			err := db.DB.Raw(q, user).Scan(&rows).Error
 			return rows, err
 		}
 
 		var total int64
-		db.DB.Table("resume_analyses").Where("organization_id = ?", org).Count(&total)
+		db.DB.Table("resume_analyses").Where("user_id = ?", user).Count(&total)
 		if total == 0 {
 			fmt.Println("Nenhuma análise de currículo disponível.")
 			fmt.Println("Dica: analise currículos (resumes/analyze) para gerar este relatório.")
@@ -70,8 +70,8 @@ currículos, além da frequência de skills nos currículos parseados.`,
 			SELECT LOWER(jt.item) AS item, COUNT(*) AS cnt
 			FROM resumes r,
 				JSON_TABLE(r.data, '$.skills[*]' COLUMNS (item VARCHAR(200) PATH '$')) jt
-			WHERE r.organization_id = ? AND JSON_VALID(r.data)
-			GROUP BY LOWER(jt.item) ORDER BY cnt DESC LIMIT 20`, org).Scan(&skills).Error; err != nil {
+			WHERE r.user_id = ? AND JSON_VALID(r.data)
+			GROUP BY LOWER(jt.item) ORDER BY cnt DESC LIMIT 20`, user).Scan(&skills).Error; err != nil {
 			return err
 		}
 		fmt.Println("\nSkills mais frequentes:")

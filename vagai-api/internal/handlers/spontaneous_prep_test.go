@@ -10,18 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// doSpontaneous invoca o handler diretamente com um org_id no contexto.
+// doSpontaneous invoca o handler diretamente com um user_id no contexto.
 // US2 agora persiste, então os casos de sucesso (geração + persistência) vivem
 // nos testes de ponta a ponta (spontaneous_prep_e2e_test.go). Aqui ficam apenas
 // os casos de validação pré-banco: erros que ocorrem antes de qualquer acesso
-// ao banco (org ausente, JSON malformado, descrição vazia).
-func doSpontaneous(t *testing.T, orgID uint, body string) *httptest.ResponseRecorder {
+// ao banco (usuário ausente, JSON malformado, descrição vazia).
+func doSpontaneous(t *testing.T, userID uint, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	t.Setenv("LMSTUDIO_URL", "http://127.0.0.1:59999")
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("org_id", orgID)
+	c.Set("user_id", userID)
 	c.Request = httptest.NewRequest("POST", "/api/interview-prep/spontaneous", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
@@ -53,8 +53,8 @@ func TestCreateSpontaneousPreparation_MalformedJSON(t *testing.T) {
 	}
 }
 
-// T011 [US2] Claim de organização ausente => 401.
-func TestCreateSpontaneousPreparation_MissingOrganizationClaim(t *testing.T) {
+// T011 [US2] Claim de usuário ausente => 401.
+func TestCreateSpontaneousPreparation_MissingUserClaim(t *testing.T) {
 	w := doSpontaneous(t, 0, `{"description":"`+handlerSpontaneousDesc+`"}`)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d (body=%s)", w.Code, w.Body.String())

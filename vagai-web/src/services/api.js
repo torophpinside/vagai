@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query'
-import { toValue } from 'vue'
+import { computed, toValue } from 'vue'
 import axios from 'axios'
 
 const API_URL = '/api'
@@ -47,11 +47,11 @@ export const useAnalyticsJobTrends = (params = {}) => {
   })
 }
 
-export const useAnalyticsOrgMetrics = (orgId) => {
+export const useAnalyticsUserMetrics = (userId) => {
   return useQuery({
-    queryKey: ['analytics', 'org-metrics', orgId],
-    queryFn: () => api.get(`/v1/analytics/org/${orgId}`).then(res => res.data),
-    enabled: !!orgId
+    queryKey: ['analytics', 'user-metrics', userId],
+    queryFn: () => api.get(`/v1/analytics/user/${userId}`).then(res => res.data),
+    enabled: userId != null
   })
 }
 
@@ -126,8 +126,8 @@ export const useMatches = (filters = {}) => {
   })
 }
 
-export const useSites = () => {
-  return useQuery({ queryKey: ['sites'], queryFn: () => api.get('/sites').then(res => res.data) })
+export const useSites = (options = {}) => {
+  return useQuery({ queryKey: ['sites'], queryFn: () => api.get('/sites').then(res => res.data), ...options })
 }
 
 export const useResumes = () => {
@@ -151,8 +151,37 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
-export const useNegativeKeywords = () => {
-  return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data) })
+export const useAdminPlans = () => {
+  return useQuery({ queryKey: ['plans', 'admin'], queryFn: () => api.get('/admin/plans').then(res => res.data) })
+}
+
+export const adminCreatePlan = (data) => api.post('/admin/plans', data)
+export const adminUpdatePlan = (id, data) => api.patch(`/admin/plans/${id}`, data)
+
+export const useAdminUsers = (filters = {}) => {
+  return useQuery({
+    queryKey: ['admin', 'users', filters],
+    queryFn: () => api.get('/admin/users', { params: toValue(filters) }).then(res => res.data)
+  })
+}
+
+export const useAdminUser = (id) => {
+  return useQuery({
+    queryKey: ['admin', 'user', id],
+    queryFn: () => api.get(`/admin/users/${toValue(id)}`).then(res => res.data),
+    enabled: computed(() => toValue(id) != null)
+  })
+}
+
+export const adminUpdateUser = (id, data) => api.patch(`/admin/users/${id}`, data)
+export const adminAssignPlan = (id, planSlug) => api.patch(`/admin/users/${id}/plan`, { plan_slug: planSlug })
+export const adminSuspendUser = (id) => api.post(`/admin/users/${id}/suspend`)
+export const adminRestoreUser = (id) => api.post(`/admin/users/${id}/restore`)
+export const adminDeleteUser = (id) => api.delete(`/admin/users/${id}`)
+export const adminReactivateUser = (id) => api.post(`/admin/users/${id}/reactivate`)
+
+export const useNegativeKeywords = (options = {}) => {
+  return useQuery({ queryKey: ['negative-keywords'], queryFn: () => api.get('/negative-keywords').then(res => res.data), ...options })
 }
 
 export const listSites = () => api.get('/sites').then(res => res.data)

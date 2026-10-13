@@ -111,9 +111,9 @@ func truncateRunes(s string, max int) string {
 // determinístico) e grava tudo em uma única transação: ou a preparação e todas
 // as perguntas existem, ou nenhuma linha é criada. Cada chamada cria uma
 // preparação nova e independente — nada é sobrescrito.
-func CreatePersistedSpontaneousPreparation(db *gorm.DB, orgID uint, title, company, description, seed string) (*models.InterviewPreparation, error) {
-	if orgID == 0 {
-		return nil, errors.New("organization_id é obrigatório")
+func CreatePersistedSpontaneousPreparation(db *gorm.DB, userID uint, title, company, description, seed string) (*models.InterviewPreparation, error) {
+	if userID == 0 {
+		return nil, errors.New("user_id é obrigatório")
 	}
 
 	result, err := GenerateSpontaneousPreparation(context.Background(), title, company, description, seed)
@@ -124,7 +124,7 @@ func CreatePersistedSpontaneousPreparation(db *gorm.DB, orgID uint, title, compa
 	var prep models.InterviewPreparation
 	err = db.Transaction(func(tx *gorm.DB) error {
 		prep = models.InterviewPreparation{
-			OrganizationID: orgID,
+			UserID: userID,
 			Title:          result.Title,
 			Company:        result.Company,
 			Description:    result.Description,
@@ -138,7 +138,7 @@ func CreatePersistedSpontaneousPreparation(db *gorm.DB, orgID uint, title, compa
 
 		for i, q := range result.Questions {
 			q.ID = 0
-			q.OrganizationID = orgID
+			q.UserID = userID
 			q.PreparationID = prep.ID
 			q.Position = i + 1
 			if err := tx.Create(&q).Error; err != nil {
@@ -148,7 +148,7 @@ func CreatePersistedSpontaneousPreparation(db *gorm.DB, orgID uint, title, compa
 		return nil
 	})
 	if err != nil {
-		log.Printf("SpontaneousPrep persist (org=%d) error: %v", orgID, err)
+		log.Printf("SpontaneousPrep persist (org=%d) error: %v", userID, err)
 		return nil, err
 	}
 

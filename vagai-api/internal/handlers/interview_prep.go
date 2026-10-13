@@ -69,7 +69,7 @@ type interviewPrepAnalysisDTO struct {
 
 type interviewPrepDTO struct {
 	ID             uint                              `json:"id"`
-	OrganizationID uint                              `json:"organization_id"`
+	UserID uint                              `json:"user_id"`
 	MatchID        uint                              `json:"match_id"`
 	JobID          uint                              `json:"job_id"`
 	Title          string                            `json:"title"`
@@ -92,7 +92,7 @@ func newInterviewPrepDTO(detail *services.PreparationDetail) interviewPrepDTO {
 
 	dto := interviewPrepDTO{
 		ID:             prep.ID,
-		OrganizationID: prep.OrganizationID,
+		UserID: prep.UserID,
 		Title:          prep.Title,
 		Company:        prep.Company,
 		Description:    prep.Description,
@@ -205,7 +205,7 @@ func progressCounts(questions []models.InterviewQuestion) (total, practiced, mas
 
 func CreateInterviewPrep(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var req struct {
 		MatchID  uint   `json:"match_id"`
@@ -223,7 +223,7 @@ func CreateInterviewPrep(c *gin.Context) {
 		seed = req.Random
 	}
 
-	prep, _, err := services.CreateOrRegeneratePreparation(db, orgID, req.MatchID, seed)
+	prep, _, err := services.CreateOrRegeneratePreparation(db, userID, req.MatchID, seed)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrMatchNotFound):
@@ -236,7 +236,7 @@ func CreateInterviewPrep(c *gin.Context) {
 		return
 	}
 
-	detail, derr := services.GetPreparationDetail(db, orgID, prep.ID)
+	detail, derr := services.GetPreparationDetail(db, userID, prep.ID)
 	if derr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao carregar preparação"})
 		return
@@ -252,8 +252,8 @@ func CreateInterviewPrep(c *gin.Context) {
 // montada (reusa newInterviewPrepDTO).
 func CreateSpontaneousPreparation(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
-	if orgID == 0 {
+	userID := c.GetUint("user_id")
+	if userID == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Organização inválida"})
 		return
 	}
@@ -276,18 +276,18 @@ func CreateSpontaneousPreparation(c *gin.Context) {
 		seed = req.AtRandom
 	}
 
-	prep, err := services.CreatePersistedSpontaneousPreparation(db, orgID, req.Title, req.Company, req.Description, seed)
+	prep, err := services.CreatePersistedSpontaneousPreparation(db, userID, req.Title, req.Company, req.Description, seed)
 	if err != nil {
 		if errors.Is(err, services.ErrSpontaneousDescriptionRequired) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Conteúdo da vaga é obrigatório"})
 			return
 		}
-		log.Printf("CreateSpontaneousPreparation (org=%d) error: %v", orgID, err)
+		log.Printf("CreateSpontaneousPreparation (org=%d) error: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar preparação"})
 		return
 	}
 
-	detail, derr := services.GetPreparationDetail(db, orgID, prep.ID)
+	detail, derr := services.GetPreparationDetail(db, userID, prep.ID)
 	if derr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao carregar preparação"})
 		return
@@ -298,7 +298,7 @@ func CreateSpontaneousPreparation(c *gin.Context) {
 
 func ListInterviewPreps(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	var matchID *uint
 	if v := c.Query("match_id"); v != "" {
@@ -311,7 +311,7 @@ func ListInterviewPreps(c *gin.Context) {
 		matchID = &mid
 	}
 
-	preps, err := services.ListPreparations(db, orgID, matchID)
+	preps, err := services.ListPreparations(db, userID, matchID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar preparações"})
 		return
@@ -319,7 +319,7 @@ func ListInterviewPreps(c *gin.Context) {
 
 	data := make([]interviewPrepDTO, 0, len(preps))
 	for i := range preps {
-		detail, err := services.GetPreparationDetail(db, orgID, preps[i].ID)
+		detail, err := services.GetPreparationDetail(db, userID, preps[i].ID)
 		if err != nil {
 			continue
 		}
@@ -331,7 +331,7 @@ func ListInterviewPreps(c *gin.Context) {
 
 func GetInterviewPrep(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	prepID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || prepID == 0 {
@@ -339,7 +339,7 @@ func GetInterviewPrep(c *gin.Context) {
 		return
 	}
 
-	detail, err := services.GetPreparationDetail(db, orgID, uint(prepID))
+	detail, err := services.GetPreparationDetail(db, userID, uint(prepID))
 	if err != nil {
 		if errors.Is(err, services.ErrPrepNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Preparação não encontrada"})
@@ -357,7 +357,7 @@ func GetInterviewPrep(c *gin.Context) {
 // chegam no GET enquanto roda em background.
 func VerifyInterviewPrep(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	prepID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || prepID == 0 {
@@ -365,7 +365,7 @@ func VerifyInterviewPrep(c *gin.Context) {
 		return
 	}
 
-	_, err = services.VerifyPreparation(db, orgID, uint(prepID))
+	_, err = services.VerifyPreparation(db, userID, uint(prepID))
 	if err != nil {
 		var inc *services.PrepIncompleteError
 		switch {
@@ -383,7 +383,7 @@ func VerifyInterviewPrep(c *gin.Context) {
 		return
 	}
 
-	ver, err := services.GetPreparationVerification(db, orgID, uint(prepID))
+	ver, err := services.GetPreparationVerification(db, userID, uint(prepID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao verificar preparação"})
 		return
@@ -398,7 +398,7 @@ func VerifyInterviewPrep(c *gin.Context) {
 
 func UpdateQuestionStatus(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	prepID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || prepID == 0 {
@@ -419,7 +419,7 @@ func UpdateQuestionStatus(c *gin.Context) {
 		return
 	}
 
-	q, err := services.UpdateQuestionStatus(db, orgID, uint(prepID), uint(questionID), models.InterviewQuestionStatus(req.Status))
+	q, err := services.UpdateQuestionStatus(db, userID, uint(prepID), uint(questionID), models.InterviewQuestionStatus(req.Status))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidQuestionStatus):
@@ -447,7 +447,7 @@ func UpdateQuestionStatus(c *gin.Context) {
 
 func SaveQuestionAnswer(c *gin.Context) {
 	db := getDB(c)
-	orgID := c.GetUint("org_id")
+	userID := c.GetUint("user_id")
 
 	prepID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || prepID == 0 {
@@ -470,7 +470,7 @@ func SaveQuestionAnswer(c *gin.Context) {
 		return
 	}
 
-	entry, err := services.SaveQuestionAnswer(db, orgID, uint(prepID), uint(questionID), req.Answer, req.SelfAssessment, req.TimeSpentSeconds)
+	entry, err := services.SaveQuestionAnswer(db, userID, uint(prepID), uint(questionID), req.Answer, req.SelfAssessment, req.TimeSpentSeconds)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidSelfAssessment):

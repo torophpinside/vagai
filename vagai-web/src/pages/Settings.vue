@@ -2,7 +2,7 @@
   <div class="space-y-12">
     <div>
       <h1 class="text-4xl font-bold text-white mb-2 font-outfit tracking-tight">Configurações</h1>
-      <p class="text-slate-400">Personalize seu scanner, gerencie sua equipe e seu plano.</p>
+      <p class="text-slate-400">{{ isAdmin ? 'Atualize seus dados pessoais.' : 'Personalize seu scanner e gerencie seu plano.' }}</p>
     </div>
 
     <!-- Perfil do Usuário -->
@@ -38,18 +38,7 @@
     </div>
 
     <!-- Quick Links -->
-    <div class="grid grid-cols-2 gap-6">
-      <router-link to="/settings/team" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
-        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
-            <Users class="w-6 h-6" />
-          </div>
-          <div>
-            <h3 class="font-bold text-white">Equipe</h3>
-            <p class="text-sm text-slate-400">Gerencie membros da organização</p>
-          </div>
-        </div>
-      </router-link>
+    <div v-if="!isAdmin" class="grid grid-cols-1 gap-6">
       <router-link to="/settings/billing" class="glass-card p-6 hover:border-indigo-500/30 transition-all cursor-pointer group">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
@@ -63,7 +52,7 @@
       </router-link>
     </div>
     
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+    <div v-if="!isAdmin" class="grid grid-cols-1 lg:grid-cols-2 gap-12">
       <div class="glass-card p-10">
         <div class="flex items-center gap-3 mb-8">
           <div class="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
@@ -132,7 +121,7 @@
       </div>
     </div>
 
-    <div class="glass-card p-10">
+    <div v-if="!isAdmin" class="glass-card p-10">
       <div class="flex items-center gap-3 mb-8">
         <div class="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-400">
           <Ban class="w-6 h-6" />
@@ -171,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { addSite, updateSite, deleteSite, useSites, useMe, updateProfile, useNegativeKeywords, updateNegativeKeywords } from '../services/api'
 import { useAuth } from '../composables/auth'
@@ -180,7 +169,6 @@ import {
   Plus,
   Trash2,
   ExternalLink,
-  Users,
   CreditCard,
   Power,
   MapPin,
@@ -189,14 +177,15 @@ import {
 } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
-const { updateUser } = useAuth()
+const { updateUser, user } = useAuth()
+const isAdmin = computed(() => user.value?.role === 'admin')
 const newSite = ref({ name: '', url: '' })
 const newKeyword = ref('')
 const keywords = ref([])
 
-const sitesQuery = useSites()
+const sitesQuery = useSites({ enabled: !isAdmin.value })
 const meQuery = useMe()
-const negativeKeywordsQuery = useNegativeKeywords()
+const negativeKeywordsQuery = useNegativeKeywords({ enabled: !isAdmin.value })
 
 const sites = sitesQuery.data
 const sitesLoading = sitesQuery.isLoading

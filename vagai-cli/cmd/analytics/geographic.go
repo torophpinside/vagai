@@ -122,48 +122,51 @@ var geographicCmd = &cobra.Command{
 trabalho remoto.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Geographic & Demographic Insights", org)
+		printHeader("Geographic & Demographic Insights", user)
 
-		// Estado vazio (T069): zero usuários com membership E zero vagas.
+		// Estado vazio (T069): zero usuários no escopo E zero vagas.
+		userScope := ""
+		var userArgs []any
+		if user > 0 {
+			userScope = " AND u.id = ?"
+			userArgs = append(userArgs, user)
+		}
 		var users, jobs int64
 		if err := db.DB.Raw(`
-			SELECT COUNT(DISTINCT u.id)
-			FROM users u JOIN memberships ms
-				ON ms.user_id = u.id AND ms.organization_id = ?
-			WHERE u.deleted_at IS NULL`, org).Scan(&users).Error; err != nil {
+			SELECT COUNT(*)
+			FROM users u
+			WHERE u.deleted_at IS NULL`+userScope, userArgs...).Scan(&users).Error; err != nil {
 			return err
 		}
-		if err := db.DB.Table("jobs").Where("organization_id = ?", org).Count(&jobs).Error; err != nil {
+		if err := db.DB.Table("jobs").Where("user_id = ?", user).Count(&jobs).Error; err != nil {
 			return err
 		}
 		if users == 0 && jobs == 0 {
 			fmt.Println("Nenhuma informação geográfica disponível.")
-			fmt.Println("Dica: cadastre usuários na organização e colete vagas (crawler) para gerar este relatório.")
+			fmt.Println("Dica: cadastre usuários e colete vagas (crawler) para gerar este relatório.")
 			return nil
 		}
 
 		// T065 — usuários por cidade (top 10) e por fuso horário (top 10).
 		printGeoNameCount("Usuários por cidade (top 10)", `
-			SELECT u.city AS name, COUNT(DISTINCT u.id) AS cnt
-			FROM users u JOIN memberships ms
-				ON ms.user_id = u.id AND ms.organization_id = ?
-			WHERE u.deleted_at IS NULL AND u.city <> ''
-			GROUP BY u.city ORDER BY cnt DESC LIMIT 10`, org, users)
+			SELECT u.city AS name, COUNT(*) AS cnt
+			FROM users u
+			WHERE u.deleted_at IS NULL AND u.city <> ''`+userScope+`
+			GROUP BY u.city ORDER BY cnt DESC LIMIT 10`, user, users)
 
 		printGeoNameCount("Usuários por fuso horário (top 10)", `
-			SELECT u.timezone AS name, COUNT(DISTINCT u.id) AS cnt
-			FROM users u JOIN memberships ms
-				ON ms.user_id = u.id AND ms.organization_id = ?
-			WHERE u.deleted_at IS NULL AND u.timezone <> ''
-			GROUP BY u.timezone ORDER BY cnt DESC LIMIT 10`, org, users)
+			SELECT u.timezone AS name, COUNT(*) AS cnt
+			FROM users u
+			WHERE u.deleted_at IS NULL AND u.timezone <> ''`+userScope+`
+			GROUP BY u.timezone ORDER BY cnt DESC LIMIT 10`, user, users)
 
 		// T066 — vagas por cidade (uma única passada com SUMs condicionais).
 		refs := geoCityRefs()
-		byCity, byState, err := geoJobsByLocation(org, refs)
+		byCity, byState, err := geoJobsByLocation(user, refs)
 		if err != nil {
 			return err
 		}
@@ -198,7 +201,7 @@ trabalho remoto.`,
 			SELECT COUNT(*) AS total,
 				COALESCE(SUM(LOWER(CONCAT(COALESCE(title,''),' ',COALESCE(description,'')))
 					REGEXP 'remote|remoto|home office|teletrabalho|hibrido remoto'),0) AS remote
-			FROM jobs WHERE organization_id = ?`, org).Scan(&remote).Error; err != nil {
+			FROM jobs WHERE user_id = ?`, user).Scan(&remote).Error; err != nil {
 			return err
 		}
 		total, remoteN := int64(remote.Total), int64(remote.Remote)
@@ -215,9 +218,9 @@ trabalho remoto.`,
 }
 
 // printGeoNameCount imprime uma seção de agregação name/cnt com percentual.
-func printGeoNameCount(title, query string, org uint, total int64) {
+func printGeoNameCount(title, query string, user uint, total int64) {
 	var rows []geoNameCount
-	if err := db.DB.Raw(query, org).Scan(&rows).Error; err != nil {
+	if err := db.DB.Raw(query, user).Scan(&rows).Error; err != nil {
 		fmt.Printf("\n%s:\n  (erro: %v)\n", title, err)
 		return
 	}
@@ -233,9 +236,9 @@ func printGeoNameCount(title, query string, org uint, total int64) {
 
 // geoJobsByLocation varre as vagas uma única vez com SUMs condicionais por
 // cidade (T066) e deriva o total por UF a partir das cidades casadas.
-func geoJobsByLocation(org uint, refs []geoCityRef) ([]geoCityCount, []geoStateCount, error) {
+func geoJobsByLocation(user uint, refs []geoCityRef) ([]geoCityCount, []geoStateCount, error) {
 	q := geoJobsByCitySQL(refs)
-	rows, err := db.DB.Raw(q, org).Rows()
+	rows, err := db.DB.Raw(q, user).Rows()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -339,7 +342,7 @@ func geoJobsByCitySQL(refs []geoCityRef) string {
 		}
 		fmt.Fprintf(&b, "SUM(%s LIKE '%%%s%%') AS c%d", haystack, ref.Name, i)
 	}
-	b.WriteString(" FROM jobs WHERE organization_id = ?")
+	b.WriteString(" FROM jobs WHERE user_id = ?")
 	return b.String()
 }
 

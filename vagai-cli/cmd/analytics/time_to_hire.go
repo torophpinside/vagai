@@ -16,15 +16,15 @@ var timeToHireCmd = &cobra.Command{
 coleta→match, match→análise IA e coleta→candidatura, com nº de amostras.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		org, err := mustSetup(cmd)
+		user, err := mustSetup(cmd)
 		if err != nil {
 			return err
 		}
-		printHeader("Time to Hire", org)
+		printHeader("Time to Hire", user)
 
 		var total int64
 		if err := db.DB.Table("matches").
-			Where("organization_id = ?", org).
+			Where("user_id = ?", user).
 			Count(&total).Error; err != nil {
 			return err
 		}
@@ -38,7 +38,7 @@ coleta→match, match→análise IA e coleta→candidatura, com nº de amostras.
 		match, err := tthStage(db.DB,
 			"GREATEST(0, DATEDIFF(matches.analyzed_at, jobs.collected_at))",
 			"matches JOIN jobs ON jobs.id = matches.job_id",
-			"matches.organization_id = ?", org)
+			"matches.user_id = ?", user)
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ coleta→match, match→análise IA e coleta→candidatura, com nº de amostras.
 			"ai_analysis_results"+
 				" JOIN interview_preparations ip ON ip.id = ai_analysis_results.preparation_id"+
 				" JOIN matches m ON m.id = ip.match_id",
-			"m.organization_id = ?", org)
+			"m.user_id = ?", user)
 		if err != nil {
 			return err
 		}
@@ -58,8 +58,8 @@ coleta→match, match→análise IA e coleta→candidatura, com nº de amostras.
 		apply, err := tthStage(db.DB,
 			"GREATEST(0, DATEDIFF(matches.applied_at, jobs.collected_at))",
 			"matches JOIN jobs ON jobs.id = matches.job_id",
-			"matches.applied = TRUE AND matches.applied_at IS NOT NULL AND matches.organization_id = ?",
-			org)
+			"matches.applied = TRUE AND matches.applied_at IS NOT NULL AND matches.user_id = ?",
+			user)
 		if err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ type tthStageStats struct {
 
 // tthStage calcula média, mediana e amostras (COUNT(*) do JOIN) de uma etapa
 // em dias. daysExpr é a expressão GREATEST(0, DATEDIFF(...)), fromSQL o
-// FROM/JOIN e whereCond a cláusula WHERE completa (no CLI o org é sempre > 0).
+// FROM/JOIN e whereCond a cláusula WHERE completa (no CLI o user é sempre > 0).
 // O relatório imprime os valores com 2 casas (%.2f); sem linhas tudo sai 0.
 func tthStage(gdb *gorm.DB, daysExpr, fromSQL, whereCond string, args ...any) (tthStageStats, error) {
 	var out tthStageStats

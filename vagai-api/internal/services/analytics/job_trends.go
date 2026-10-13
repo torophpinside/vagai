@@ -25,18 +25,18 @@ var ValidPeriods = map[string]bool{
 // (FR-012, US3 — T022–T025).
 //
 // Retorna nil quando a organização (ou a visão global) não possui vagas.
-func (s *Service) JobTrends(ctx context.Context, orgID uint, period string, opts PageOptions) (*models.JobMarketTrends, error) {
+func (s *Service) JobTrends(ctx context.Context, userID uint, period string, opts PageOptions) (*models.JobMarketTrends, error) {
 	period = periodOrDefault(period)
 	db, ctx, cancel := s.ctxDB(ctx)
 	defer cancel()
 
-	key := fmt.Sprintf("org:%d:job-trends:%s:page:%d:size:%d", orgID, period, opts.Page, opts.PageSize)
+	key := fmt.Sprintf("org:%d:job-trends:%s:page:%d:size:%d", userID, period, opts.Page, opts.PageSize)
 	return cachedValue(ctx, s, key, func(ctx context.Context) (*models.JobMarketTrends, error) {
-		return loadJobTrends(db, orgID, period, opts)
+		return loadJobTrends(db, userID, period, opts)
 	})
 }
 
-func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*models.JobMarketTrends, error) {
+func loadJobTrends(db *gorm.DB, userID uint, period string, opts PageOptions) (*models.JobMarketTrends, error) {
 	// T022 — distribuição de status por organização.
 	type statusRow struct {
 		Status models.JobStatus
@@ -44,8 +44,8 @@ func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*m
 	}
 	var statusRows []statusRow
 	q := db.Table("jobs").Select("status, COUNT(*) AS cnt").Group("status")
-	if orgID > 0 {
-		q = q.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		q = q.Where("user_id = ?", userID)
 	}
 	if err := q.Scan(&statusRows).Error; err != nil {
 		return nil, err
@@ -61,31 +61,31 @@ func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*m
 		return nil, nil
 	}
 
-	// T023 — top 5 organizações ativas por volume de vagas.
-	type orgRow struct {
-		OrganizationID uint
-		Name           string
-		JobCount       int64
+	// T023 — top 5 usuários ativos por volume de vagas.
+	type userRow struct {
+		UserID   uint
+		Name     string
+		JobCount int64
 	}
-	var orgRows []orgRow
-	orgQ := db.Table("jobs").
-		Select("jobs.organization_id, organizations.name, COUNT(*) AS job_count").
-		Joins("JOIN organizations ON organizations.id = jobs.organization_id").
-		Group("jobs.organization_id, organizations.name").
+	var userRows []userRow
+	userQ := db.Table("jobs").
+		Select("jobs.user_id, users.name, COUNT(*) AS job_count").
+		Joins("JOIN users ON users.id = jobs.user_id").
+		Group("jobs.user_id, users.name").
 		Order("job_count DESC").
 		Limit(5)
-	if orgID > 0 {
-		orgQ = orgQ.Where("jobs.organization_id = ?", orgID)
+	if userID > 0 {
+		userQ = userQ.Where("jobs.user_id = ?", userID)
 	}
-	if err := orgQ.Scan(&orgRows).Error; err != nil {
+	if err := userQ.Scan(&userRows).Error; err != nil {
 		return nil, err
 	}
-	topOrgs := make([]models.OrganizationSummary, 0, len(orgRows))
-	for _, r := range orgRows {
-		topOrgs = append(topOrgs, models.OrganizationSummary{
-			OrganizationID: r.OrganizationID,
-			Name:           r.Name,
-			JobCount:       r.JobCount,
+	topUsers := make([]models.UserSummary, 0, len(userRows))
+	for _, r := range userRows {
+		topUsers = append(topUsers, models.UserSummary{
+			UserID:   r.UserID,
+			Name:     r.Name,
+			JobCount: r.JobCount,
 		})
 	}
 
@@ -99,8 +99,8 @@ func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*m
 	var volTotal int64
 	countQ := db.Table("jobs").Select(fmt.Sprintf("COUNT(DISTINCT %s)", bucketExpr)).
 		Where("COALESCE(posted_date, collected_at) IS NOT NULL")
-	if orgID > 0 {
-		countQ = countQ.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		countQ = countQ.Where("user_id = ?", userID)
 	}
 	if err := countQ.Scan(&volTotal).Error; err != nil {
 		return nil, err
@@ -110,8 +110,8 @@ func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*m
 	volQ := db.Table("jobs").
 		Select(fmt.Sprintf("%s AS period, COUNT(*) AS cnt", bucketExpr)).
 		Where("COALESCE(posted_date, collected_at) IS NOT NULL")
-	if orgID > 0 {
-		volQ = volQ.Where("organization_id = ?", orgID)
+	if userID > 0 {
+		volQ = volQ.Where("user_id = ?", userID)
 	}
 	if err := volQ.Group("period").Order("period DESC").
 		Offset(opts.Offset()).Limit(opts.Limit()).
@@ -125,20 +125,20 @@ func loadJobTrends(db *gorm.DB, orgID uint, period string, opts PageOptions) (*m
 
 	// T025 — empresas ativas: organizações com >0 vagas.
 	var active int64
-	activeQ := db.Table("jobs").Select("COUNT(DISTINCT organization_id)")
-	if orgID > 0 {
-		activeQ = activeQ.Where("organization_id = ?", orgID)
+	activeQ := db.Table("jobs").Select("COUNT(DISTINCT user_id)")
+	if userID > 0 {
+		activeQ = activeQ.Where("user_id = ?", userID)
 	}
 	if err := activeQ.Scan(&active).Error; err != nil {
 		return nil, err
 	}
 
 	return &models.JobMarketTrends{
-		JobsByStatus:     byStatus,
-		TopOrganizations: topOrgs,
-		PostingVolume:    volume,
-		ActiveCompanies:  active,
-		TotalJobs:        total,
+		JobsByStatus:       byStatus,
+		TopUsers:           topUsers,
+		PostingVolume:      volume,
+		ActiveCompanies:    active,
+		TotalJobs:          total,
 		PostingVolumeTotal: volTotal,
 	}, nil
 }

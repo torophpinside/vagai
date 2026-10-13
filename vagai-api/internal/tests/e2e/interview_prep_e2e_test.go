@@ -11,7 +11,7 @@ import (
 // frontend's expectation for the "respondidas" counter.
 func TestInterviewPrep_AnsweredCountReactivity(t *testing.T) {
 	token, _ := registerUser(t, "Reactive User", "reactive@example.com", "password123", "Reactive Org")
-	orgID := getOrgID(t, token)
+	orgID := getUserID(t, token)
 
 	matchID := setupAppliedMatch(t, token, orgID,
 		"https://example.com/job/reactive", "Backend Developer", fixedCountTechDescription)

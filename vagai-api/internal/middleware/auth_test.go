@@ -17,7 +17,7 @@ func init() {
 }
 
 func TestGenerateToken(t *testing.T) {
-	token, err := GenerateToken(1, 10, "test@example.com", "owner")
+	token, err := GenerateToken(1, "test@example.com", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken() error = %v", err)
 	}
@@ -38,19 +38,16 @@ func TestGenerateToken(t *testing.T) {
 	if claims.UserID != 1 {
 		t.Errorf("Claims.UserID = %v, expected 1", claims.UserID)
 	}
-	if claims.OrganizationID != 10 {
-		t.Errorf("Claims.OrganizationID = %v, expected 10", claims.OrganizationID)
-	}
 	if claims.Email != "test@example.com" {
 		t.Errorf("Claims.Email = %v, expected test@example.com", claims.Email)
 	}
-	if claims.Role != "owner" {
-		t.Errorf("Claims.Role = %v, expected owner", claims.Role)
+	if claims.Role != "admin" {
+		t.Errorf("Claims.Role = %v, expected admin", claims.Role)
 	}
 }
 
 func TestGenerateRefreshToken(t *testing.T) {
-	token, err := GenerateRefreshToken(1, 10)
+	token, err := GenerateRefreshToken(1)
 	if err != nil {
 		t.Fatalf("GenerateRefreshToken() error = %v", err)
 	}
@@ -127,7 +124,7 @@ func TestJWTAuth_InvalidToken(t *testing.T) {
 }
 
 func TestJWTAuth_ValidToken(t *testing.T) {
-	token, err := GenerateToken(1, 10, "test@example.com", "owner")
+	token, err := GenerateToken(1, "test@example.com", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken() error = %v", err)
 	}
@@ -137,13 +134,11 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	router.Use(JWTAuth())
 	router.GET("/test", func(c *gin.Context) {
 		userID, _ := c.Get("user_id")
-		orgID, _ := c.Get("org_id")
 		email, _ := c.Get("user_email")
 		role, _ := c.Get("user_role")
 
 		c.JSON(http.StatusOK, gin.H{
 			"user_id": userID,
-			"org_id":  orgID,
 			"email":   email,
 			"role":    role,
 		})
@@ -163,23 +158,19 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	if response["user_id"].(float64) != 1 {
 		t.Errorf("Expected user_id 1, got %v", response["user_id"])
 	}
-	if response["org_id"].(float64) != 10 {
-		t.Errorf("Expected org_id 10, got %v", response["org_id"])
-	}
 	if response["email"] != "test@example.com" {
 		t.Errorf("Expected email test@example.com, got %v", response["email"])
 	}
-	if response["role"] != "owner" {
-		t.Errorf("Expected role owner, got %v", response["role"])
+	if response["role"] != "admin" {
+		t.Errorf("Expected role admin, got %v", response["role"])
 	}
 }
 
 func TestJWTAuth_ExpiredToken(t *testing.T) {
 	claims := Claims{
-		UserID:         1,
-		OrganizationID: 10,
-		Email:          "test@example.com",
-		Role:           "owner",
+		UserID: 1,
+		Email:  "test@example.com",
+		Role:   "admin",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
@@ -227,17 +218,13 @@ func TestGetJWTSecret_Unset(t *testing.T) {
 
 func TestClaimsStruct(t *testing.T) {
 	claims := Claims{
-		UserID:         42,
-		OrganizationID: 100,
-		Email:          "claims@test.com",
-		Role:           "admin",
+		UserID: 42,
+		Email:  "claims@test.com",
+		Role:   "admin",
 	}
 
 	if claims.UserID != 42 {
 		t.Errorf("Claims.UserID = %v, expected 42", claims.UserID)
-	}
-	if claims.OrganizationID != 100 {
-		t.Errorf("Claims.OrganizationID = %v, expected 100", claims.OrganizationID)
 	}
 	if claims.Email != "claims@test.com" {
 		t.Errorf("Claims.Email = %v, expected claims@test.com", claims.Email)
