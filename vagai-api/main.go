@@ -118,6 +118,13 @@ func main() {
 		api.POST("/me/change-password", handlers.ChangePassword)
 		api.POST("/me/plan", handlers.ChangePlan)
 		api.GET("/jobs", handlers.ListJobs)
+
+		// Sabatina situational questions (specs/015-sabatina-questions)
+		sabatina := api.Group("/sabatinas")
+		{
+			sabatina.POST("/:id/questions", handlers.CreateSabatinaQuestions)
+			sabatina.GET("/:id/questions", handlers.GetSabatinaQuestions)
+		}
 		api.POST("/jobs", handlers.CreateJob)
 		api.POST("/jobs/extract", handlers.ExtractJob)
 		api.GET("/jobs/:id", handlers.GetJob)
@@ -157,13 +164,13 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":7000",
 		Handler:      r,
 		ReadTimeout:  240 * time.Second,
 		WriteTimeout: 240 * time.Second,
 	}
 
-	log.Println("VagAI API rodando em :8080")
+	log.Println("VagAI API rodando em :7000")
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Falha ao iniciar servidor: %v", err)
 	}
@@ -188,6 +195,8 @@ func autoMigrate(db *gorm.DB) {
 		&models.PreparationVerification{},
 		&models.AIAnalysisResult{},
 		&models.PreparationVerificationHistory{},
+		&models.SabatinaSession{},
+		&models.Question{},
 	)
 
 	seedPlans(db)
