@@ -82,6 +82,9 @@ func main() {
 		auth.POST("/login", handlers.Login)
 	}
 
+	// Planos públicos para a landing page (sem autenticação; só planos ativos).
+	r.GET("/api/public/plans", handlers.ListPlans)
+
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuth())
 	{
@@ -158,6 +161,7 @@ func main() {
 		api.POST("/interview-prep", handlers.CreateInterviewPrep)
 		api.POST("/interview-prep/spontaneous", handlers.CreateSpontaneousPreparation)
 		api.GET("/interview-prep/:id", handlers.GetInterviewPrep)
+		api.DELETE("/interview-prep/:id", handlers.DeleteInterviewPrep)
 		api.PATCH("/interview-prep/:id/questions/:questionId", handlers.UpdateQuestionStatus)
 		api.POST("/interview-prep/:id/questions/:questionId/answers", handlers.SaveQuestionAnswer)
 		api.POST("/interview-prep/:id/verify", handlers.VerifyInterviewPrep)

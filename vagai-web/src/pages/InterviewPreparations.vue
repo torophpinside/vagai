@@ -35,6 +35,10 @@
             <div class="flex items-center gap-3 mb-2">
               <h3 class="text-xl font-bold text-white font-outfit">{{ prep.title }}</h3>
               <span class="px-2 py-0.5 bg-white/5 rounded text-[10px] text-slate-500 font-mono">{{ prep.id }}</span>
+              <span v-if="prep.job_removed" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/15 border border-red-500/30 text-red-300">
+                <AlertTriangle class="w-3.5 h-3.5" />
+                Vaga removida
+              </span>
             </div>
             <div class="flex items-center gap-4 text-slate-400 text-sm">
               <span class="flex items-center gap-1.5"><Building2 class="w-4 h-4" /> {{ prep.company || 'Sem empresa' }}</span>
@@ -103,6 +107,10 @@
             <Briefcase class="w-4 h-4" />
             Ver candidatadas
           </router-link>
+          <button @click="removePrep(prep)" :disabled="deletingId === prep.id" class="ml-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-sm font-semibold hover:bg-red-500 hover:text-white transition-all disabled:opacity-40 disabled:cursor-wait">
+            <Trash2 class="w-4 h-4" />
+            {{ deletingId === prep.id ? 'Excluindo...' : 'Excluir' }}
+          </button>
         </div>
       </div>
     </div>
@@ -112,8 +120,8 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { useInterviewPreps, verifyInterviewPrep } from '../services/api'
-import { Building2, GraduationCap, Play, Briefcase, Sparkles, RefreshCw, Wand2 } from 'lucide-vue-next'
+import { useInterviewPreps, verifyInterviewPrep, deleteInterviewPrep } from '../services/api'
+import { Building2, GraduationCap, Play, Briefcase, Sparkles, RefreshCw, Wand2, Trash2, AlertTriangle } from 'lucide-vue-next'
 
 const queryClient = useQueryClient()
 const { data: prepsResponse, isLoading } = useInterviewPreps()
@@ -151,6 +159,23 @@ const verifyPrep = async (prep) => {
     console.error('Falha ao verificar respostas', e)
   } finally {
     verifyingId.value = null
+  }
+}
+
+const deletingId = ref(null)
+
+const removePrep = async (prep) => {
+  if (!prep || deletingId.value) return
+  if (!confirm(`Excluir a preparação "${prep.title}"? Esta ação não pode ser desfeita.`)) return
+  deletingId.value = prep.id
+  try {
+    await deleteInterviewPrep(prep.id)
+    await queryClient.invalidateQueries({ queryKey: ['interview-preps'] })
+  } catch (e) {
+    console.error('Falha ao excluir preparação', e)
+    alert(e.response?.data?.error || 'Erro ao excluir preparação')
+  } finally {
+    deletingId.value = null
   }
 }
 

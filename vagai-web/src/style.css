@@ -13,6 +13,10 @@
   --border-color: rgba(255, 255, 255, 0.1);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   @apply bg-[#0f172a] text-slate-50 font-sans;
   font-family: 'Inter', sans-serif;

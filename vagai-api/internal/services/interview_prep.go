@@ -683,6 +683,10 @@ type PreparationDetail struct {
 	Analyses map[uint]models.AIAnalysisResult
 	// History são as tentativas de verificação concluídas (evolução da nota).
 	History []models.PreparationVerificationHistory
+	// JobRemoved é true quando a vaga vinculada deixou de estar candidatada:
+	// o match foi excluído ou voltou a applied=false (spec 018). Preparações
+	// avulsas (sem match) nunca são marcadas.
+	JobRemoved bool
 }
 
 // GetPreparationDetail carrega o detalhe completo de uma preparação. Executa o
@@ -747,7 +751,57 @@ func GetPreparationDetail(db *gorm.DB, userID, prepID uint) (*PreparationDetail,
 	}
 	detail.Verification = ver
 
+	if prep.MatchID != nil {
+		var applied int64
+		if err := db.Model(&models.Match{}).
+			Where("id = ? AND user_id = ? AND applied = ?", *prep.MatchID, userID, true).
+			Count(&applied).Error; err != nil {
+			return nil, err
+		}
+		detail.JobRemoved = applied == 0
+	}
+
 	return detail, nil
+}
+
+// DeletePreparation exclui a preparação do tenant com perguntas, respostas,
+// verificação, histórico e feedbacks. O Match vinculado não é tocado (spec 018).
+// Retorna ErrPrepNotFound quando a preparação não existe ou é de outro tenant.
+func DeletePreparation(db *gorm.DB, userID, prepID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var prep models.InterviewPreparation
+		if err := tx.Where("id = ? AND user_id = ?", prepID, userID).First(&prep).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrPrepNotFound
+			}
+			return err
+		}
+
+		var qids []uint
+		if err := tx.Model(&models.InterviewQuestion{}).
+			Where("user_id = ? AND preparation_id = ?", userID, prep.ID).
+			Pluck("id", &qids).Error; err != nil {
+			return err
+		}
+		if len(qids) > 0 {
+			if err := tx.Where("user_id = ? AND question_id IN ?", userID, qids).
+				Delete(&models.PracticeEntry{}).Error; err != nil {
+				return err
+			}
+		}
+		for _, model := range []interface{}{
+			&models.InterviewQuestion{},
+			&models.PreparationVerification{},
+			&models.AIAnalysisResult{},
+			&models.PreparationVerificationHistory{},
+		} {
+			if err := tx.Where("user_id = ? AND preparation_id = ?", userID, prep.ID).
+				Delete(model).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Delete(&prep).Error
+	})
 }
 
 // VerifyPreparation inicia (ou re-inicia) a verificação assíncrona da

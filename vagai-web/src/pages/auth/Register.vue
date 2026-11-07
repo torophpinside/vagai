@@ -96,7 +96,7 @@ async function handleRegister() {
 
   try {
     await register(name.value, email.value, password.value)
-    router.push('/')
+    router.push('/dashboard')
   } catch (err) {
     error.value = err.code === 'QUOTA_EXCEEDED'
       ? err.message

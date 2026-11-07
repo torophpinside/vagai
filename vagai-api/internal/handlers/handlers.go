@@ -563,7 +563,11 @@ func ListMatches(c *gin.Context) {
 		}
 	}
 
-	if sortOrder == "asc" {
+	if appliedFilter == "true" {
+		// Candidatadas: mais antigas primeiro (applied_at nulo vem antes no MySQL,
+		// tratado como candidatura antiga); matches.id desempata para paginação estável.
+		query = query.Order("matches.applied_at ASC").Order("matches.id ASC")
+	} else if sortOrder == "asc" {
 		query = query.Order("similarity_score ASC")
 	} else {
 		query = query.Order("similarity_score DESC")

@@ -38,6 +38,9 @@
                   {{ Math.round(match.similarity_score) }}%
                 </div>
                 <div class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Similaridade</div>
+                <div v-if="isStale(match.applied_at)" class="mt-1 text-xs font-medium text-amber-400">
+                  A candidatura esta com mais de 30 dias.
+                </div>
               </div>
               <div class="flex flex-col items-end gap-2">
                 <div v-if="prepsByMatch[match.id]" class="text-right">
@@ -195,6 +198,17 @@ const scoreTextColor = (score) => {
   if (score >= 80) return 'text-emerald-400'
   if (score >= 60) return 'text-indigo-400'
   return 'text-slate-400'
+}
+
+const STALE_DAYS = 30
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Sem data de candidatura registrada = tratada como antiga (spec 017).
+const isStale = (appliedAt) => {
+  if (!appliedAt) return true
+  const ts = new Date(appliedAt).getTime()
+  if (Number.isNaN(ts)) return true
+  return Date.now() - ts > STALE_DAYS * DAY_MS
 }
 
 const formatDate = (date) => {

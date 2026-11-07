@@ -151,6 +151,10 @@ export const usePlans = () => {
   return useQuery({ queryKey: ['plans'], queryFn: () => api.get('/plans').then(res => res.data) })
 }
 
+export const usePublicPlans = () => {
+  return useQuery({ queryKey: ['plans', 'public'], queryFn: () => api.get('/public/plans').then(res => res.data) })
+}
+
 export const useAdminPlans = () => {
   return useQuery({ queryKey: ['plans', 'admin'], queryFn: () => api.get('/admin/plans').then(res => res.data) })
 }
@@ -216,4 +220,5 @@ export const listInterviewPreps = (filter = {}) => api.get('/interview-prep', { 
 export const getInterviewPrep = (id) => api.get(`/interview-prep/${id}`).then(res => res.data)
 export const updateQuestionStatus = (prepId, questionId, status) => api.patch(`/interview-prep/${prepId}/questions/${questionId}`, { status }).then(res => res.data)
 export const saveQuestionAnswer = (prepId, questionId, answer, selfAssessment, timeSpentSeconds = 0) => api.post(`/interview-prep/${prepId}/questions/${questionId}/answers`, { answer, self_assessment: selfAssessment, time_spent_seconds: timeSpentSeconds }).then(res => res.data)
+export const deleteInterviewPrep = (id) => api.delete(`/interview-prep/${id}`).then(res => res.data)
 export const verifyInterviewPrep = (prepId) => api.post(`/interview-prep/${prepId}/verify`).then(res => res.data)

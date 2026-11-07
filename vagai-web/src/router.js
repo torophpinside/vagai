@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Landing from './pages/Landing.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Jobs from './pages/Jobs.vue'
 import JobAdd from './pages/JobAdd.vue'
@@ -20,7 +21,8 @@ import UsersAdmin from './pages/UsersAdmin.vue'
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
   { path: '/register', name: 'Register', component: Register, meta: { guest: true } },
-  { path: '/', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
+  { path: '/', name: 'Landing', component: Landing, meta: { public: true } },
+  { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/jobs', name: 'Jobs', component: Jobs, meta: { requiresAuth: true } },
   { path: '/jobs/new', name: 'JobAdd', component: JobAdd, meta: { requiresAuth: true } },
   { path: '/matches', name: 'Matches', component: Matches, meta: { requiresAuth: true } },

@@ -1,10 +1,10 @@
 <template>
-  <div v-if="!isAuthenticated" class="min-h-screen bg-[#0f172a]">
+  <div v-if="!isAuthenticated || route.meta.public" class="min-h-screen bg-[#0f172a]">
     <router-view />
   </div>
-  <div v-else class="flex min-h-screen bg-[#0f172a] text-slate-200 overflow-hidden">
+  <div v-else class="flex h-screen bg-[#0f172a] text-slate-200 overflow-hidden">
     <!-- Sidebar -->
-    <aside class="w-72 bg-slate-900/50 border-r border-white/5 backdrop-blur-xl flex flex-col">
+    <aside class="w-72 shrink-0 h-full overflow-y-auto bg-slate-900/50 border-r border-white/5 backdrop-blur-xl flex flex-col">
       <div class="p-8">
         <div class="flex items-center gap-3 mb-12">
           <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -14,7 +14,7 @@
         </div>
 
         <nav class="space-y-2">
-          <router-link to="/" class="nav-link" active-class="active">
+          <router-link to="/dashboard" class="nav-link" active-class="active">
             <LayoutDashboard class="w-5 h-5" />
             <span>Dashboard</span>
           </router-link>
@@ -123,7 +123,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   Target,
   LayoutDashboard,
@@ -147,6 +147,7 @@ import { useAuth } from './composables/auth'
 import DropdownMenu from './components/DropdownMenu.vue'
 
 const router = useRouter()
+const route = useRoute()
 const { user, isAuthenticated, initAuth, logout } = useAuth()
 
 const showUserMenu = ref(false)

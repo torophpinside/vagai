@@ -84,6 +84,9 @@ type interviewPrepDTO struct {
 	Verification   *interviewPrepVerificationDTO     `json:"verification,omitempty"`
 	Analyses       map[uint]interviewPrepAnalysisDTO `json:"analyses"`
 	History        []interviewPrepHistoryDTO         `json:"history"`
+	// JobRemoved: a vaga vinculada não está mais candidatada (match excluído
+	// ou applied=false).
+	JobRemoved bool `json:"job_removed"`
 }
 
 func newInterviewPrepDTO(detail *services.PreparationDetail) interviewPrepDTO {
@@ -99,6 +102,7 @@ func newInterviewPrepDTO(detail *services.PreparationDetail) interviewPrepDTO {
 		Source:         string(prep.Source),
 		GeneratedAt:    prep.GeneratedAt,
 		TechStack:      []string{},
+		JobRemoved:     detail.JobRemoved,
 	}
 	if prep.MatchID != nil {
 		dto.MatchID = *prep.MatchID
@@ -350,6 +354,30 @@ func GetInterviewPrep(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"preparation": newInterviewPrepDTO(detail)})
+}
+
+// DeleteInterviewPrep exclui a preparação do usuário autenticado; o match
+// vinculado permanece intacto.
+func DeleteInterviewPrep(c *gin.Context) {
+	db := getDB(c)
+	userID := c.GetUint("user_id")
+
+	prepID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || prepID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := services.DeletePreparation(db, userID, uint(prepID)); err != nil {
+		if errors.Is(err, services.ErrPrepNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Preparação não encontrada"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar preparação"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "preparação deletada"})
 }
 
 // VerifyInterviewPrep inicia (ou re-inicia) a verificação assíncrona das
