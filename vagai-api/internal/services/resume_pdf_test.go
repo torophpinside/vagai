@@ -245,7 +245,7 @@ func TestGenerateResumePDF_ATSFormat(t *testing.T) {
 		t.Errorf("contact line expected joined by ' | '")
 	}
 
-	// Ordem reverse-cronológica.
+	// Ordem definida pelo usuário é preservada (Pleno, Sênior, Estagiário).
 	idxSenior := strings.Index(text, "Engenheiro Sênior")
 	idxPleno := strings.Index(text, "Engenheiro de Software")
 	idxEstagio := strings.Index(text, "Estagiário")
@@ -253,8 +253,8 @@ func TestGenerateResumePDF_ATSFormat(t *testing.T) {
 		idxPleno == strings.Index(text, "Engenheiro de software com foco") {
 		t.Fatalf("missing/ambiguous experience roles in text: %q", text)
 	}
-	if !(idxSenior < idxPleno && idxPleno < idxEstagio) {
-		t.Errorf("experience not reverse-chronological: senior=%d pleno=%d estagio=%d", idxSenior, idxPleno, idxEstagio)
+	if !(idxPleno < idxSenior && idxSenior < idxEstagio) {
+		t.Errorf("experience order not preserved: pleno=%d senior=%d estagio=%d", idxPleno, idxSenior, idxEstagio)
 	}
 
 	idxPos := strings.Index(text, "Pós-graduação")

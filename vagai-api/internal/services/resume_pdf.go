@@ -47,8 +47,8 @@ type ResumeData struct {
 }
 
 func GenerateResumePDF(data ResumeData) ([]byte, error) {
+	// Experiências seguem a ordem definida pelo usuário no editor (sem reordenar por data).
 	experience := append([]ExperienceEntry(nil), data.Experience...)
-	sortExperience(experience)
 
 	education := append([]EducationEntry(nil), data.Education...)
 	sortEducation(education)

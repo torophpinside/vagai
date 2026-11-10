@@ -77,8 +77,12 @@
           v-for="(exp, i) in form.experience"
           :key="i"
           :model-value="exp"
+          :is-first="i === 0"
+          :is-last="i === form.experience.length - 1"
           @update:model-value="form.experience[i] = $event"
           @remove="removeExperience(i)"
+          @move-up="moveExperience(i, -1)"
+          @move-down="moveExperience(i, 1)"
         />
       </div>
     </div>
@@ -225,6 +229,13 @@ const addExperience = () => {
 
 const removeExperience = (index) => {
   form.experience.splice(index, 1)
+}
+
+const moveExperience = (index, delta) => {
+  const target = index + delta
+  if (target < 0 || target >= form.experience.length) return
+  const [item] = form.experience.splice(index, 1)
+  form.experience.splice(target, 0, item)
 }
 
 const addEducation = () => {

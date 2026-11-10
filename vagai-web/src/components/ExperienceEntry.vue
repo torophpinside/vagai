@@ -2,13 +2,33 @@
   <div class="bg-slate-950/50 border border-white/5 rounded-2xl p-5 space-y-4 relative group">
     <div class="flex items-center justify-between">
       <h4 class="text-sm font-bold text-slate-400 uppercase tracking-widest">Experiencia</h4>
-      <button
-        type="button"
-        @click="$emit('remove')"
-        class="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-      >
-        <Trash2 class="w-4 h-4" />
-      </button>
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          @click="$emit('move-up')"
+          :disabled="isFirst"
+          title="Mover para cima"
+          class="p-1.5 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
+        >
+          <ChevronUp class="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          @click="$emit('move-down')"
+          :disabled="isLast"
+          title="Mover para baixo"
+          class="p-1.5 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
+        >
+          <ChevronDown class="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          @click="$emit('remove')"
+          class="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 class="w-4 h-4" />
+        </button>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -68,16 +88,18 @@
 </template>
 
 <script setup>
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, ChevronUp, ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps({
   modelValue: {
     type: Object,
     default: () => ({ company: '', role: '', start_date: '', end_date: '', description: '' })
-  }
+  },
+  isFirst: { type: Boolean, default: false },
+  isLast: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['update:modelValue', 'remove'])
+const emit = defineEmits(['update:modelValue', 'remove', 'move-up', 'move-down'])
 
 const update = (field, value) => {
   emit('update:modelValue', { ...props.modelValue, [field]: value })
