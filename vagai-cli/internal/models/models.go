@@ -108,6 +108,8 @@ type Job struct {
 	Title       string     `gorm:"size:255" json:"title"`
 	Company     string     `gorm:"size:255" json:"company"`
 	Description string     `gorm:"type:text" json:"description"`
+	Location    string     `gorm:"size:255" json:"location"`
+	WorkModel   string     `gorm:"size:20" json:"work_model"`
 	URL         string     `gorm:"size:500;uniqueIndex:idx_job_url_user" json:"url"`
 	PostedDate  *time.Time `json:"posted_date"`
 	CollectedAt time.Time  `gorm:"autoCreateTime" json:"collected_at"`

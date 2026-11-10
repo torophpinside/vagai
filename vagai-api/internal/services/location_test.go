@@ -71,3 +71,19 @@ func TestLocationAllowedToMatch_API(t *testing.T) {
 		})
 	}
 }
+
+func TestAnalyzeJobLocationFor_Structured(t *testing.T) {
+	loc := AnalyzeJobLocationFor("Software Engineer - Hybrid", "texto sem cidade", "Barueri, SP, BR", "")
+	if loc.Type != "hybrid" || loc.City == "" {
+		t.Fatalf("loc=%+v", loc)
+	}
+	if LocationAllowedToMatch(loc, "Curitiba") {
+		t.Error("hybrid em outra cidade deveria ser bloqueada")
+	}
+	if !LocationAllowedToMatch(AnalyzeJobLocationFor("Dev - Hybrid", "", "Curitiba, Paraná, Brasil", ""), "Curitiba") {
+		t.Error("mesma cidade deveria passar")
+	}
+	if !LocationAllowedToMatch(AnalyzeJobLocationFor("Dev", "", "São Paulo", "remote"), "Curitiba") {
+		t.Error("remoto deveria passar")
+	}
+}

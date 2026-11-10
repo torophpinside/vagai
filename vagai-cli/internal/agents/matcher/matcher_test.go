@@ -327,3 +327,34 @@ func TestLocationAllowedToMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestJobLocationFor_StructuredBlocksOtherCity(t *testing.T) {
+	cases := []struct {
+		name string
+		job  models.Job
+		user string
+		want bool
+	}{
+		{"hybrid sem cidade no texto, local de outra cidade", models.Job{Title: "Software Engineer - Hybrid", Location: "Barueri, SP, BR"}, "Curitiba", false},
+		{"mesma cidade", models.Job{Title: "Dev - Hybrid", Location: "Curitiba, Paraná, Brasil"}, "Curitiba", true},
+		{"work model do site presencial, outra cidade", models.Job{Title: "Dev", WorkModel: "presencial", Location: "Ribeirão Preto, SP"}, "Curitiba", false},
+		{"remoto do site ignora cidade", models.Job{Title: "Dev", WorkModel: "remote", Location: "São Paulo, SP"}, "Curitiba", true},
+		{"hybrid com país apenas não bloqueia", models.Job{Title: "Dev - Hybrid", Location: "Brasil"}, "Curitiba", true},
+	}
+	for _, c := range cases {
+		loc := jobLocationFor(c.job, c.user)
+		if got := locationAllowedToMatch(loc, c.user); got != c.want {
+			t.Errorf("%s: allowed=%v want %v (loc=%+v)", c.name, got, c.want, loc)
+		}
+	}
+}
+
+func TestJobLocationFor_UnknownModelOtherCityIsPenalized(t *testing.T) {
+	loc := jobLocationFor(models.Job{Title: "Dev Back end", Location: "Barueri, SP"}, "Curitiba")
+	if loc.Type != "unknown" || !loc.Structured {
+		t.Fatalf("loc=%+v", loc)
+	}
+	if locationPenalty(loc, "Curitiba") <= 0 {
+		t.Error("expected penalty")
+	}
+}

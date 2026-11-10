@@ -383,6 +383,12 @@ func UpdateJobStatus(c *gin.Context) {
 	}
 
 	if body.Status == "matched" {
+		loc := services.AnalyzeJobLocationFor(job.Title, job.Description, job.Location, job.WorkModel)
+		if !services.LocationAllowedToMatch(loc, user.City) {
+			log.Printf("Vaga %d marcada como matched manualmente, mas fora da cidade do usuário; match não criado", job.ID)
+			c.JSON(http.StatusOK, job)
+			return
+		}
 		var resumes []models.Resume
 		if err := db.Where("user_id = ?", ownerID).Find(&resumes).Error; err == nil {
 			for i := range resumes {
@@ -475,7 +481,7 @@ func RematchMatches(c *gin.Context) {
 
 	created, updated, excluded := 0, 0, 0
 	for _, job := range jobs {
-		loc := services.AnalyzeJobLocation(job.Title + " " + job.Description)
+		loc := services.AnalyzeJobLocationFor(job.Title, job.Description, job.Location, job.WorkModel)
 		if !services.LocationAllowedToMatch(loc, userCity) {
 			db.Model(&job).Update("status", models.JobStatusUnmatched)
 			excluded++

@@ -175,6 +175,8 @@ func crawlSite(site models.Site) error {
 				company = strings.TrimSpace(card.Find(site.SelectorCompany).First().Text())
 			}
 
+			cardLocation := cleanLocation(card.Find(".job-search-card__location").First().Text())
+
 			log.Printf("Link encontrado: %s", title)
 			if company != "" {
 				log.Printf("Empresa: %s", company)
@@ -207,6 +209,7 @@ func crawlSite(site models.Site) error {
 				URL:            link,
 				Title:          title,
 				Company:        company,
+				Location:       cardLocation,
 				CollectedAt:    now,
 				Status:         models.JobStatusNew,
 			}
@@ -499,6 +502,17 @@ func fetchJobDetails(job *models.Job, site models.Site, client *http.Client) err
 	}
 	job.Description = desc
 
+	// Localização estruturada da página (JSON-LD ou seletores); não sobrescreve
+	// valor já lido do card da listagem quando a página não traz nada.
+	if loc, model := extractLocation(doc); loc != "" || model != "" {
+		if loc != "" {
+			job.Location = loc
+		}
+		if model != "" {
+			job.WorkModel = model
+		}
+	}
+
 	return nil
 }
 
@@ -616,6 +630,7 @@ func crawlWorkana(site models.Site) error {
 				Title:          title,
 				Company:        authorName,
 				Description:    description,
+				WorkModel:      "remote",
 				CollectedAt:    now,
 				Status:         models.JobStatusNew,
 			}
@@ -711,6 +726,7 @@ func crawlRemoteOKAPI(site models.Site) error {
 			description = val
 		}
 
+		remoteLocation, _ := item["location"].(string)
 		job = models.Job{
 			UserID: site.UserID,
 			SiteID:        &site.ID,
@@ -718,6 +734,8 @@ func crawlRemoteOKAPI(site models.Site) error {
 			Title:         title,
 			Company:       company,
 			Description:   description,
+			Location:      cleanLocation(remoteLocation),
+			WorkModel:     "remote",
 			CollectedAt:   now,
 			Status:        models.JobStatusNew,
 		}
@@ -795,12 +813,15 @@ func crawlWorkingNomadsAPI(site models.Site) error {
 			continue
 		}
 
+		nomadsLocation, _ := item["location"].(string)
 		job = models.Job{
 			UserID: site.UserID,
 			SiteID:        &site.ID,
 			URL:           jobURL,
 			Title:         title,
 			Description:   stripHTML(description),
+			Location:      cleanLocation(nomadsLocation),
+			WorkModel:     "remote",
 			CollectedAt:   now,
 			Status:        models.JobStatusNew,
 		}

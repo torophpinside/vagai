@@ -148,6 +148,8 @@ type JobLocation struct {
 	Type  string // "remote", "presencial", "hybrid", "unknown"
 	City  string // cidade extraída da descrição
 	State string // estado extraído
+	// Structured: a cidade veio do campo Location capturado do site (não do texto livre).
+	Structured bool
 }
 
 func Run(threshold int, force bool) error {
@@ -331,7 +333,7 @@ func processTask(job models.Job, resume models.Resume, userCity string, negative
 	}
 
 	// Analisar localização da vaga
-	jobLoc := analyzeJobLocation(job.Title+" "+job.Description, userCity)
+	jobLoc := jobLocationFor(job, userCity)
 
 	if !locationAllowedToMatch(jobLoc, userCity) {
 		result.exclude = true
@@ -347,7 +349,7 @@ func processTask(job models.Job, resume models.Resume, userCity string, negative
 	}
 
 	// Aplicar penalidade de localização para vagas presenciais/hibridas fora da cidade
-	if userCity != "" && jobLoc.Type != "remote" && jobLoc.Type != "unknown" {
+	if userCity != "" && jobLoc.Type != "remote" && (jobLoc.Type != "unknown" || jobLoc.Structured) {
 		penalty := locationPenalty(jobLoc, userCity)
 		if penalty > 0 {
 			score = score - penalty
@@ -892,6 +894,70 @@ func analyzeJobLocation(description, _ string) JobLocation {
 	}
 
 	return loc
+}
+
+// countryOnlyLocations: localização estruturada que não identifica cidade.
+var countryOnlyLocations = map[string]bool{
+	"brasil": true, "brazil": true, "br": true, "worldwide": true, "global": true,
+	"anywhere": true, "remote": true, "remoto": true, "latam": true, "latin america": true,
+	"america latina": true,
+}
+
+// jobLocationFor combina o campo Location/WorkModel capturado do site (fonte
+// preferencial) com a análise do texto livre (fallback).
+func jobLocationFor(job models.Job, userCity string) JobLocation {
+	loc := analyzeJobLocation(job.Title+" "+job.Description, userCity)
+
+	switch job.WorkModel {
+	case "remote", "hybrid", "presencial":
+		loc.Type = job.WorkModel
+	}
+
+	raw := strings.TrimSpace(job.Location)
+	if raw == "" {
+		return loc
+	}
+	desc := stripAccents(raw)
+	if loc.Type == "unknown" {
+		for _, m := range workModelMarkers {
+			if strings.Contains(desc, m.marker) {
+				loc.Type = m.model
+				break
+			}
+		}
+	}
+
+	// Cidade conhecida da tabela de aliases; senão, primeiro segmento literal
+	// ("Barueri, SP, BR" -> "barueri"), desde que não seja só país/região.
+	city := ""
+	for _, p := range cityPatterns {
+		if p.re.MatchString(desc) {
+			city = p.canonical
+			break
+		}
+	}
+	if city == "" {
+		segs := strings.FieldsFunc(desc, func(r rune) bool { return r == ',' || r == '|' || r == '(' })
+		if len(segs) > 0 {
+			first := strings.TrimSpace(segs[0])
+			if first != "" && !countryOnlyLocations[first] {
+				city = first
+			}
+		}
+	}
+	if city != "" {
+		loc.City = city
+		loc.Structured = true
+	} else if isCountryOnly(desc) {
+		// "Brasil" sozinho: não restringe cidade; descarta cidade citada no texto livre
+		// (pode ser matriz/filial).
+		loc.City = ""
+	}
+	return loc
+}
+
+func isCountryOnly(desc string) bool {
+	return countryOnlyLocations[strings.TrimSpace(desc)]
 }
 
 // locationAllowedToMatch aplica a regra de cidade do usuário. Vagas

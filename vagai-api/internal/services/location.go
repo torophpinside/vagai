@@ -183,6 +183,59 @@ func AnalyzeJobLocation(description string) JobLocation {
 	return loc
 }
 
+var countryOnlyLocations = map[string]bool{
+	"brasil": true, "brazil": true, "br": true, "worldwide": true, "global": true,
+	"anywhere": true, "remote": true, "remoto": true, "latam": true, "latin america": true,
+	"america latina": true,
+}
+
+// AnalyzeJobLocationFor combina Location/WorkModel capturados do site (fonte
+// preferencial) com a análise do texto livre (fallback).
+func AnalyzeJobLocationFor(title, description, location, workModel string) JobLocation {
+	loc := AnalyzeJobLocation(title + " " + description)
+
+	switch workModel {
+	case "remote", "hybrid", "presencial":
+		loc.Type = workModel
+	}
+
+	desc := stripAccents(strings.TrimSpace(location))
+	if desc == "" {
+		return loc
+	}
+	if loc.Type == "unknown" {
+		for _, m := range workModelMarkers {
+			if strings.Contains(desc, m.marker) {
+				loc.Type = m.model
+				break
+			}
+		}
+	}
+
+	city := ""
+	for _, p := range locationPatterns {
+		if p.re.MatchString(desc) {
+			city = p.canonical
+			break
+		}
+	}
+	if city == "" {
+		segs := strings.FieldsFunc(desc, func(r rune) bool { return r == ',' || r == '|' || r == '(' })
+		if len(segs) > 0 {
+			first := strings.TrimSpace(segs[0])
+			if first != "" && !countryOnlyLocations[first] {
+				city = first
+			}
+		}
+	}
+	if city != "" {
+		loc.City = city
+	} else if countryOnlyLocations[desc] {
+		loc.City = ""
+	}
+	return loc
+}
+
 func normalizeUserCity(userCity string) string {
 	stripped := stripAccents(strings.TrimSpace(userCity))
 	fields := strings.FieldsFunc(stripped, func(r rune) bool {
