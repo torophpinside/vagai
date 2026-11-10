@@ -105,6 +105,9 @@
                   {{ Math.round(match.similarity_score) }}%
                 </div>
                 <div class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Similaridade</div>
+                <div v-if="match.recent_application" class="mt-1 max-w-[220px] text-xs font-medium text-amber-400">
+                  Você já se candidatou nesta empresa em "{{ match.recent_application.job_title }}" {{ daysAgoLabel(match.recent_application.applied_at) }}.
+                </div>
               </div>
               <button @click="hideMatch(match.id, match.job.id)" class="w-12 h-12 rounded-2xl bg-slate-700 flex items-center justify-center text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition-all">
                 <EyeOff class="w-6 h-6" />
@@ -278,6 +281,12 @@ const scoreTextColor = (score) => {
   if (score >= 80) return 'text-emerald-400'
   if (score >= 60) return 'text-indigo-400'
   return 'text-slate-400'
+}
+
+const daysAgoLabel = (appliedAt) => {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(appliedAt).getTime()) / (24 * 60 * 60 * 1000)))
+  if (days === 0) return 'hoje'
+  return days === 1 ? 'há 1 dia' : `há ${days} dias`
 }
 
 const formatDate = (date) => {

@@ -160,6 +160,16 @@ type Match struct {
 	Applied         bool       `gorm:"default:false" json:"applied"`
 	AppliedAt       *time.Time `json:"applied_at"`
 	AnalyzedAt      time.Time  `gorm:"autoCreateTime" json:"analyzed_at"`
+
+	// Calculado em ListMatches; não persistido.
+	RecentApplication *RecentApplication `gorm:"-" json:"recent_application,omitempty"`
+}
+
+// RecentApplication: candidatura do usuário na mesma empresa dentro dos últimos 30 dias.
+type RecentApplication struct {
+	JobTitle  string    `json:"job_title"`
+	Company   string    `json:"company"`
+	AppliedAt time.Time `json:"applied_at"`
 }
 
 type ResumeAnalysis struct {

@@ -595,6 +595,7 @@ func ListMatches(c *gin.Context) {
 	if matches == nil {
 		matches = []models.Match{}
 	}
+	attachRecentApplications(db, matches, time.Now())
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":       matches,
